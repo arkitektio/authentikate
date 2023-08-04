@@ -48,7 +48,7 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
                 client_id=token.client_id, iss=token.iss
             )
 
-        user = models.User.objects.get(username=token_to_username(token))
+        user = models.User.objects.get(sub=token.sub, iss=token.iss)
         if user.changed_hash != token.changed_hash:
             # User has changed, update the user object
             user.first_name = token.preferred_username
@@ -57,9 +57,15 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
             user.save()
 
     except models.User.DoesNotExist:
+        preexisting_user = models.User.objects.filter(
+            username=token.preferred_username
+        ).first()
+
         user = models.User(
             sub=token.sub,
-            username=token_to_username(token),
+            username=token_to_username(token)
+            if preexisting_user
+            else token.preferred_username,
             iss=token.iss,
             first_name=token.preferred_username,
         )

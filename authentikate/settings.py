@@ -1,9 +1,13 @@
-from authentikate.structs import LokSettings
+from authentikate.structs import AuthentikateSettings
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-import os 
+import os
 
-def get_settings() -> LokSettings:
+
+settings = None
+
+
+def prepare_settings() -> AuthentikateSettings:
     try:
         user = settings.AUTH_USER_MODEL
         if user != "authentikate.User":
@@ -23,20 +27,24 @@ def get_settings() -> LokSettings:
     try:
         algorithms = [group["KEY_TYPE"]]
 
-
-
-
         public_key = group.get("PUBLIC_KEY", None)
+        allow_imitate = group.get("ALLOW_IMITATE", True)
+        imitation_headers = group.get("IMITATION_HEADERS", None)
+        imitate_permission = group.get("IMITATE_PERMISSION", None)
+        authorization_headers = group.get("AUTHORIZATION_HEADERS", None)
+
         if not public_key:
             pem_file = group.get("PUBLIC_KEY_PEM_FILE", None)
             if not pem_file:
-                raise ImproperlyConfigured("Missing setting in AUTHENTIKAE: PUBLIC_KEY_PEM_FILE (path to public_key.pem) or PUBLIC_KEY (string of public key)")
-            
+                raise ImproperlyConfigured(
+                    "Missing setting in AUTHENTIKAE: PUBLIC_KEY_PEM_FILE (path to public_key.pem) or PUBLIC_KEY (string of public key)"
+                )
+
             try:
                 base_dir = settings.BASE_DIR
             except AttributeError:
                 raise ImproperlyConfigured("Missing setting AUTHENTIKATE")
-            
+
             try:
                 path = os.path.join(base_dir, pem_file)
 
@@ -46,13 +54,26 @@ def get_settings() -> LokSettings:
             except FileNotFoundError:
                 raise ImproperlyConfigured(f"Pem File not found: {path}")
 
-
-
         force_client = group.get("FORCE_CLIENT", False)
 
     except KeyError:
-        raise ImproperlyConfigured("Missing setting AUTHENTIKATE KEY_TYPE or AUTHENTIKATE PUBLIC_KEY")
+        raise ImproperlyConfigured(
+            "Missing setting AUTHENTIKATE KEY_TYPE or AUTHENTIKATE PUBLIC_KEY"
+        )
 
-    return LokSettings(
-        algorithms=algorithms, public_key=public_key, force_client=force_client
+    return AuthentikateSettings(
+        algorithms=algorithms,
+        public_key=public_key,
+        force_client=force_client,
+        imitation_headers=imitation_headers,
+        authorization_headers=authorization_headers,
+        allow_imitate=allow_imitate,
+        imitate_permission=imitate_permission,
     )
+
+
+def get_settings() -> AuthentikateSettings:
+    global settings
+    if not settings:
+        settings = prepare_settings()
+    return settings

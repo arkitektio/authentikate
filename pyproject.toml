@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "authentikate"
-version = "0.1.0"
+version = "0.1.2"
 description = ""
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 readme = "README.md"
@@ -10,7 +10,8 @@ packages = [{ include = "authentikate" }]
 [tool.poetry.dependencies]
 python = "^3.10"
 pyjwt = "^2.8.0"
-pydantic = "^2.1.1"
+pydantic = "<2"
+django-guardian = "^2.4.0"
 
 
 [tool.mypy]

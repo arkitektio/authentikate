@@ -23,3 +23,7 @@ class MalformedJwtTokenError(JwtTokenError):
 
 class InvalidJwtTokenError(JwtTokenError):
     pass
+
+
+class AuthentikateUserNotFound(AuthentikatePermissionDenied):
+    pass

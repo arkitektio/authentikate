@@ -1,7 +1,7 @@
 import logging
 import dataclasses
 from .models import User, App
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, Field
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,16 @@ class JWTToken(BaseModel):
         extra = "ignore"
 
 
-class LokSettings(BaseModel):
+class AuthentikateSettings(BaseModel):
     algorithms: list[str]
     public_key: str
     force_client: bool
+    allow_imitate: bool
+    imitate_headers: list[str] = Field(default_factory=lambda: ["X-Imitate-User"])
+    authorization_headers: list[str] = Field(
+        default_factory=lambda: ["Authorization", "X-Authorization", "AUTHORIZATION"]
+    )
+    imitate_permission: str = "authentikate.imitate"
 
 
 @dataclasses.dataclass

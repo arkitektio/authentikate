@@ -10,7 +10,13 @@ class User(AbstractUser):
     changed_hash = models.CharField(max_length=1000, null=True, blank=True)
 
     class Meta:
-        unique_together = ("iss", "sub")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sub", "iss"],
+                condition=models.Q(sub__isnull=False, iss__isnull=False),
+                name="unique_sub_iss_if_both_not_null",
+            )
+        ]
         permissions = [("imitate", "Can imitate me")]
 
 
