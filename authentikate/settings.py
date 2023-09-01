@@ -4,7 +4,7 @@ from django.core.exceptions import ImproperlyConfigured
 import os
 
 
-settings = None
+cached_settings = None
 
 
 def prepare_settings() -> AuthentikateSettings:
@@ -73,7 +73,7 @@ def prepare_settings() -> AuthentikateSettings:
 
 
 def get_settings() -> AuthentikateSettings:
-    global settings
-    if not settings:
-        settings = prepare_settings()
-    return settings
+    global cached_settings
+    if not cached_settings:
+        cached_settings = prepare_settings()
+    return cached_settings

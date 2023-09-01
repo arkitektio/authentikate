@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "authentikate"
-version = "0.1.2"
+version = "0.1.6"
 description = ""
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 readme = "README.md"
