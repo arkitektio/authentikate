@@ -20,7 +20,27 @@ def set_user_groups(user: models.User, roles: list[str]):
         user.groups.add(g)
 
 
-def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.Auth:
+def get_app(
+    token: structs.JWTToken, settings: structs.AuthentikateSettings
+) -> models.App:
+    """Get or create an app"""
+    app, _ = models.App.objects.get_or_create(
+        **{settings.client_id_field: token.client_id, settings.app_iss_field: token.iss}
+    )
+    return app
+
+
+def get_user(
+    token: structs.JWTToken, settings: structs.AuthentikateSettings
+) -> models.User:
+    return models.User.objects.get(
+        **{settings.sub_field: token.sub, settings.iss_field: token.iss}
+    )
+
+
+def expand_token(
+    token: structs.JWTToken, settings: structs.AuthentikateSettings
+) -> structs.Auth:
     if token.sub is None:
         raise AuthentikatePermissionDenied("Missing sub parameter in JWT token")
 
@@ -35,7 +55,7 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
         raise AuthentikatePermissionDenied("Token has expired")
 
     if token.client_id is None:
-        if force_client:
+        if settings.force_client:
             raise AuthentikatePermissionDenied(
                 "Missing client_id parameter in JWT token"
             )
@@ -44,9 +64,7 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
         if token.client_id is None:
             app = None
         else:
-            app, _ = models.App.objects.get_or_create(
-                client_id=token.client_id, iss=token.iss
-            )
+            app = get_app(token, settings)
 
         user = models.User.objects.get(sub=token.sub, iss=token.iss)
         if user.changed_hash != token.changed_hash:

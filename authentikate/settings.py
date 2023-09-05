@@ -10,13 +10,9 @@ cached_settings = None
 def prepare_settings() -> AuthentikateSettings:
     try:
         user = settings.AUTH_USER_MODEL
-        if user != "authentikate.User":
-            raise ImproperlyConfigured(
-                "AUTH_USER_MODEL must be authentikate.User in order to use authentikate"
-            )
     except AttributeError:
         raise ImproperlyConfigured(
-            "AUTH_USER_MODEL must be authentikate.User in order to use authentikate"
+            "AUTH_USER_MODEL must be configured in order to use authentikate"
         )
 
     try:
@@ -32,6 +28,12 @@ def prepare_settings() -> AuthentikateSettings:
         imitation_headers = group.get("IMITATION_HEADERS", None)
         imitate_permission = group.get("IMITATE_PERMISSION", None)
         authorization_headers = group.get("AUTHORIZATION_HEADERS", None)
+        sub_field = group.get("USER_SUB_FIELD", "sub")
+        iss_field = group.get("USER_ISS_FIELD", "iss")
+        app_model = group.get("APP_MODEL", "authentikate.App")
+        client_id_field = group.get("APP_CLIENT_ID_FIELD", "client_id")
+        app_iss_field = group.get("APP_ISS_FIELD", "iss")
+        jwt_base_model = group.get("JWT_BASE_MODEL", "authentikate.structs.JWTToken")
 
         if not public_key:
             pem_file = group.get("PUBLIC_KEY_PEM_FILE", None)
@@ -69,6 +71,12 @@ def prepare_settings() -> AuthentikateSettings:
         authorization_headers=authorization_headers,
         allow_imitate=allow_imitate,
         imitate_permission=imitate_permission,
+        sub_field=sub_field,
+        iss_field=iss_field,
+        app_model=app_model,
+        client_id_field=client_id_field,
+        app_iss_field=app_iss_field,
+        jwt_base_model=jwt_base_model,
     )
 
 

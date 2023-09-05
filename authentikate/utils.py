@@ -16,7 +16,9 @@ def authenticate_token(token: str, settings: AuthentikateSettings) -> Auth:
 
     """
 
-    decoded = decode_token(token, settings.algorithms, settings.public_key)
+    decoded = decode_token(
+        token, settings.public_key, settings.algorithms, settings.jwt_base_model
+    )
     return expand_token(decoded, settings.force_client)
 
 

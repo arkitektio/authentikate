@@ -2,8 +2,23 @@ import logging
 import dataclasses
 from .models import User, App
 from pydantic import BaseModel, validator, Field
+from django.contrib.auth import get_user_model
+from django.utils.functional import cached_property
+from importlib import import_module
 
 logger = logging.getLogger(__name__)
+
+
+def import_model(model_str: str):
+    module_str, model_str = model_str.rsplit(".", 1)
+    module = import_module(module_str)
+    return getattr(module, model_str)
+
+
+def import_function(function_str: str):
+    module_str, function_str = function_str.rsplit(".", 1)
+    module = import_module(module_str)
+    return getattr(module, function_str)
 
 
 class JWTToken(BaseModel):
@@ -14,7 +29,6 @@ class JWTToken(BaseModel):
     preferred_username: str
     roles: list[str]
     scope: str
-
     aud: str | None = None
 
     @validator("sub", pre=True)
@@ -42,9 +56,38 @@ class AuthentikateSettings(BaseModel):
     allow_imitate: bool
     imitate_headers: list[str] = Field(default_factory=lambda: ["X-Imitate-User"])
     authorization_headers: list[str] = Field(
-        default_factory=lambda: ["Authorization", "X-Authorization", "AUTHORIZATION"]
+        default_factory=lambda: [
+            "Authorization",
+            "X-Authorization",
+            "AUTHORIZATION",
+            "authorization",
+        ]
     )
     imitate_permission: str = "authentikate.imitate"
+    sub_field: str = "sub"
+    iss_field: str = "iss"
+    user_model_str: str | None = None
+    jwt_base_model_str: str = "authentikate.structs.JWTToken"
+    app_model_str: str = "authentikate.App"
+    client_id_field: str = "client_id"
+    app_iss_field: str = "iss"
+    force_client: bool = False
+
+    @cached_property
+    def user_model(self):
+        return get_user_model() or import_model(self.user_model_str)
+
+    @cached_property
+    def app_model(self):
+        return import_model(self.app_model)
+
+    @cached_property
+    def jwt_base_model(self):
+        return import_model(self.jwt_base_model_str)
+
+    class Config:
+        arbitrary_types_allowed = True
+        keep_untouched = (cached_property,)
 
 
 @dataclasses.dataclass
