@@ -8,6 +8,24 @@ cached_settings = None
 
 
 def prepare_settings() -> AuthentikateSettings:
+    """Prepare the settings
+
+    Prepare the settings for authentikate from django_settings.
+    This function will raise a ImproperlyConfigured exception if the settings are
+    not correct.
+
+    Returns
+    -------
+    AuthentikateSettings
+        The settings
+
+    Raises
+    ------
+    ImproperlyConfigured
+        When the settings are not correct
+    """
+
+
     try:
         user = settings.AUTH_USER_MODEL
         if user != "authentikate.User":
@@ -75,6 +93,14 @@ def prepare_settings() -> AuthentikateSettings:
 
 
 def get_settings() -> AuthentikateSettings:
+    """Get the settings
+
+    Returns
+    -------
+
+    AuthentikateSettings
+        The settings
+    """
     global cached_settings
     if not cached_settings:
         cached_settings = prepare_settings()

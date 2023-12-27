@@ -27,6 +27,21 @@ jwt_re = re.compile(r"Bearer\s(?P<token>[^\s]*)")
 
 
 def extract_plain_from_authorization(authorization: str) -> str:
+    """
+    Extract a plain token from an Authorization header
+
+    Parameters
+    ----------
+
+    authorization : str
+        The Authorization header
+
+    Returns
+    -------
+    str
+        The token
+    """
+
     m = jwt_re.match(authorization)
     if m:
         token = m.group("token")
@@ -61,8 +76,21 @@ def authenticate_header_or_none(
     headers: dict, settings: AuthentikateSettings = None
 ) -> Auth | None:
     """
-    Authenticate a request and return the auth context
-    (containing user, app and scopes)
+    Authenticate a request header and return the auth context
+
+    Parameters
+    ----------
+    headers : dict
+        The headers to authenticate
+
+    settings : AuthentikateSettings, optional
+        The settings to use, by default None
+
+    Returns
+    -------
+    Auth | None
+        The auth context or None if the token is invalid
+
 
     """
     if not settings:
@@ -106,8 +134,32 @@ def authenticate_header_or_none(
 
 
 def authenticate_token_or_none(
-    token: str, settings: AuthentikateSettings = None
+    token: str, settings: AuthentikateSettings | None = None
 ) -> Auth | None:
+    """
+    Authenticate a token and return the auth context
+
+    Tries to authenticate the token, if it fails it will return None
+    
+
+    Parameters
+    ----------
+    token : str
+        The token to authenticate
+
+    settings : AuthentikateSettings, optional
+        The settings to use, by default None
+
+    Returns
+    -------
+    Auth | None
+        The auth context or None if the token is invalid
+
+
+    """
+
+
+
     if not settings:
         settings = get_settings()
 
