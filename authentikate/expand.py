@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def token_to_username(token: structs.JWTToken) -> str:
     """Convert a JWT token to a username
-    
+
     Parameters
     ----------
     token : structs.JWTToken
@@ -21,9 +21,9 @@ def token_to_username(token: structs.JWTToken) -> str:
 
     str
         The username
-    
-    
-    
+
+
+
     """
     return f"{token.iss}_{token.sub}"
 
@@ -60,7 +60,6 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
     structs.Auth
         The expanded token
     """
-
 
     if token.sub is None:
         raise AuthentikatePermissionDenied("Missing sub parameter in JWT token")

@@ -1,6 +1,7 @@
 from authentikate.structs import Auth
 from authentikate.decode import decode_token
-from authentikate.settings import get_settings, AuthentikateSettings
+from authentikate.settings import get_settings
+from authentikate.structs import AuthentikateSettings, JWTToken
 import re
 import logging
 from authentikate.expand import expand_token
@@ -15,6 +16,8 @@ def authenticate_token(token: str, settings: AuthentikateSettings) -> Auth:
     (containing user, app and scopes)
 
     """
+    decoded: JWTToken
+
     if token in settings.static_tokens:
         decoded = settings.static_tokens[token]
     else:
@@ -50,7 +53,9 @@ def extract_plain_from_authorization(authorization: str) -> str:
     raise ValueError("Not a valid token")
 
 
-def authenticate_header(headers: dict, settings: AuthentikateSettings = None) -> Auth:
+def authenticate_header(
+    headers: dict[str, str], settings: AuthentikateSettings | None = None
+) -> Auth:
     """
     Authenticate a request and return the auth context
     (containing user, app and scopes)
@@ -73,7 +78,7 @@ def authenticate_header(headers: dict, settings: AuthentikateSettings = None) ->
 
 
 def authenticate_header_or_none(
-    headers: dict, settings: AuthentikateSettings = None
+    headers: dict[str, str], settings: AuthentikateSettings | None = None
 ) -> Auth | None:
     """
     Authenticate a request header and return the auth context
@@ -140,7 +145,7 @@ def authenticate_token_or_none(
     Authenticate a token and return the auth context
 
     Tries to authenticate the token, if it fails it will return None
-    
+
 
     Parameters
     ----------
@@ -157,8 +162,6 @@ def authenticate_token_or_none(
 
 
     """
-
-
 
     if not settings:
         settings = get_settings()

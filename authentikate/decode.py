@@ -2,7 +2,9 @@ import jwt
 from authentikate import errors, structs
 
 
-def decode_token(token: str, algorithms: list, public_key: str) -> structs.JWTToken:
+def decode_token(
+    token: str, algorithms: list[str], public_key: str
+) -> structs.JWTToken:
     """Decode a JWT token
 
     Parameters

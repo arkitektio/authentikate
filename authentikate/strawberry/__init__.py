@@ -13,5 +13,3 @@ from .permissions import NeedsScopes, IsAuthenticated
 
 
 __all__ = ["NeedsScopes", "IsAuthenticated"]
-
-

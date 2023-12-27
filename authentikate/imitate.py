@@ -22,7 +22,6 @@ def imitate_user(auth: Auth, imitate_id: str, settings: AuthentikateSettings) ->
         The new auth context
     """
 
-
     sub, iss = imitate_id.split("@")
     user = User.objects.get(sub=sub, iss=iss)
 

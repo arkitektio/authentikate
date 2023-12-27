@@ -1,7 +1,7 @@
-from authentikate.structs import AuthentikateSettings
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 import os
+from authentikate.structs import AuthentikateSettings
 
 
 cached_settings = None
@@ -24,7 +24,6 @@ def prepare_settings() -> AuthentikateSettings:
     ImproperlyConfigured
         When the settings are not correct
     """
-
 
     try:
         user = settings.AUTH_USER_MODEL
@@ -53,7 +52,7 @@ def prepare_settings() -> AuthentikateSettings:
         static_tokens = group.get("STATIC_TOKENS", {})
 
         if not public_key:
-            pem_file = group.get("PUBLIC_KEY_PEM_FILE", None)
+            pem_file: str = group.get("PUBLIC_KEY_PEM_FILE", None)  # type: ignore
             if not pem_file:
                 raise ImproperlyConfigured(
                     "Missing setting in AUTHENTIKAE: PUBLIC_KEY_PEM_FILE (path to public_key.pem) or PUBLIC_KEY (string of public key)"

@@ -36,8 +36,9 @@ mypy = "^1.7.1"
 cryptography = "^41.0.3"
 ruff = "^0.0.282"
 black = ">=22"
-django-stubs = {extras = ["compatible-mypy"], version = "^4.2.7"}
 strawberry-graphql = "^0.216.1"
+django-stubs = "^4.2.7"
+strawberry-graphql-django = "^0.28.3"
 
 
 [build-system]
@@ -76,6 +77,7 @@ exclude = [
     "venv",
     "tests",
     "examples",
+    "**/migrations",
 ]
 
 # Same as Black.

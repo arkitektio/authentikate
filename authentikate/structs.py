@@ -11,13 +11,12 @@ logger = logging.getLogger(__name__)
 
 class JWTToken(BaseModel):
     """A JWT token
-    
+
     This is a pydantic model that represents a JWT token.
     It is used to validate the token and to extract information from it.
     The token is decoded using the `decode_token` function.
 
     """
-
 
     sub: str
     """A unique identifier for the user (is unique for the issuer)"""
@@ -56,10 +55,13 @@ class JWTToken(BaseModel):
 
     class Config:
         """Pydantic config"""
+
         extra = "ignore"
 
 
 class StaticToken(JWTToken):
+    """A static JWT token"""
+
     sub: str
     iss: str = "static"
     exp: int = Field(
@@ -79,6 +81,7 @@ class AuthentikateSettings(BaseModel):
     This is a pydantic model that represents the settings for authentikate.
     It is used to configure the library.
     """
+
     algorithms: list[str]
     public_key: str
     force_client: bool
@@ -103,7 +106,7 @@ class Auth:
     user: User
     app: App
 
-    def is_valid(self, scopes: list[str] | None =None) -> bool:
+    def is_valid(self, scopes: list[str] | None = None) -> bool:
         """
         Check if the token is valid
 
@@ -121,7 +124,7 @@ class Auth:
         """
         return not self.is_expired() and self.has_scopes(scopes or [])
 
-    def is_expired(self)-> bool:
+    def is_expired(self) -> bool:
         """
         Check if the token is expired
 
@@ -136,7 +139,7 @@ class Auth:
         # Token expiration is already checked
         return False
 
-    def has_scopes(self, scopes: list[str])-> bool:
+    def has_scopes(self, scopes: list[str]) -> bool:
         """Does the token have the required scopes?
 
         Check if the token has the required scopes, if no scopes are provided
