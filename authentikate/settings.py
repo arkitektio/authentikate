@@ -50,6 +50,7 @@ def prepare_settings() -> AuthentikateSettings:
         imitation_headers = group.get("IMITATION_HEADERS", None)
         imitate_permission = group.get("IMITATE_PERMISSION", None)
         authorization_headers = group.get("AUTHORIZATION_HEADERS", None)
+        static_tokens = group.get("STATIC_TOKENS", {})
 
         if not public_key:
             pem_file = group.get("PUBLIC_KEY_PEM_FILE", None)
@@ -87,6 +88,7 @@ def prepare_settings() -> AuthentikateSettings:
         authorization_headers=authorization_headers,
         allow_imitate=allow_imitate,
         imitate_permission=imitate_permission,
+        static_tokens=static_tokens,
     )
 
 

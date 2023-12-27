@@ -15,8 +15,11 @@ def authenticate_token(token: str, settings: AuthentikateSettings) -> Auth:
     (containing user, app and scopes)
 
     """
+    if token in settings.static_tokens:
+        decoded = settings.static_tokens[token]
+    else:
+        decoded = decode_token(token, settings.algorithms, settings.public_key)
 
-    decoded = decode_token(token, settings.algorithms, settings.public_key)
     return expand_token(decoded, settings.force_client)
 
 
@@ -45,6 +48,28 @@ def extract_plain_from_authorization(authorization: str) -> str:
         return token
 
     raise ValueError("Not a valid token")
+
+
+def authenticate_header(headers: dict, settings: AuthentikateSettings = None) -> Auth:
+    """
+    Authenticate a request and return the auth context
+    (containing user, app and scopes)
+
+    """
+    if not settings:
+        settings = get_settings()
+
+    for i in settings.authorization_headers:
+        authorization = headers.get(i, None)
+        if authorization:
+            break
+
+    if not authorization:
+        raise ValueError("No Authorization header")
+
+    token = extract_plain_from_authorization(authorization)
+
+    return authenticate_token(token, settings)
 
 
 def authenticate_header_or_none(
