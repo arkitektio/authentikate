@@ -1,13 +1,30 @@
-from authentikate.structs import AuthentikateSettings
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 import os
+from authentikate.structs import AuthentikateSettings
 
 
 cached_settings = None
 
 
 def prepare_settings() -> AuthentikateSettings:
+    """Prepare the settings
+
+    Prepare the settings for authentikate from django_settings.
+    This function will raise a ImproperlyConfigured exception if the settings are
+    not correct.
+
+    Returns
+    -------
+    AuthentikateSettings
+        The settings
+
+    Raises
+    ------
+    ImproperlyConfigured
+        When the settings are not correct
+    """
+
     try:
         user = settings.AUTH_USER_MODEL
         if user != "authentikate.User":
@@ -32,9 +49,10 @@ def prepare_settings() -> AuthentikateSettings:
         imitation_headers = group.get("IMITATION_HEADERS", None)
         imitate_permission = group.get("IMITATE_PERMISSION", None)
         authorization_headers = group.get("AUTHORIZATION_HEADERS", None)
+        static_tokens = group.get("STATIC_TOKENS", {})
 
         if not public_key:
-            pem_file = group.get("PUBLIC_KEY_PEM_FILE", None)
+            pem_file: str = group.get("PUBLIC_KEY_PEM_FILE", None)  # type: ignore
             if not pem_file:
                 raise ImproperlyConfigured(
                     "Missing setting in AUTHENTIKAE: PUBLIC_KEY_PEM_FILE (path to public_key.pem) or PUBLIC_KEY (string of public key)"
@@ -69,10 +87,19 @@ def prepare_settings() -> AuthentikateSettings:
         authorization_headers=authorization_headers,
         allow_imitate=allow_imitate,
         imitate_permission=imitate_permission,
+        static_tokens=static_tokens,
     )
 
 
 def get_settings() -> AuthentikateSettings:
+    """Get the settings
+
+    Returns
+    -------
+
+    AuthentikateSettings
+        The settings
+    """
     global cached_settings
     if not cached_settings:
         cached_settings = prepare_settings()

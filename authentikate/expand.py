@@ -8,19 +8,59 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def token_to_username(token: structs.JWTToken):
-    """Convert a JWT token to a username"""
+def token_to_username(token: structs.JWTToken) -> str:
+    """Convert a JWT token to a username
+
+    Parameters
+    ----------
+    token : structs.JWTToken
+        The token to convert
+
+    Returns
+    -------
+
+    str
+        The username
+
+
+
+    """
     return f"{token.iss}_{token.sub}"
 
 
-def set_user_groups(user: models.User, roles: list[str]):
-    """Set the groups of a user"""
+def set_user_groups(user: models.User, roles: list[str]) -> None:
+    """Add a list of roles to a user
+
+    Roles are added as groups
+
+    Parameters
+    ----------
+    user : models.User
+        The user to add the roles to
+    roles : list[str]
+        The roles to add
+    """
     for role in roles:
         g, _ = Group.objects.get_or_create(name=role)
         user.groups.add(g)
 
 
 def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.Auth:
+    """Expand a JWT token into an Auth context
+
+    Parameters
+    ----------
+    token : structs.JWTToken
+        The token to expand
+    force_client : bool, optional
+        Whether to force the client to be present, by default True
+
+    Returns
+    -------
+    structs.Auth
+        The expanded token
+    """
+
     if token.sub is None:
         raise AuthentikatePermissionDenied("Missing sub parameter in JWT token")
 
