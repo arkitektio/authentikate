@@ -2,6 +2,8 @@ import logging
 import dataclasses
 from .models import User, App
 from pydantic import BaseModel, validator, Field
+import datetime
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,20 @@ class JWTToken(BaseModel):
         extra = "ignore"
 
 
+class StaticToken(JWTToken):
+    sub: str
+    iss: str = "static"
+    exp: int = Field(
+        default_factory=lambda: int(
+            (datetime.datetime.utcnow() + datetime.timedelta(days=1)).timestamp()
+        )
+    )
+    client_id: str = "static"
+    preferred_username: str = "static_user"
+    scope: str = "openid profile email"
+    roles: list[str] = Field(default_factory=lambda: ["static"])
+
+
 class AuthentikateSettings(BaseModel):
     algorithms: list[str]
     public_key: str
@@ -45,6 +61,8 @@ class AuthentikateSettings(BaseModel):
         default_factory=lambda: ["Authorization", "X-Authorization", "AUTHORIZATION"]
     )
     imitate_permission: str = "authentikate.imitate"
+    static_tokens: dict[str, StaticToken] = Field(default_factory=dict)
+    """A map of static tokens to their decoded values. Should only be used in tests."""
 
 
 @dataclasses.dataclass
