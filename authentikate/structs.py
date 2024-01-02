@@ -88,7 +88,12 @@ class AuthentikateSettings(BaseModel):
     allow_imitate: bool
     imitate_headers: list[str] = Field(default_factory=lambda: ["X-Imitate-User"])
     authorization_headers: list[str] = Field(
-        default_factory=lambda: ["Authorization", "X-Authorization", "AUTHORIZATION"]
+        default_factory=lambda: [
+            "Authorization",
+            "X-Authorization",
+            "AUTHORIZATION",
+            "authorization",
+        ]
     )
     imitate_permission: str = "authentikate.imitate"
     static_tokens: dict[str, StaticToken] = Field(default_factory=dict)
