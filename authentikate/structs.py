@@ -36,6 +36,8 @@ class JWTToken(BaseModel):
     aud: str | None = None
     """The audience of the token"""
 
+    raw: str | None = None
+
     @validator("sub", pre=True)
     def sub_to_username(cls: Type["JWTToken"], v: str) -> str:
         """Convert the sub to a username compatible string"""

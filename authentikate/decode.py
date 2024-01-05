@@ -27,6 +27,6 @@ def decode_token(
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
     try:
-        return structs.JWTToken(**decoded)
+        return structs.JWTToken(**{"raw": token, **decoded})
     except TypeError as e:
         raise errors.MalformedJwtTokenError("Error decoding token") from e

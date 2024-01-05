@@ -2,9 +2,9 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 import os
 from authentikate.structs import AuthentikateSettings
+from typing import Optional
 
-
-cached_settings = None
+cached_settings: Optional[AuthentikateSettings] = None
 
 
 def prepare_settings() -> AuthentikateSettings:
@@ -74,21 +74,21 @@ def prepare_settings() -> AuthentikateSettings:
 
         force_client = group.get("FORCE_CLIENT", False)
 
+        return AuthentikateSettings(
+            algorithms=algorithms,
+            public_key=public_key,
+            force_client=force_client,
+            imitation_headers=imitation_headers,
+            authorization_headers=authorization_headers,
+            allow_imitate=allow_imitate,
+            imitate_permission=imitate_permission,
+            static_tokens=static_tokens,
+        )
+
     except KeyError:
         raise ImproperlyConfigured(
             "Missing setting AUTHENTIKATE KEY_TYPE or AUTHENTIKATE PUBLIC_KEY"
         )
-
-    return AuthentikateSettings(
-        algorithms=algorithms,
-        public_key=public_key,
-        force_client=force_client,
-        imitation_headers=imitation_headers,
-        authorization_headers=authorization_headers,
-        allow_imitate=allow_imitate,
-        imitate_permission=imitate_permission,
-        static_tokens=static_tokens,
-    )
 
 
 def get_settings() -> AuthentikateSettings:
