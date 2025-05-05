@@ -2,8 +2,9 @@ from kante.types import Info
 import strawberry
 from typing import cast
 import strawberry_django
-from authentikate.strawberry import get_user, AuthentikateExtension
+from authentikate.vars import get_user, get_client
 from authentikate import models
+from authentikate.strawberry.extension import AuthentikateExtension
 
 
 
@@ -11,6 +12,13 @@ from authentikate import models
 class User:
     """ This is the user type """
     sub: str
+
+
+@strawberry_django.type(models.Client)
+class Client:
+    """ This is the client type """
+    client_id: str
+
 
 
 @strawberry.type
@@ -24,6 +32,14 @@ class Query:
         
         user = get_user()
         return cast(User, user) if user else None
+    
+    
+    @strawberry_django.field
+    def client(self, info: Info) -> Client | None:
+        """Get the current client"""
+        
+        client = get_client()
+        return cast(Client, client) if client else None
         
         
 

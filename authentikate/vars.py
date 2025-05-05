@@ -1,7 +1,7 @@
 import contextvars
 from authentikate.base_models import JWTToken
-from authentikate.models import User
-from authentikate.expand import aexpand_user_from_token, expand_user_from_token
+from authentikate.models import User, Client
+from authentikate.expand import aexpand_user_from_token, expand_user_from_token, aexpand_client_from_token, expand_client_from_token
 
 
 
@@ -60,7 +60,8 @@ def get_user() -> User | None:
     return expand_user_from_token(token) if token else None
 
 
-async def aget_imitate_user() -> User | None:
+
+async def aget_client() -> Client | None:
     """
     Get the current user from the context variable
 
@@ -70,10 +71,10 @@ async def aget_imitate_user() -> User | None:
         The current user
     """
     token = get_token()
-    return await aexpand_user_from_token(token) if token else None
-
-
-def get_imitate_user() -> User | None:
+    return await aexpand_client_from_token(token) if token else None
+    
+    
+def get_client() -> Client | None:
     """
     Get the current user from the context variable
 
@@ -83,5 +84,7 @@ def get_imitate_user() -> User | None:
         The current user
     """
     token = get_token()
-    return expand_user_from_token(token) if token else None
+    return expand_client_from_token(token) if token else None
+
+
 

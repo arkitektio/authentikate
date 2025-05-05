@@ -154,5 +154,16 @@ async def aexpand_client_from_token(
     return client
 
 
+def expand_client_from_token(
+    token: base_models.JWTToken,
+) -> models.Client:
+    """
+    Expand a client from the provided JWT token.
+    """
+    client, _ = models.Client.objects.get_or_create(
+        client_id=token.client_id, iss=token.iss
+    )
+    return client
+
 
 

@@ -37,3 +37,36 @@ async def test_str_channel_subscription_receives_broadcast_from_http_mutation(db
     
     assert answer["data"]["me"] is not None
     assert answer["data"]["me"]["sub"] == "1", f"Expected '1', got {answer['data']['me']['sub']}"
+    
+    
+    
+    
+@pytest.mark.asyncio
+async def test_str_channel_subscription_receives_broadcast_from_http_mutation(db, valid_auth_headers, key_pair_str) -> None:
+    """ Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
+    # Initialize both clients
+    
+    
+    
+    # Set the public key in settings
+    settings.AUTHENTIKATE["PUBLIC_KEY"] = key_pair_str.public_key
+    
+    
+    
+    http_client = GraphQLHttpTestClient(application=application,
+                                        headers=valid_auth_headers)
+    
+    
+    # Send the mutation via HTTP
+    answer = await http_client.execute(
+        query="""
+        query {
+            client  {
+                clientId
+            }
+        }
+        """,
+    )
+    
+    assert answer["data"]["client"] is not None, f"Expected 'client' to be not None, got {answer}"
+    assert answer["data"]["client"]["clientId"] == "XXXX", f"Expected 'XXXX', got {answer['data']['client']['clientId']}"
