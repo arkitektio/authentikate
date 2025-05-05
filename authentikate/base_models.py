@@ -2,7 +2,7 @@ import logging
 import dataclasses
 from typing import Type
 from .models import User, App
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 import datetime
 
 
@@ -17,13 +17,18 @@ class JWTToken(BaseModel):
     The token is decoded using the `decode_token` function.
 
     """
+    model_config = ConfigDict(extra="forbid")
 
     sub: str
     """A unique identifier for the user (is unique for the issuer)"""
     iss: str
     """The issuer of the token"""
-    exp: int
+    
+    
+    exp: datetime.datetime
     """The expiration time of the token"""
+    
+    
     client_id: str
     """The client_id of the app that requested the token"""
     preferred_username: str
@@ -31,18 +36,42 @@ class JWTToken(BaseModel):
     roles: list[str]
     """The roles of the user"""
     scope: str
-    """The scopes of the token"""
+    """The scope of the token"""
+    
+    iat: datetime.datetime
+    """The issued at time of the token"""
 
     aud: str | None = None
     """The audience of the token"""
+    
+    jti: str | None = None
+    """The unique identifier for the token"""
 
-    raw: str | None = None
+    raw: str
+    """ The raw original token string """
 
-    @validator("sub", pre=True)
+    @field_validator("sub", mode="before")
     def sub_to_username(cls: Type["JWTToken"], v: str) -> str:
         """Convert the sub to a username compatible string"""
         if isinstance(v, int):
             return str(v)
+        return v
+    
+    @field_validator("iat", mode="before")
+    def iat_to_datetime(cls: Type["JWTToken"], v: int) -> datetime.datetime:
+        """Convert the iat to a datetime object"""
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return datetime.datetime.fromtimestamp(v)
+        return v
+    
+    
+    @field_validator("exp", mode="before")
+    def exp_to_datetime(cls: Type["JWTToken"], v: int) -> datetime.datetime:
+        """Convert the exp to a datetime object"""
+        if isinstance(v, int):
+            return datetime.datetime.fromtimestamp(v)
         return v
 
     @property
@@ -55,26 +84,27 @@ class JWTToken(BaseModel):
         """The scopes of the token. Each scope is a string separated by a space"""
         return self.scope.split(" ")
 
-    class Config:
-        """Pydantic config"""
-
-        extra = "ignore"
 
 
 class StaticToken(JWTToken):
     """A static JWT token"""
 
     sub: str
-    iss: str = "static"
-    exp: int = Field(
-        default_factory=lambda: int(
-            (datetime.datetime.utcnow() + datetime.timedelta(days=1)).timestamp()
-        )
+    iss: str
+    iat: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now()
+    )
+    exp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now() + datetime.timedelta(days=1)
     )
     client_id: str = "static"
     preferred_username: str = "static_user"
     scope: str = "openid profile email"
     roles: list[str] = Field(default_factory=lambda: ["static"])
+    raw: str = Field(default_factory=lambda: "static_token")
+    
+    
+    
 
 
 class AuthentikateSettings(BaseModel):
@@ -83,7 +113,7 @@ class AuthentikateSettings(BaseModel):
     This is a pydantic model that represents the settings for authentikate.
     It is used to configure the library.
     """
-
+    allowed_audiences: list[str] = Field(default_factory=lambda: ["rekuest"])
     algorithms: list[str]
     public_key: str
     force_client: bool

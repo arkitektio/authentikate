@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 import os
-from authentikate.structs import AuthentikateSettings
+from authentikate.base_models import AuthentikateSettings
 from typing import Optional
 
 cached_settings: Optional[AuthentikateSettings] = None

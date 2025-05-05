@@ -1,7 +1,7 @@
-from authentikate.structs import Auth
+from authentikate.base_models import Auth
 from authentikate.decode import decode_token
 from authentikate.settings import get_settings
-from authentikate.structs import AuthentikateSettings, JWTToken
+from authentikate.base_models import AuthentikateSettings, JWTToken
 import re
 import logging
 from authentikate.expand import expand_token
@@ -63,18 +63,37 @@ def authenticate_header(
     """
     if not settings:
         settings = get_settings()
+        
+    authorization_header = None
 
     for i in settings.authorization_headers:
-        authorization = headers.get(i, None)
-        if authorization:
+        authorization_header = headers.get(i, None)
+        if authorization_header:
             break
 
-    if not authorization:
+    if not authorization_header:
         raise ValueError("No Authorization header")
 
-    token = extract_plain_from_authorization(authorization)
+    token = extract_plain_from_authorization(authorization_header)
+    
+    auth = authenticate_token(token, settings)
+    
+    if settings.allow_imitate:
+        imitate_header = None
+        
+        for i in settings.imitate_headers:
+            imitate_header = headers.get(i, None)
+            if imitate_header:
+                break
 
-    return authenticate_token(token, settings)
+        if imitate_header:
+            return imitate_user(auth, imitate_header, settings)
+        else:
+            logger.info("Imitation header not found. User acts on their own behalf!")
+    else:
+        logger.info("Imitation is not allowed. Skipping!")
+
+    return auth
 
 
 def authenticate_header_or_none(
@@ -98,43 +117,10 @@ def authenticate_header_or_none(
 
 
     """
-    if not settings:
-        settings = get_settings()
-
-    for i in settings.authorization_headers:
-        authorization = headers.get(i, None)
-        if authorization:
-            break
-
-    if not authorization:
-        logger.info("No Authorization header. Skipping!")
-        return None
-
     try:
-        token = extract_plain_from_authorization(authorization)
-    except ValueError:
-        logger.error("Not a valid token. Skipping!")
-        return None
-
-    try:
-        auth = authenticate_token(token, settings)
+        return authenticate_header(headers, settings)
     except Exception:
-        logger.error("Error authenticating token. Skipping!", exc_info=True)
-        return None
-
-    for i in settings.imitate_headers:
-        imitate = headers.get(i, None)
-        if imitate:
-            break
-
-    if not imitate:
-        logger.info("No Imitate header. Returning!")
-        return auth
-
-    try:
-        return imitate_user(auth, imitate, settings)
-    except Exception:
-        logger.error("Error imitating user. Skipping!", exc_info=True)
+        logger.error("Error authenticating header. Skipping!", exc_info=True)
         return None
 
 

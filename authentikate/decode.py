@@ -1,10 +1,10 @@
 import jwt
-from authentikate import errors, structs
+from authentikate import base_models, errors
 
 
 def decode_token(
     token: str, algorithms: list[str], public_key: str
-) -> structs.JWTToken:
+) -> base_models.JWTToken:
     """Decode a JWT token
 
     Parameters
@@ -27,6 +27,6 @@ def decode_token(
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
     try:
-        return structs.JWTToken(**{"raw": token, **decoded})
+        return base_models.JWTToken(**{"raw": token, **decoded})
     except TypeError as e:
         raise errors.MalformedJwtTokenError("Error decoding token") from e

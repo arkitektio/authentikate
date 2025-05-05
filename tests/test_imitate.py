@@ -1,8 +1,8 @@
 from authentikate.models import User
 from authentikate.expand import expand_token
 from authentikate.decode import decode_token
-from authentikate.utils import authenticate_header_or_none
-from authentikate.structs import AuthentikateSettings
+from authentikate.utils import authenticate_header, authenticate_header_or_none
+from authentikate.base_models import AuthentikateSettings
 from guardian.shortcuts import assign_perm
 
 
@@ -34,5 +34,6 @@ def test_imitate(db, valid_jwt, key_pair_str):
         force_client=False,
     )
 
-    x = authenticate_header_or_none(headers, settings)
-    assert x.user.sub == "2", "User ID should be 1"
+    x = authenticate_header(headers, settings)
+    assert x.user.sub == "2", "User ID should be 2"
+    assert x.app.client_id == "XXXX", "Client ID should be 'static'"

@@ -1,4 +1,4 @@
-from authentikate.structs import Auth, AuthentikateSettings
+from authentikate.base_models import Auth, AuthentikateSettings
 from authentikate.models import User
 
 
@@ -21,7 +21,10 @@ def imitate_user(auth: Auth, imitate_id: str, settings: AuthentikateSettings) ->
     Auth
         The new auth context
     """
-
+    if "@" not in imitate_id:
+        raise ValueError("Imitate ID must be in the format sub@iss")
+    
+    
     sub, iss = imitate_id.split("@")
     user = User.objects.get(sub=sub, iss=iss)
 

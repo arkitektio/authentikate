@@ -39,6 +39,7 @@ Features:
 - [x] Build in support for Static Tokens (Token that are hard coded into the settings, e.g. for testing)
 - [x] Build in support for [Strawberry](https://strawberry.rocks/) 
 - [x] Designed to work with [Koherent](https://github.com/jhnnsrs/koherent) for audit logging
+- [x] Imitation support with Imitation Tokens (Token that are hard coded into the settings, e.g. for testing)
 
 
 ### Composed Usage

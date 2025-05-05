@@ -1,14 +1,14 @@
 from authentikate.errors import AuthentikatePermissionDenied
 import time
 from django.contrib.auth.models import Group
-from authentikate import models, structs
+from authentikate import base_models, models
 import logging
 
 
 logger = logging.getLogger(__name__)
 
 
-def token_to_username(token: structs.JWTToken) -> str:
+def token_to_username(token: base_models.JWTToken) -> str:
     """Convert a JWT token to a username
 
     Parameters
@@ -45,7 +45,7 @@ def set_user_groups(user: models.User, roles: list[str]) -> None:
         user.groups.add(g)
 
 
-def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.Auth:
+def expand_token(token: base_models.JWTToken, force_client: bool = True) -> base_models.Auth:
     """Expand a JWT token into an Auth context
 
     Parameters
@@ -71,7 +71,7 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
         raise AuthentikatePermissionDenied("Missing exp parameter in JWT token")
 
     # Check if token is expired
-    if token.exp < time.time():
+    if token.exp.timestamp() < time.time():
         raise AuthentikatePermissionDenied("Token has expired")
 
     if token.client_id is None:
@@ -119,7 +119,7 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
         logger.error(f"Error while authenticating: {e}", exc_info=True)
         raise AuthentikatePermissionDenied(f"Error while authenticating: {e}")
 
-    return structs.Auth(
+    return base_models.Auth(
         token=token,
         user=user,
         app=app,

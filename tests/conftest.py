@@ -6,6 +6,7 @@ import dataclasses
 import pytest
 import datetime
 import jwt
+import uuid
 
 # Generate a private key
 
@@ -59,11 +60,12 @@ def key_pair_str(private_key) -> KeyPairStr:
 @pytest.fixture(scope="session")
 def valid_claims():
     return {
-        "sub": 1,
+        "sub": "1",
         "iss": "XXXX",
-        "iat": int(datetime.datetime.utcnow().timestamp()),  # issued at
+        "jti": uuid.uuid4().hex,
+        "iat": int(datetime.datetime.now().timestamp()),  # issued at
         "exp": int(
-            (datetime.datetime.utcnow() + datetime.timedelta(days=1)).timestamp()
+            (datetime.datetime.now() + datetime.timedelta(days=1)).timestamp()
         ),
         "preferred_username": "farter",
         "client_id": "XXXX",
