@@ -1,7 +1,7 @@
 from typing import AsyncIterator, Iterator, Union
 from strawberry.extensions import SchemaExtension
 from kante.context import WsContext, HttpContext
-from .vars import set_token
+from authentikate.vars import set_token
 
 from authentikate.utils import authenticate_token_or_none, authenticate_header_or_none
 

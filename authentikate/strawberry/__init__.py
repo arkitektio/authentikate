@@ -1,7 +1,7 @@
 """ Strawberry extension for Authentikate """
 
 from .extension import AuthentikateExtension
-from .vars import set_token, get_token , get_user, aget_user
+from ..vars import set_token, get_token , get_user, aget_user
 
 
 __all__ = [
