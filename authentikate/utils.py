@@ -1,16 +1,13 @@
-from authentikate.base_models import Auth
 from authentikate.decode import decode_token
 from authentikate.settings import get_settings
 from authentikate.base_models import AuthentikateSettings, JWTToken
 import re
 import logging
-from authentikate.expand import expand_token
-from authentikate.imitate import imitate_user
 
 logger = logging.getLogger(__name__)  #
 
 
-def authenticate_token(token: str, settings: AuthentikateSettings) -> Auth:
+def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTToken:
     """
     Authenticate a token and return the auth context
     (containing user, app and scopes)
@@ -23,7 +20,7 @@ def authenticate_token(token: str, settings: AuthentikateSettings) -> Auth:
     else:
         decoded = decode_token(token, settings.algorithms, settings.public_key)
 
-    return expand_token(decoded, settings.force_client)
+    return decoded
 
 
 jwt_re = re.compile(r"Bearer\s(?P<token>[^\s]*)")
@@ -55,7 +52,7 @@ def extract_plain_from_authorization(authorization: str) -> str:
 
 def authenticate_header(
     headers: dict[str, str], settings: AuthentikateSettings | None = None
-) -> Auth:
+) -> JWTToken:
     """
     Authenticate a request and return the auth context
     (containing user, app and scopes)
@@ -75,30 +72,13 @@ def authenticate_header(
         raise ValueError("No Authorization header")
 
     token = extract_plain_from_authorization(authorization_header)
+    return authenticate_token(token, settings) 
     
-    auth = authenticate_token(token, settings)
-    
-    if settings.allow_imitate:
-        imitate_header = None
-        
-        for i in settings.imitate_headers:
-            imitate_header = headers.get(i, None)
-            if imitate_header:
-                break
-
-        if imitate_header:
-            return imitate_user(auth, imitate_header, settings)
-        else:
-            logger.info("Imitation header not found. User acts on their own behalf!")
-    else:
-        logger.info("Imitation is not allowed. Skipping!")
-
-    return auth
 
 
 def authenticate_header_or_none(
     headers: dict[str, str], settings: AuthentikateSettings | None = None
-) -> Auth | None:
+) -> JWTToken | None:
     """
     Authenticate a request header and return the auth context
 
@@ -126,7 +106,7 @@ def authenticate_header_or_none(
 
 def authenticate_token_or_none(
     token: str, settings: AuthentikateSettings | None = None
-) -> Auth | None:
+) -> JWTToken | None:
     """
     Authenticate a token and return the auth context
 
@@ -157,3 +137,7 @@ def authenticate_token_or_none(
     except Exception:
         logger.error("Error authenticating token. Skipping!", exc_info=True)
         return None
+
+
+
+

@@ -104,6 +104,12 @@ class StaticToken(JWTToken):
     raw: str = Field(default_factory=lambda: "static_token")
     
     
+
+class ImitationRequest(BaseModel):
+    """ An imitation request"""
+    sub: str
+    iss: str
+    
     
 
 
@@ -131,69 +137,3 @@ class AuthentikateSettings(BaseModel):
     static_tokens: dict[str, StaticToken] = Field(default_factory=dict)
     """A map of static tokens to their decoded values. Should only be used in tests."""
 
-
-@dataclasses.dataclass
-class Auth:
-    """
-    Mimics the structure of `AbstractAccessToken` so you can use standard
-    Django Oauth Toolkit permissions like `TokenHasScope`.
-    """
-
-    token: JWTToken
-    user: User
-    client: Client
-
-    def is_valid(self, scopes: list[str] | None = None) -> bool:
-        """
-        Check if the token is valid
-
-
-        Parameters
-        ----------
-        scopes : list[str], optional
-            The scopes to check, by default None
-
-        Returns
-        -------
-        bool
-            Whether the token is valid
-
-        """
-        return not self.is_expired() and self.has_scopes(scopes or [])
-
-    def is_expired(self) -> bool:
-        """
-        Check if the token is expired
-
-        As we are using JWT tokens, we do not need to check the expiration time
-        as the token is already checked for expiration when it is decoded.
-
-        Returns
-        -------
-        bool
-            Whether the token is expired or not (will always return False)
-        """
-        # Token expiration is already checked
-        return False
-
-    def has_scopes(self, scopes: list[str]) -> bool:
-        """Does the token have the required scopes?
-
-        Check if the token has the required scopes, if no scopes are provided
-        it will return True.
-
-        Parameters
-        ----------
-        scopes : list[str]
-            The scopes to check
-
-        Returns
-        -------
-        bool
-            Does the token have the required scopes?
-        """
-
-        provided_scopes = set(self.token.scopes)
-        resource_scopes = set(scopes)
-
-        return resource_scopes.issubset(provided_scopes)

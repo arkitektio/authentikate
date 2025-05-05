@@ -82,3 +82,10 @@ def valid_jwt(valid_claims, key_pair: KeyPair):
         key=key_pair.private_key,
         algorithm="RS256",
     )
+
+
+@pytest.fixture(scope="session")
+def valid_auth_headers(valid_jwt):
+    return {
+        "Authorization": f"Bearer {valid_jwt}",
+    }

@@ -47,8 +47,13 @@ def prepare_settings() -> AuthentikateSettings:
         public_key = group.get("PUBLIC_KEY", None)
         allow_imitate = group.get("ALLOW_IMITATE", True)
         imitation_headers = group.get("IMITATION_HEADERS", None)
-        imitate_permission = group.get("IMITATE_PERMISSION", None)
-        authorization_headers = group.get("AUTHORIZATION_HEADERS", None)
+        imitate_permission = group.get("IMITATE_PERMISSION", "authentikate.imitate")
+        authorization_headers = group.get("AUTHORIZATION_HEADERS", [
+            "Authorization",
+            "X-Authorization",
+            "AUTHORIZATION",
+            "authorization",
+        ])
         static_tokens = group.get("STATIC_TOKENS", {})
 
         if not public_key:
