@@ -16,11 +16,11 @@ wheels = [
 
 [[package]]
 name = "asgiref"
-version = "3.7.2"
+version = "3.8.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/12/19/64e38c1c2cbf0da9635b7082bbdf0e89052e93329279f59759c24a10cc96/asgiref-3.7.2.tar.gz", hash = "sha256:9e0ce3aa93a819ba5b45120216b23878cf6e8525eb3848653452b4192b92afed", size = 33393 }
+sdist = { url = "https://files.pythonhosted.org/packages/29/38/b3395cc9ad1b56d2ddac9970bc8f4141312dbaec28bc7c218b0dfafd0f42/asgiref-3.8.1.tar.gz", hash = "sha256:c343bd80a0bec947a9860adb4c432ffa7db769836c64238fc34bdc3fec84d590", size = 35186 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/80/b9051a4a07ad231558fcd8ffc89232711b4e618c15cb7a392a17384bbeef/asgiref-3.7.2-py3-none-any.whl", hash = "sha256:89b2ef2247e3b562a16eef663bc0e2e703ec6468e2fa8a5cd61cd449786d4f6e", size = 24140 },
+    { url = "https://files.pythonhosted.org/packages/39/e3/893e8757be2612e6c266d9bb58ad2e3651524b5b40cf56761e985a28b13e/asgiref-3.8.1-py3-none-any.whl", hash = "sha256:3e1e3ecc849832fe52ccf2cb6686b7a55f82bb1d6aee72a58826471390335e47", size = 23828 },
 ]
 
 [[package]]
@@ -28,6 +28,7 @@ name = "authentikate"
 version = "0.1.11"
 source = { editable = "." }
 dependencies = [
+    { name = "django", marker = "python_full_version >= '3.12'" },
     { name = "django-guardian", marker = "python_full_version >= '3.12'" },
     { name = "pydantic", marker = "python_full_version >= '3.12'" },
     { name = "pyjwt", marker = "python_full_version >= '3.12'" },
@@ -37,7 +38,6 @@ dependencies = [
 dev = [
     { name = "black", marker = "python_full_version >= '3.12'" },
     { name = "cryptography", marker = "python_full_version >= '3.12'" },
-    { name = "django", marker = "python_full_version >= '3.12'" },
     { name = "django-stubs", marker = "python_full_version >= '3.12'" },
     { name = "mypy", marker = "python_full_version >= '3.12'" },
     { name = "pytest", marker = "python_full_version >= '3.12'" },
@@ -51,6 +51,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "django", specifier = ">5" },
     { name = "django-guardian", specifier = ">=2.4.0,<3" },
     { name = "pydantic", specifier = ">2,<3" },
     { name = "pyjwt", specifier = ">=2.10.0,<3" },
@@ -60,7 +61,6 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=22" },
     { name = "cryptography", specifier = ">=41.0.3,<42" },
-    { name = "django", specifier = ">=4.2.4,<5" },
     { name = "django-stubs", specifier = ">=4.2.7,<5" },
     { name = "mypy", specifier = ">=1.7.1,<2" },
     { name = "pytest", specifier = ">=7.4.0,<8" },
@@ -320,16 +320,16 @@ wheels = [
 
 [[package]]
 name = "django"
-version = "4.2.8"
+version = "5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref", marker = "python_full_version >= '3.12'" },
     { name = "sqlparse", marker = "python_full_version >= '3.12'" },
     { name = "tzdata", marker = "python_full_version >= '3.12' and sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/bf/ff46fc1bd0f7d86390134e3869dd093be1d2bbaa9dafcb5389e87ef5bcb5/Django-4.2.8.tar.gz", hash = "sha256:d69d5e36cc5d9f4eb4872be36c622878afcdce94062716cf3e25bcedcb168b62", size = 10425581 }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/1b/c6da718c65228eb3a7ff7ba6a32d8e80fa840ca9057490504e099e4dd1ef/Django-5.2.tar.gz", hash = "sha256:1a47f7a7a3d43ce64570d350e008d2949abe8c7e21737b351b6a1611277c6d89", size = 10824891 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/79/7f45e9c129c3cd8e4d54806649efeb1db9c223c54a1c54b30511d246bc60/Django-4.2.8-py3-none-any.whl", hash = "sha256:6cb5dcea9e3d12c47834d32156b8841f533a4493c688e2718cafd51aa430ba6d", size = 7991169 },
+    { url = "https://files.pythonhosted.org/packages/63/e0/6a5b5ea350c5bd63fe94b05e4c146c18facb51229d9dee42aa39f9fc2214/Django-5.2-py3-none-any.whl", hash = "sha256:91ceed4e3a6db5aedced65e3c8f963118ea9ba753fc620831c77074e620e7d83", size = 8301361 },
 ]
 
 [[package]]

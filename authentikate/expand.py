@@ -82,9 +82,9 @@ def expand_token(token: base_models.JWTToken, force_client: bool = True) -> base
 
     try:
         if token.client_id is None:
-            app = None
+            client = None
         else:
-            app, _ = models.App.objects.get_or_create(
+            client, _ = models.Client.objects.get_or_create(
                 client_id=token.client_id, iss=token.iss
             )
 
@@ -122,5 +122,5 @@ def expand_token(token: base_models.JWTToken, force_client: bool = True) -> base
     return base_models.Auth(
         token=token,
         user=user,
-        app=app,
+        client=client,
     )

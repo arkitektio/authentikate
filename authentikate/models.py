@@ -22,10 +22,10 @@ class User(AbstractUser):
         permissions = [("imitate", "Can imitate me")]
 
 
-class App(models.Model):
-    """An Oauth2 App
+class Client(models.Model):
+    """An Oauth2 Client
 
-    An Oauth2 App is a model to represent an Oauth2 app that is
+    An Oauth2 Client is a model to represent an Oauth2 client that is
     registered when a JWT token is authenticated. It retrieves
     the client_id from the token and uses it to create a new
     app or retrieve an existing app. This allows for the grouping
@@ -37,10 +37,10 @@ class App(models.Model):
     name = models.CharField(max_length=2000, null=True, blank=True)
 
     class Meta:
-        """Meta class for App"""
+        """Meta class for Client"""
 
         unique_together = ("iss", "client_id")
 
     def __str__(self) -> str:
-        """String representation of App"""
+        """String representation of Client"""
         return f"{self.name}"

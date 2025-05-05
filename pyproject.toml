@@ -10,11 +10,11 @@ dependencies = [
     "pyjwt>=2.10.0,<3",
     "pydantic>2, <3",
     "django-guardian>=2.4.0,<3",
+    "django>5",
 ]
 
 [tool.uv]
 dev-dependencies =  [
-    "django>=4.2.4,<5",
     "pytest-django>=4.5.2,<5",
     "pytest>=7.4.0,<8",
     "pytest-cov>=4.1.0,<5",

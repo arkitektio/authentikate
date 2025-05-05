@@ -1,7 +1,7 @@
 import logging
 import dataclasses
 from typing import Type
-from .models import User, App
+from .models import User, Client
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import datetime
 
@@ -141,7 +141,7 @@ class Auth:
 
     token: JWTToken
     user: User
-    app: App
+    client: Client
 
     def is_valid(self, scopes: list[str] | None = None) -> bool:
         """

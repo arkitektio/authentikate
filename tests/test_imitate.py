@@ -36,4 +36,4 @@ def test_imitate(db, valid_jwt, key_pair_str):
 
     x = authenticate_header(headers, settings)
     assert x.user.sub == "2", "User ID should be 2"
-    assert x.app.client_id == "XXXX", "Client ID should be 'static'"
+    assert x.client.client_id == "XXXX", "Client ID should be 'static'"
