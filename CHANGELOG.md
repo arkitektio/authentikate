@@ -1,9 +1,15 @@
 # CHANGELOG
 
 
+## v0.8.0 (2025-05-05)
+
+
 ## v0.7.0 (2025-05-05)
 
 ### Features
+
+- Add client expansion from JWT token and update related functions
+  ([`4c4d95c`](https://github.com/arkitektio/authentikate/commit/4c4d95cbd0ac9128bd69cf7c32b5a77b141425e0))
 
 - Restructure token management and update version to 0.6.0
   ([`8890001`](https://github.com/arkitektio/authentikate/commit/8890001229efe5488619906a8f2a39161d51850d))
