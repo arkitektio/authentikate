@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.6.0 (2025-05-05)
+
+### Features
+
+- Disbled imitate and refactored a lot to acommotated kante
+  ([`f87c334`](https://github.com/arkitektio/authentikate/commit/f87c3343454fa49d4c00c325dd69c57ca6d3b6cd))
+
+
 ## v0.5.0 (2025-05-05)
 
 
