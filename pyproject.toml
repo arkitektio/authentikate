@@ -25,6 +25,7 @@ dev-dependencies =  [
     "strawberry-graphql>=0.216.1,<0.217",
     "django-stubs>=4.2.7,<5",
     "strawberry-graphql-django>=0.28.3,<0.29",
+    "python-semantic-release>=9.21.1",
 ]
 
 [tool.mypy]
