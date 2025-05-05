@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.8.1 (2025-05-05)
+
+### Bug Fixes
+
+- Ensure user groups are updated correctly in aexpand_user_from_token
+  ([`d8775f2`](https://github.com/arkitektio/authentikate/commit/d8775f210a08d1da68c8ca8b226a1e18b10418b7))
+
+
 ## v0.8.0 (2025-05-05)
 
 
