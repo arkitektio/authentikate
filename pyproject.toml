@@ -95,3 +95,11 @@ line-length = 300
 
 # Assume Python 3.12.
 target-version = "py312"
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+upload_to_pypi = true
+branch = "main"
+build_command = "uv build"
+
