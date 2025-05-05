@@ -28,6 +28,11 @@ dev-dependencies =  [
     "python-semantic-release>=9.21.1",
 ]
 
+[tool.coverage.run]
+omit = [
+    "test_project/*"
+]
+
 [tool.mypy]
 exclude = ["venv/", "tests/", "examples/"]
 plugins = ["mypy_django_plugin.main","pydantic.mypy"]
