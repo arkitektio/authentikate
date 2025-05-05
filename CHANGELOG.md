@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.5.0 (2025-05-05)
+
+
 ## v0.4.0 (2025-05-05)
+
+### Features
+
+- Rename App model to Client and update related references
+  ([`3c17425`](https://github.com/arkitektio/authentikate/commit/3c17425fc17d2766c8aa9becb50e9a916f45760b))
 
 
 ## v0.3.0 (2025-05-05)
