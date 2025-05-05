@@ -1,12 +1,25 @@
 # CHANGELOG
 
 
+## v0.7.0 (2025-05-05)
+
+### Features
+
+- Restructure token management and update version to 0.6.0
+  ([`8890001`](https://github.com/arkitektio/authentikate/commit/8890001229efe5488619906a8f2a39161d51850d))
+
+
 ## v0.6.0 (2025-05-05)
 
 ### Features
 
 - Disbled imitate and refactored a lot to acommotated kante
   ([`f87c334`](https://github.com/arkitektio/authentikate/commit/f87c3343454fa49d4c00c325dd69c57ca6d3b6cd))
+
+### Refactoring
+
+- Remove unused imports and enhance docstrings for clarity
+  ([`e89dd98`](https://github.com/arkitektio/authentikate/commit/e89dd9852cb2d51bf2f3b05282b2382a65ead6d0))
 
 
 ## v0.5.0 (2025-05-05)
