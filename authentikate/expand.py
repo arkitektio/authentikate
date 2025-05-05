@@ -77,8 +77,9 @@ async def aexpand_user_from_token(
             # User has changed, update the user object
             user.first_name = token.preferred_username
             user.changed_hash = token.changed_hash
-            await aset_user_groups(user, token.roles)
             await user.asave()
+            await aset_user_groups(user, token.roles)
+            
             
         return user
 
@@ -96,11 +97,11 @@ async def aexpand_user_from_token(
             first_name=token.preferred_username,
         )
         user.set_unusable_password()
-        user.save()
         user.first_name = token.preferred_username
         user.changed_hash = token.changed_hash
-        await aset_user_groups(user, token.roles)
+        
         await user.asave()
+        await aset_user_groups(user, token.roles)
         return user
    
 def expand_user_from_token(
