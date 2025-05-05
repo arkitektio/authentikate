@@ -1,5 +1,3 @@
-from authentikate.errors import AuthentikatePermissionDenied
-import time
 from django.contrib.auth.models import Group
 from authentikate import base_models, models
 import logging

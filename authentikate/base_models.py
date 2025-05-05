@@ -1,7 +1,5 @@
 import logging
-import dataclasses
 from typing import Type
-from .models import User, Client
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import datetime
 

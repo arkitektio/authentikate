@@ -6,9 +6,11 @@ from .vars import set_token
 from authentikate.utils import authenticate_token_or_none, authenticate_header_or_none
 
 class AuthentikateExtension(SchemaExtension):
+    """ This is the extension class for the authentikate extension """
     
     
     async def on_operation(self) -> Union[AsyncIterator[None], Iterator[None]]:
+        """ Set the token in the context variable """
         
         context = self.execution_context.context
         

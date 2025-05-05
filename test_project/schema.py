@@ -1,13 +1,6 @@
-import asyncio
-from typing import AsyncGenerator
-from kante.context import WsContext
 from kante.types import Info
 import strawberry
-from strawberry import ID, scalars
 from typing import cast
-from kante.channel import build_channel
-from pydantic import BaseModel
-from strawberry.experimental import pydantic
 import strawberry_django
 from authentikate.strawberry import get_user, AuthentikateExtension
 from authentikate import models
@@ -16,11 +9,13 @@ from authentikate import models
 
 @strawberry_django.type(models.User)
 class User:
+    """ This is the user type """
     sub: str
 
 
 @strawberry.type
 class Query:
+    """ This is the query class """
     
     
     @strawberry_django.field
@@ -35,9 +30,11 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    """ This is the mutation class """
     
     @strawberry_django.mutation
     def create_user(self, info: Info, name: str) -> User:
+        """Create a new user"""
         user = models.User.objects.create(username=name)
         return cast(User, user)
         
