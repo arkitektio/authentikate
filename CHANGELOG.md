@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.4.0 (2025-05-05)
+
+
 ## v0.3.0 (2025-05-05)
+
+### Features
+
+- Add semantic release configuration to pyproject.toml
+  ([`49105c6`](https://github.com/arkitektio/authentikate/commit/49105c6ad15752373d471a8cf7c155d8182433bb))
 
 
 ## v0.2.0 (2025-05-05)
