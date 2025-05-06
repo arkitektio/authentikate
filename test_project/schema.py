@@ -5,19 +5,8 @@ import strawberry_django
 from authentikate.vars import get_user, get_client
 from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension
+from authentikate.strawberry.types import User, Client
 
-
-
-@strawberry_django.type(models.User)
-class User:
-    """ This is the user type """
-    sub: str
-
-
-@strawberry_django.type(models.Client)
-class Client:
-    """ This is the client type """
-    client_id: str
 
 
 
