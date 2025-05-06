@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.9.1 (2025-05-06)
+
+
 ## v0.9.0 (2025-05-06)
+
+### Bug Fixes
+
+- Update kante dependency version to >=0.9.0 in pyproject.toml and uv.lock
+  ([`28d4269`](https://github.com/arkitektio/authentikate/commit/28d42697aa02c69f575cd2f3d7870c3d8b79d404))
 
 ### Features
 
