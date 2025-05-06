@@ -1,6 +1,6 @@
 from kante.types import Info
 import strawberry
-from typing import cast
+from typing import AsyncGenerator, cast
 import strawberry_django
 from authentikate.vars import get_user, get_client
 from authentikate import models
@@ -55,6 +55,15 @@ class Mutation:
         return cast(User, user)
         
     
+@strawberry.type
+class Subscription:
+    """ This is the subscription class """
+    
+    @strawberry.subscription
+    async def yield_user(self, info: Info) -> AsyncGenerator[User,  None]:
+        """Subscribe to user creation events"""
+        # This is just a placeholder. In a real application, you would use channels or another method to send updates.
+        yield cast(User, info.context.request.user)
     
             
             
@@ -63,6 +72,7 @@ class Mutation:
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
+    subscription=Subscription,
     extensions=[
         AuthentikateExtension,   
     ]
