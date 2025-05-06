@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.9.0 (2025-05-06)
+
+### Features
+
+- Enhance Authentikate extension with user and client context management, update dependencies, and
+  add subscription support
+  ([`f59a70b`](https://github.com/arkitektio/authentikate/commit/f59a70b031992a8cf62c182f8e2b355f3bab0205))
+
+
 ## v0.8.1 (2025-05-05)
 
 ### Bug Fixes
