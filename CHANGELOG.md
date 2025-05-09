@@ -1,7 +1,20 @@
 # CHANGELOG
 
 
+## v0.14.0 (2025-05-09)
+
+### Bug Fixes
+
+- Correct function name typos in user and client token expansion
+  ([`bde2677`](https://github.com/arkitektio/authentikate/commit/bde26775893b8bb184934ed9f7fccb26090464d7))
+
+
 ## v0.13.0 (2025-05-09)
+
+### Features
+
+- Simplify user creation logic in aexpand_user_from_token
+  ([`111f201`](https://github.com/arkitektio/authentikate/commit/111f201368d490474a2edc1fca811a1e8c17c3f2))
 
 
 ## v0.12.0 (2025-05-09)
