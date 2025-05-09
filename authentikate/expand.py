@@ -85,15 +85,10 @@ async def aexpand_user_from_token(
         return user
 
     except models.User.DoesNotExist:
-        preexisting_user = await models.User.objects.filter(
-            username=token.preferred_username
-        ).afirst()
 
         user = models.User(
             sub=token.sub,
-            username=token_to_username(token)
-            if preexisting_user
-            else token.preferred_username,
+            username=token_to_username(token),
             iss=token.iss,
             first_name=token.preferred_username,
         )

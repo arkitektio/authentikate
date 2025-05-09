@@ -20,14 +20,14 @@ class AuthentikateExtension(SchemaExtension):
         return settings
     
     
-    async def axepand_user_from_token(self, token: JWTToken) -> "UserModel":
+    async def aexpand_user_from_token(self, token: JWTToken) -> "UserModel":
         """ Expand a user from the provided JWT token """
         from authentikate.expand import aexpand_user_from_token
         # Call the async function to expand the user
         user = await aexpand_user_from_token(token)
         return cast(UserModel, user)
     
-    async def axepand_client_from_token(self, token: JWTToken) -> "ClientModel":
+    async def aexpand_client_from_token(self, token: JWTToken) -> "ClientModel":
         """ Expand a client from the provided JWT token """
         from authentikate.expand import aexpand_client_from_token
         # Call the async function to expand the client
