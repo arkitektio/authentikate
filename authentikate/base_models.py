@@ -43,7 +43,7 @@ class JWTToken(BaseModel):
     iat: datetime.datetime
     """The issued at time of the token"""
 
-    aud: str | None = None
+    aud: list[str] | None = None
     """The audience of the token"""
     
     jti: str | None = None
@@ -51,6 +51,17 @@ class JWTToken(BaseModel):
 
     raw: str
     """ The raw original token string """
+    
+    
+    @field_validator("aud", mode="before")
+    def aud_to_list(cls: Type["JWTToken"], v: str | list[str] | None) -> list[str] | None:
+        """Convert the aud to a list"""
+        if not v:
+            return None
+        if isinstance(v, str):
+            return [v]
+        
+        return v
 
     @field_validator("sub", mode="before")
     def sub_to_username(cls: Type["JWTToken"], v: str) -> str:
