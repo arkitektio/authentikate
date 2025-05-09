@@ -20,10 +20,7 @@ def test_static_token(db, key_pair_str):
     headers = {"Authorization": f"Bearer {fake_token}"}
 
     settings = AuthentikateSettings(
-        algorithms=["RS256"],
-        public_key=key_pair_str.public_key,
-        allow_imitate=True,
-        force_client=False,
+        issuers=[],
         static_tokens={fake_token: StaticToken(sub="1", iss="XXXX")},
     )
 

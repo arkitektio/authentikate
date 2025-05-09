@@ -1,9 +1,9 @@
-import jwt
+from joserfc import jwt
 from authentikate import base_models, errors
 
 
 def decode_token(
-    token: str, algorithms: list[str], public_key: str
+    token: str,  settings: base_models.AuthentikateSettings
 ) -> base_models.JWTToken:
     """Decode a JWT token
 
@@ -22,11 +22,11 @@ def decode_token(
         The decoded token
     """
     try:
-        decoded = jwt.decode(token, public_key, algorithms=algorithms)
+        decoded = jwt.decode(token, settings.load_key)
     except Exception as e:
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
     try:
-        return base_models.JWTToken(**{"raw": token, **decoded})
+        return base_models.JWTToken(**{"raw": token, **decoded.claims})
     except TypeError as e:
         raise errors.MalformedJwtTokenError("Error decoding token") from e

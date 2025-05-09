@@ -16,7 +16,7 @@ async def test_str_channel_subscription_receives_broadcast_from_http_mutation(db
     
     
     # Set the public key in settings
-    settings.AUTHENTIKATE["PUBLIC_KEY"] = key_pair_str.public_key
+    settings.AUTHENTIKATE["ISSUERS"][0]["public_key"] = key_pair_str.public_key
     
     
     
@@ -52,7 +52,7 @@ async def test_str_channel_subscription_receives_broadcast_from_http_mutation(db
     
     
     # Set the public key in settings
-    settings.AUTHENTIKATE["PUBLIC_KEY"] = key_pair_str.public_key
+    settings.AUTHENTIKATE["ISSUERS"][0]["public_key"] = key_pair_str.public_key
     
     
     

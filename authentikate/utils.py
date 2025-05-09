@@ -18,7 +18,7 @@ def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTToken:
     if token in settings.static_tokens:
         decoded = settings.static_tokens[token]
     else:
-        decoded = decode_token(token, settings.algorithms, settings.public_key)
+        decoded = decode_token(token, settings)
 
     return decoded
 

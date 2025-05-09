@@ -1,6 +1,5 @@
 from authentikate.models import User
 from authentikate.decode import decode_token
-import jwt
 
 
 def test_create_user(db):

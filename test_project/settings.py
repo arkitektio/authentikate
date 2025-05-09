@@ -46,9 +46,13 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "authentikate.User"
 
 AUTHENTIKATE = {
-    "KEY_TYPE": "RS256",
-    "PUBLIC_KEY_PEM_FILE": "public_key.pem",
-    "FORCE_CLIENT": False,
+    "ISSUERS": [
+        {
+            "iss": "lok",
+            "kind": "rsa",
+            "public_key": "public_key.pem",
+        }
+    ],
 }
 
 

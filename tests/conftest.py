@@ -5,8 +5,11 @@ from pytest_django.fixtures import SettingsWrapper
 import dataclasses
 import pytest
 import datetime
-import jwt
+from joserfc import jwt
 import uuid
+from joserfc.jwk import RSAKey
+from authentikate.base_models import AuthentikateSettings, Issuer, RSAKeyIssuer, JWKIssuer
+
 
 # Generate a private key
 
@@ -75,13 +78,53 @@ def valid_claims():
 
 
 @pytest.fixture(scope="session")
-def valid_jwt(valid_claims, key_pair: KeyPair):
-    print(key_pair.private_key)
+def valid_jwt(valid_claims, key_pair_str: KeyPairStr):
+    
+    key = RSAKey.import_key(key_pair_str.private_key)
+    
+    header = {"alg": "RS256", "kid": "1"}
     return jwt.encode(
+        header,
         valid_claims,
-        key=key_pair.private_key,
-        algorithm="RS256",
+        key,
     )
+    
+    
+@pytest.fixture(scope="session")
+def valid_settings(key_pair_str: KeyPairStr):
+    
+    key = RSAKey.import_key(key_pair_str.public_key)
+    
+    
+    return AuthentikateSettings(
+        issuers=[
+            JWKIssuer(
+                iss="XXXX",
+                jwks={
+                    "keys": [
+                        key.as_dict(kid="1"),
+                    ]
+                }
+            )
+        ]
+    )
+    
+@pytest.fixture(scope="session")
+def valid_rsa_key(key_pair_str: KeyPairStr):
+    
+    return AuthentikateSettings(
+        issuers=[
+            RSAKeyIssuer(
+                iss="XXXX",
+                key=key_pair_str.public_key,
+            )
+        ]
+    )
+    
+    
+@pytest.fixture(scope="session")
+def valid_decode_key(key_pair_str: KeyPairStr):
+    return RSAKey.import_key(key_pair_str.public_key)
 
 
 @pytest.fixture(scope="session")
