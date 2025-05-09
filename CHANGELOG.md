@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.12.0 (2025-05-09)
+
+
 ## v0.11.0 (2025-05-09)
+
+### Features
+
+- Update JWTToken audience field to support list and add tests
+  ([`919487f`](https://github.com/arkitektio/authentikate/commit/919487f15251a5901660e25c64268628e1869aa7))
 
 
 ## v0.10.0 (2025-05-06)
