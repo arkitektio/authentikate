@@ -176,7 +176,7 @@ class JWKIssuer(Issuer):
         return v
     
     
-    def get_as_jwks(self) -> Dict[str, Any]:
+    def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
         return self.jwks["keys"]
     
@@ -235,7 +235,7 @@ class RSAKeyFileIssuer(Issuer):
         validation_alias=AliasChoices("public_key_pem_file", "PUBLIC_KEY_PEM_FILE")
     )
     
-    def get_as_jwks(self) -> Dict[str, Any]:
+    def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
         
         with open(self.public_key_pem_file, "rb") as f:

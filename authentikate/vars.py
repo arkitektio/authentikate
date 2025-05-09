@@ -1,12 +1,12 @@
 import contextvars
 from authentikate.base_models import JWTToken
-from authentikate.models import User, Client
+from authentikate.protocols import UserModel, ClientModel
 
 
 
 token_var: contextvars.ContextVar[JWTToken | None] = contextvars.ContextVar("token_var", default=None)
-user_var: contextvars.ContextVar[User | None] = contextvars.ContextVar("user_var", default=None)
-client_var: contextvars.ContextVar[Client | None] = contextvars.ContextVar("client_var", default=None)
+user_var: contextvars.ContextVar[UserModel | None] = contextvars.ContextVar("user_var", default=None)
+client_var: contextvars.ContextVar[ClientModel | None] = contextvars.ContextVar("client_var", default=None)
 
 
 def get_token() -> JWTToken | None:
@@ -21,7 +21,7 @@ def get_token() -> JWTToken | None:
     return token_var.get()
 
         
-def get_user() -> User | None:
+def get_user() -> UserModel | None:
     """
     Get the current user from the context variable
 
@@ -32,7 +32,7 @@ def get_user() -> User | None:
     """
     return user_var.get()
 
-def get_client() -> Client | None:
+def get_client() -> ClientModel | None:
     """
     Get the current client from the context variable
 

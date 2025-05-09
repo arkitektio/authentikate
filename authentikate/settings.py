@@ -27,17 +27,6 @@ def prepare_settings() -> AuthentikateSettings:
     """
 
     try:
-        user = settings.AUTH_USER_MODEL
-        if user != "authentikate.User":
-            raise ImproperlyConfigured(
-                "AUTH_USER_MODEL must be authentikate.User in order to use authentikate"
-            )
-    except AttributeError:
-        raise ImproperlyConfigured(
-            "AUTH_USER_MODEL must be authentikate.User in order to use authentikate"
-        )
-
-    try:
         group = settings.AUTHENTIKATE
     except AttributeError:
         raise ImproperlyConfigured("Missing setting AUTHENTIKATE")

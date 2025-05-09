@@ -1,6 +1,7 @@
 from django.contrib.auth.models import Group
 from authentikate import base_models, models
 import logging
+from django.contrib.auth import get_user_model
 
 
 logger = logging.getLogger(__name__)

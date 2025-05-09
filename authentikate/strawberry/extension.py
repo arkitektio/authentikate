@@ -2,12 +2,38 @@ from typing import AsyncIterator, Iterator, Union
 from strawberry.extensions import SchemaExtension
 from kante.context import WsContext, HttpContext
 from authentikate.vars import token_var, user_var, client_var
-
+from authentikate.base_models import JWTToken
 from authentikate.utils import authenticate_token_or_none, authenticate_header_or_none
-from authentikate.expand import aexpand_user_from_token, aexpand_client_from_token
+from authentikate.protocols import UserModel, ClientModel
+from typing import cast
+from authentikate.base_models import AuthentikateSettings
 
 class AuthentikateExtension(SchemaExtension):
     """ This is the extension class for the authentikate extension """
+    
+    
+    def get_settings(self) -> "AuthentikateSettings":
+        """ Get the settings for the extension """
+        from authentikate.settings import get_settings
+        # Call the function to get the settings
+        settings = get_settings()
+        return settings
+    
+    
+    async def axepand_user_from_token(self, token: JWTToken) -> "UserModel":
+        """ Expand a user from the provided JWT token """
+        from authentikate.expand import aexpand_user_from_token
+        # Call the async function to expand the user
+        user = await aexpand_user_from_token(token)
+        return cast(UserModel, user)
+    
+    async def axepand_client_from_token(self, token: JWTToken) -> "ClientModel":
+        """ Expand a client from the provided JWT token """
+        from authentikate.expand import aexpand_client_from_token
+        # Call the async function to expand the client
+        client = await aexpand_client_from_token(token)
+        return cast(ClientModel, client)  
+        
     
     
     async def on_operation(self) -> Union[AsyncIterator[None], Iterator[None]]:
@@ -25,11 +51,12 @@ class AuthentikateExtension(SchemaExtension):
             
             token = authenticate_token_or_none(
                 context.connection_params.get("token", ""),
+                self.get_settings(),
             )
             reset_token = token_var.set(token)
             if token:
-                user = await aexpand_user_from_token(token)
-                client = await aexpand_client_from_token(token)
+                user = await self.axepand_user_from_token(token)
+                client = await self.axepand_client_from_token(token)
                 
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
@@ -45,11 +72,12 @@ class AuthentikateExtension(SchemaExtension):
             # Do something with the HTTP context
             token = authenticate_header_or_none(
                 context.headers,
+                self.get_settings(),
             )
             reset_token = token_var.set(token)
             if token:
-                user = await aexpand_user_from_token(token)
-                client = await aexpand_client_from_token(token)
+                user = await self.axepand_user_from_token(token)
+                client = await self.axepand_client_from_token(token)
                 
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
