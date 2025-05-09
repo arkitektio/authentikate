@@ -55,8 +55,8 @@ class AuthentikateExtension(SchemaExtension):
             )
             reset_token = token_var.set(token)
             if token:
-                user = await self.axepand_user_from_token(token)
-                client = await self.axepand_client_from_token(token)
+                user = await self.aexpand_user_from_token(token)
+                client = await self.aexpand_client_from_token(token)
                 
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
@@ -76,8 +76,8 @@ class AuthentikateExtension(SchemaExtension):
             )
             reset_token = token_var.set(token)
             if token:
-                user = await self.axepand_user_from_token(token)
-                client = await self.axepand_client_from_token(token)
+                user = await self.aexpand_user_from_token(token)
+                client = await self.aexpand_client_from_token(token)
                 
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
