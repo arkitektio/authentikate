@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.13.0 (2025-05-09)
+
+
 ## v0.12.0 (2025-05-09)
+
+### Features
+
+- Refactor so that we dont need to rely on a specific model
+  ([`be30139`](https://github.com/arkitektio/authentikate/commit/be301397f432d23f3c4551e26df1367286978be1))
 
 
 ## v0.11.0 (2025-05-09)
