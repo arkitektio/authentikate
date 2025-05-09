@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.11.0 (2025-05-09)
+
+
 ## v0.10.0 (2025-05-06)
+
+### Features
+
+- Enhance issuer models and settings integration for JWT handling
+  ([`4e3438b`](https://github.com/arkitektio/authentikate/commit/4e3438b67c9e6ea44f1efef6687225e4c9a2f56a))
 
 
 ## v0.9.1 (2025-05-06)
