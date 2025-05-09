@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.10.0 (2025-05-06)
+
+
 ## v0.9.1 (2025-05-06)
+
+### Features
+
+- Refactor user and client types into separate file and
+  ([`72602a4`](https://github.com/arkitektio/authentikate/commit/72602a415b5b2ef495f5d1cf251446a253c53432))
 
 
 ## v0.9.0 (2025-05-06)
