@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.15.0 (2025-07-10)
+
+### Features
+
+- Add organization support
+  ([`40e5dca`](https://github.com/arkitektio/authentikate/commit/40e5dca8adfc8441ecee505ecf7577e1094bfcc1))
+
+
 ## v0.14.0 (2025-05-09)
 
 ### Bug Fixes
