@@ -78,6 +78,17 @@ async def aexpand_user_from_token(
             # User has changed, update the user object
             user.first_name = token.preferred_username
             user.changed_hash = token.changed_hash
+            
+            if token.active_org:
+                current_org, _ = await models.Organization.objects.aget_or_create(
+                    identifier=token.active_org or "",
+                )
+                
+                user.active_organization = current_org
+                
+            user.active_organization = current_org
+            
+            
             await user.asave()
             await aset_user_groups(user, token.roles)
             
@@ -95,6 +106,13 @@ async def aexpand_user_from_token(
         user.set_unusable_password()
         user.first_name = token.preferred_username
         user.changed_hash = token.changed_hash
+        
+        if token.active_org:
+            current_org, _ = await models.Organization.objects.aget_or_create(
+                identifier=token.active_org or "",
+            )
+            
+            user.active_organization = current_org
         
         await user.asave()
         await aset_user_groups(user, token.roles)
@@ -114,6 +132,13 @@ def expand_user_from_token(
             user.first_name = token.preferred_username
             user.changed_hash = token.changed_hash
             set_user_groups(user, token.roles)
+            
+            if token.active_org:
+                current_org, _ = models.Organization.objects.get_or_create(
+                    identifier=token.active_org)
+                
+                user.active_organization = current_org
+            
             user.save()
             
         return user
@@ -132,11 +157,18 @@ def expand_user_from_token(
             first_name=token.preferred_username,
         )
         user.set_unusable_password()
-        user.save()
         user.first_name = token.preferred_username
         user.changed_hash = token.changed_hash
-        set_user_groups(user, token.roles)
+        
+        if token.active_org:
+            current_org, _ = models.Organization.objects.get_or_create(
+                identifier=token.active_org)
+            
+            user.active_organization = current_org
+        
+        
         user.save()
+        set_user_groups(user, token.roles)
         return user 
     
 async def aexpand_client_from_token(

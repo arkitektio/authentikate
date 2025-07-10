@@ -31,6 +31,9 @@ class JWTToken(BaseModel):
     """The expiration time of the token"""
     
     
+    active_org: str | None = None
+    """The active organization of the user, if any"""
+    
     client_id: str
     """The client_id of the app that requested the token"""
     preferred_username: str
@@ -90,7 +93,7 @@ class JWTToken(BaseModel):
     @property
     def changed_hash(self) -> str:
         """A hash that changes when the user changes"""
-        return str(hash(self.sub + self.preferred_username + " ".join(self.roles)))
+        return str(hash(self.sub + self.preferred_username + " ".join(self.roles) + (self.active_org or "")))
 
     @property
     def scopes(self) -> list[str]:

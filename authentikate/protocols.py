@@ -39,3 +39,13 @@ class ClientModel(Protocol):
 
     name: str
     """The name of the client"""
+
+
+class OrganizationModel(Protocol):
+    """A protocol for the organizaition model"""
+
+    id: str
+    """The id of the client"""
+
+    identifier: str
+    """The name of orgnaization"""

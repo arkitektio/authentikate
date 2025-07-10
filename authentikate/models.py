@@ -2,11 +2,28 @@ from django.db import models  # Create your models here.
 from django.contrib.auth.models import AbstractUser
 
 
+
+class Organization(models.Model):
+    """An Organization model to represent an organization in the system"""
+    identifier = models.CharField(max_length=1000, unique=True)
+
+    def __str__(self) -> str:
+        """String representation of Organization"""
+        return self.identifier
+
+
 class User(AbstractUser):
     """A reflection on the real User"""
 
     sub = models.CharField(max_length=1000, null=True, blank=True)
     iss = models.CharField(max_length=1000, null=True, blank=True)
+    active_organization = models.ForeignKey(
+        Organization,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="active_users",
+    )
     changed_hash = models.CharField(max_length=1000, null=True, blank=True)
 
     class Meta:

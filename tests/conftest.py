@@ -74,6 +74,7 @@ def valid_claims():
         "client_id": "XXXX",
         "scope": "openid profile email",
         "roles": ["XXXX"],
+        "active_org": "kkk",
     }
 
 
