@@ -6,7 +6,7 @@ from authentikate.vars import get_user, get_client
 from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension
 from authentikate.strawberry.types import User, Client
-from authentikate.strawberry.directives import Auth, AuthExtension, all_directives
+from authentikate.strawberry.directives import Auth, AuthExtension, all_directives, AuthSubscribeExtension
 
 
 
@@ -63,7 +63,7 @@ class Mutation:
 class Subscription:
     """ This is the subscription class """
     
-    @strawberry.subscription(extensions=[AuthExtension(scopes="read")])
+    @strawberry.subscription(extensions=[AuthSubscribeExtension(scopes="read")])
     async def yield_user(self, info: Info) -> AsyncGenerator[User,  None]:
         """Subscribe to user creation events"""
         # This is just a placeholder. In a real application, you would use channels or another method to send updates.
