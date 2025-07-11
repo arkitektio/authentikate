@@ -63,7 +63,7 @@ class Mutation:
 class Subscription:
     """ This is the subscription class """
     
-    @strawberry.subscription
+    @strawberry.subscription(extensions=[AuthExtension(scopes="read")])
     async def yield_user(self, info: Info) -> AsyncGenerator[User,  None]:
         """Subscribe to user creation events"""
         # This is just a placeholder. In a real application, you would use channels or another method to send updates.

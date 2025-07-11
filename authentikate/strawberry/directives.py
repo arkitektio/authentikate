@@ -92,7 +92,7 @@ class AuthExtension(FieldExtension):
         
         
         
-        return next_(source, info, **kwargs)
+        return await next_(source, info, **kwargs)
     
     
     
