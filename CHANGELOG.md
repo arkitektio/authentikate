@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.17.1 (2025-07-11)
+
+
 ## v0.17.0 (2025-07-11)
+
+### Bug Fixes
+
+- Add resolve async
+  ([`fdbcfbf`](https://github.com/arkitektio/authentikate/commit/fdbcfbfd3b1fd7f2b858ced5938afe547c50e283))
 
 ### Features
 
