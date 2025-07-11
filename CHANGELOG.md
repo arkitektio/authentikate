@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.16.0 (2025-07-11)
+
+### Features
+
+- Add auth
+  ([`48064a4`](https://github.com/arkitektio/authentikate/commit/48064a479c5f7b789765340a37034e80e61e0028))
+
+
 ## v0.15.0 (2025-07-10)
 
 ### Features
