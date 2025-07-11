@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.18.2 (2025-07-11)
+
+
 ## v0.18.1 (2025-07-11)
+
+### Bug Fixes
+
+- Maybe this time?
+  ([`4090136`](https://github.com/arkitektio/authentikate/commit/409013653e1aca11d9c1256def9788ca438fc992))
 
 
 ## v0.18.0 (2025-07-11)
