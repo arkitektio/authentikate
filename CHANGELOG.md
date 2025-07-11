@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.17.0 (2025-07-11)
+
+### Features
+
+- Update kante
+  ([`911e9c5`](https://github.com/arkitektio/authentikate/commit/911e9c5120313a88e360e1d206663f2468de3c9f))
+
+
 ## v0.16.0 (2025-07-11)
 
 ### Features
