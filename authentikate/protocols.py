@@ -39,6 +39,13 @@ class ClientModel(Protocol):
 
     name: str
     """The name of the client"""
+    
+    
+    
+    def has_scope(self, scope: str) -> bool:
+        """Check if the user has the given scope"""
+        ...
+    
 
 
 class OrganizationModel(Protocol):

@@ -6,7 +6,7 @@ from authentikate.vars import get_user, get_client
 from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension
 from authentikate.strawberry.types import User, Client
-
+from authentikate.strawberry.directives import Auth, AuthExtension, all_directives
 
 
 
@@ -21,6 +21,8 @@ class Query:
         
         user = get_user()
         return cast(User, user) if user else None
+    
+    
     
     
     @strawberry_django.field
@@ -42,6 +44,15 @@ class Mutation:
         """Create a new user"""
         user = models.User.objects.create(username=name)
         return cast(User, user)
+    
+    
+    @strawberry_django.mutation(extensions=[AuthExtension(scopes="write")])
+    def require_write(self, info: Info) -> str:
+        return "User"
+    
+    @strawberry_django.mutation(extensions=[AuthExtension(scopes="read")])
+    def require_read(self, info: Info) -> str:
+        return "User"
         
     
 @strawberry.type
@@ -64,5 +75,6 @@ schema = strawberry.Schema(
     subscription=Subscription,
     extensions=[
         AuthentikateExtension,   
-    ]
+    ],
+    schema_directives=all_directives,
 )

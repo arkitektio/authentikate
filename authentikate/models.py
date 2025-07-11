@@ -14,7 +14,6 @@ class Organization(models.Model):
 
 class User(AbstractUser):
     """A reflection on the real User"""
-
     sub = models.CharField(max_length=1000, null=True, blank=True)
     iss = models.CharField(max_length=1000, null=True, blank=True)
     active_organization = models.ForeignKey(

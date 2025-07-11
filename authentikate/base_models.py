@@ -99,6 +99,29 @@ class JWTToken(BaseModel):
     def scopes(self) -> list[str]:
         """The scopes of the token. Each scope is a string separated by a space"""
         return self.scope.split(" ")
+    
+    
+    def has_scopes(self, scopes: list[str]) -> bool:
+        """Check if the user has the given scope"""
+        if not scopes:
+            return True
+        
+        return all(scope in self.scopes for scope in scopes)
+    
+    def has_any_role(self, roles: list[str]) -> bool:
+        """Check if the user has any of the given roles"""
+        if not roles:
+            return True
+        
+        return any(role in self.roles for role in roles)
+        
+    
+    def has_roles(self, roles: list[str]) -> bool:
+        """Check if the user has the given role"""
+        if not roles:
+            return True
+        
+        return all(role in self.roles for role in roles)
 
 
 

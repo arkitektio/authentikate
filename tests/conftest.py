@@ -72,7 +72,7 @@ def valid_claims():
         ),
         "preferred_username": "farter",
         "client_id": "XXXX",
-        "scope": "openid profile email",
+        "scope": "openid profile email read",
         "roles": ["XXXX"],
         "active_org": "kkk",
     }

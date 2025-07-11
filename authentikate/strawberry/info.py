@@ -1,0 +1,1 @@
+from kante.types import Info

@@ -45,6 +45,7 @@ class AuthentikateExtension(SchemaExtension):
         reset_client = None
         reset_token = None
         
+        
         if isinstance(context, WsContext):
             # WebSocket context
             # Do something with the WebSocket context
@@ -63,6 +64,7 @@ class AuthentikateExtension(SchemaExtension):
                 
                 context.request.set_user(user)  
                 context.request.set_client(client)
+                context.request.set_extension("token", token)
                 
             
             
@@ -84,6 +86,7 @@ class AuthentikateExtension(SchemaExtension):
                 
                 context.request.set_user(user)  
                 context.request.set_client(client)
+                context.request.set_extension("token", token)
         else:
             raise ValueError("Unknown context type. Cannot determine if it's WebSocket or HTTP.")
            
