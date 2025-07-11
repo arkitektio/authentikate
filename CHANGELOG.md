@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.18.1 (2025-07-11)
+
+
 ## v0.18.0 (2025-07-11)
+
+### Bug Fixes
+
+- Hopefully fix subscriptions
+  ([`cdf6a12`](https://github.com/arkitektio/authentikate/commit/cdf6a1273dca29c85e7f6cc83e8eb2053e2be744))
 
 ### Features
 
