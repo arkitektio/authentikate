@@ -1,6 +1,7 @@
 import strawberry
-from typing import Callable, Any, Optional, List, Union
+from typing import Awaitable, Callable, Any, Optional, List, Union
 from graphql import GraphQLError
+from strawberry.extensions.field_extension import AsyncExtensionResolver
 from strawberry.schema_directive import Location
 from kante.types import Info
 from strawberry.extensions import FieldExtension
@@ -63,6 +64,30 @@ class AuthExtension(FieldExtension):
         except KeyError:
             raise GraphQLError("Token not found in request context")
         
+        
+        
+        return next_(source, info, **kwargs)
+    
+    async def resolve_async(self, next_: Callable[..., Awaitable[Any]], source: Any, info: Info, **kwargs: Any) -> Any:
+        
+        
+        """ Resolve the field with authentication checks."""
+        if not info.context.request.user:
+            raise GraphQLError("Authentication required")
+        
+        
+        try:
+            token: JWTToken = info.context.request.get_extension("token")
+            
+            if self.scopes and not token.has_scopes(self.scopes):
+                raise GraphQLError(f"User does not have the required scopes: {self.scopes}")
+        
+            if self.roles and not token.has_roles(self.roles):
+                raise GraphQLError(f"User does not have the required roles: {', '.join(self.roles)}")
+            
+            
+        except KeyError:
+            raise GraphQLError("Token not found in request context")
         
         
         
