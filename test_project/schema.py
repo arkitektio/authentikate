@@ -50,6 +50,10 @@ class Mutation:
     def require_write(self, info: Info) -> str:
         return "User"
     
+    @strawberry_django.mutation(extensions=[AuthExtension(scopes="write")])
+    async def async_require_write(self, info: Info) -> str:
+        return "User"
+    
     @strawberry_django.mutation(extensions=[AuthExtension(scopes="read")])
     def require_read(self, info: Info) -> str:
         return "User"
