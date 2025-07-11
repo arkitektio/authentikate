@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.19.0 (2025-07-11)
+
+
 ## v0.18.2 (2025-07-11)
+
+### Features
+
+- Added support for async stuff
+  ([`06e9383`](https://github.com/arkitektio/authentikate/commit/06e9383268afc7f4501fdcdec411cb6f539b5afa))
 
 
 ## v0.18.1 (2025-07-11)
