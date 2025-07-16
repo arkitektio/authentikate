@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.21.0 (2025-07-16)
+
+### Features
+
+- Fix lack of ogrgniazion in request
+  ([`cf56d99`](https://github.com/arkitektio/authentikate/commit/cf56d9982477449b6da327e07f9bca53cdf585c8))
+
+
 ## v0.20.0 (2025-07-16)
 
 
