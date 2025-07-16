@@ -5,11 +5,11 @@ from django.contrib.auth.models import AbstractUser
 
 class Organization(models.Model):
     """An Organization model to represent an organization in the system"""
-    identifier = models.CharField(max_length=1000, unique=True)
+    slug = models.CharField(max_length=1000, unique=True)
 
     def __str__(self) -> str:
         """String representation of Organization"""
-        return self.identifier
+        return self.slug
 
 
 class User(AbstractUser):

@@ -1,10 +1,10 @@
 from typing import AsyncIterator, Iterator, Union
 from strawberry.extensions import SchemaExtension
 from kante.context import WsContext, HttpContext
-from authentikate.vars import token_var, user_var, client_var
+from authentikate.vars import token_var, user_var, client_var, organization_var
 from authentikate.base_models import JWTToken
 from authentikate.utils import authenticate_token_or_none, authenticate_header_or_none
-from authentikate.protocols import UserModel, ClientModel
+from authentikate.protocols import UserModel, ClientModel, OrganizationModel
 from typing import cast
 from authentikate.base_models import AuthentikateSettings
 
@@ -33,6 +33,13 @@ class AuthentikateExtension(SchemaExtension):
         # Call the async function to expand the client
         client = await aexpand_client_from_token(token)
         return cast(ClientModel, client)  
+    
+    async def aexpand_organization_from_token(self, token: JWTToken) -> "OrganizationModel":
+        """ Expand an organization from the provided JWT token """
+        from authentikate.expand import aexpand_organization_from_token
+        # Call the async function to expand the organization
+        organization = await aexpand_organization_from_token(token)
+        return cast(OrganizationModel, organization)
         
     
     
@@ -58,12 +65,15 @@ class AuthentikateExtension(SchemaExtension):
             if token:
                 user = await self.aexpand_user_from_token(token)
                 client = await self.aexpand_client_from_token(token)
+                organization = await self.aexpand_organization_from_token(token)
                 
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
+                reset_organization = organization_var.set(organization)
                 
                 context.request.set_user(user)  
                 context.request.set_client(client)
+                context.request.set_organization(organization)
                 context.request.set_extension("token", token)
                 
             
@@ -80,12 +90,15 @@ class AuthentikateExtension(SchemaExtension):
             if token:
                 user = await self.aexpand_user_from_token(token)
                 client = await self.aexpand_client_from_token(token)
+                organization = await self.aexpand_organization_from_token(token)
                 
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
+                reset_organization = organization_var.set(organization)
                 
                 context.request.set_user(user)  
                 context.request.set_client(client)
+                context.request.set_organization(organization)
                 context.request.set_extension("token", token)
         else:
             raise ValueError("Unknown context type. Cannot determine if it's WebSocket or HTTP.")
@@ -103,6 +116,9 @@ class AuthentikateExtension(SchemaExtension):
             
         if reset_token:
             token_var.reset(reset_token)
+            
+        if reset_organization:
+            organization_var.reset(reset_organization)
         
         return 
         

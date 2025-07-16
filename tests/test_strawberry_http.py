@@ -32,7 +32,7 @@ async def test_user_query(db, valid_auth_headers, key_pair_str) -> None:
                 sub
                 activeOrganization {
                     id
-                    identifier
+                    slug
                 }
             }
         }
@@ -42,7 +42,7 @@ async def test_user_query(db, valid_auth_headers, key_pair_str) -> None:
     assert answer["data"]["me"] is not None
     assert answer["data"]["me"]["sub"] == "1", f"Expected '1', got {answer['data']['me']['sub']}"
     assert answer["data"]["me"]["activeOrganization"] is not None, f"Expected 'activeOrganization' to be not None, got {answer['data']['me']['activeOrganization']}"
-    assert answer["data"]["me"]["activeOrganization"]["identifier"] == "kkk", f"Expected '1', got {answer['data']['me']['activeOrganization']['id']}"
+    assert answer["data"]["me"]["activeOrganization"]["slug"] == "kkk", f"Expected '1', got {answer['data']['me']['activeOrganization']['id']}"
     
     
     

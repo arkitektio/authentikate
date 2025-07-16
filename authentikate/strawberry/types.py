@@ -7,14 +7,13 @@ import strawberry_django
 class Organization:
     """ This is the organization type """
     id: str
-    identifier: str
+    slug: str
 
 @strawberry_django.type(models.User)
 class User:
     """ This is the user type """
     sub: str
     preferred_username: str
-    roles: list[str]
     active_organization: Organization | None = None
     
     

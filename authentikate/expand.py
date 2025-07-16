@@ -1,7 +1,6 @@
 from django.contrib.auth.models import Group
 from authentikate import base_models, models
 import logging
-from django.contrib.auth import get_user_model
 
 
 logger = logging.getLogger(__name__)
@@ -64,6 +63,17 @@ def set_user_groups(user: models.User, roles: list[str]) -> None:
         user.groups.add(g)
 
 
+async def aexpand_organization_from_token(
+    token: base_models.JWTToken,
+) -> models.Organization:
+    """
+    Expand an organization from the provided JWT token.
+    """
+    org, _ = await models.Organization.objects.aget_or_create(
+        slug=token.active_org
+    )
+    return org
+
 
 async def aexpand_user_from_token(
     token: base_models.JWTToken,
@@ -81,12 +91,11 @@ async def aexpand_user_from_token(
             
             if token.active_org:
                 current_org, _ = await models.Organization.objects.aget_or_create(
-                    identifier=token.active_org or "",
+                    slug=token.active_org or "",
                 )
                 
                 user.active_organization = current_org
                 
-            user.active_organization = current_org
             
             
             await user.asave()
@@ -109,7 +118,7 @@ async def aexpand_user_from_token(
         
         if token.active_org:
             current_org, _ = await models.Organization.objects.aget_or_create(
-                identifier=token.active_org or "",
+                slug=token.active_org or "",
             )
             
             user.active_organization = current_org

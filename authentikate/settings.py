@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-import os
 from authentikate.base_models import AuthentikateSettings
 from typing import Optional
 from pydantic import ValidationError
