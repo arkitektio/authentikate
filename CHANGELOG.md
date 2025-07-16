@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.20.0 (2025-07-16)
+
+
 ## v0.19.0 (2025-07-11)
+
+### Features
+
+- Add organization
+  ([`0206f7e`](https://github.com/arkitektio/authentikate/commit/0206f7e02e5aad99e1e2b5d78309ca0052f4d712))
 
 
 ## v0.18.2 (2025-07-11)
