@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.21.1 (2025-07-17)
+
+### Bug Fixes
+
+- Add reset_orgniation initialization
+  ([`9d161d7`](https://github.com/arkitektio/authentikate/commit/9d161d781ad414f8833febfa2a373f742d13f1b6))
+
+
 ## v0.21.0 (2025-07-16)
 
 ### Features
