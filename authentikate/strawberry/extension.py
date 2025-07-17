@@ -51,6 +51,7 @@ class AuthentikateExtension(SchemaExtension):
         reset_user = None
         reset_client = None
         reset_token = None
+        reset_organization = None
         
         
         if isinstance(context, WsContext):
