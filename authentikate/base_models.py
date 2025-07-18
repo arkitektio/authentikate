@@ -122,6 +122,13 @@ class JWTToken(BaseModel):
             return True
         
         return all(role in self.roles for role in roles)
+    
+    def has_any_scope(self, scopes: list[str]) -> bool:
+        """Check if the user has any of the given scopes"""
+        if not scopes:
+            return True
+        
+        return any(scope in self.scopes for scope in scopes)
 
 
 

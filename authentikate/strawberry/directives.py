@@ -23,7 +23,7 @@ class Auth:
 class AuthExtension(FieldExtension):
     
     
-    def __init__(self, scopes: Optional[List[str]] | str = None, roles: Optional[List[str]] = None) -> None:
+    def __init__(self, scopes: Optional[List[str]] | str = None, roles: Optional[List[str]] = None, any_role_of: Optional[List[str]] = None , any_scope_of: Optional[List[str]] = None ) -> None:
         """Initialize the AuthExtension with optional scopes and roles."""
         if isinstance(scopes, str):
             scopes = [scopes]
@@ -32,6 +32,8 @@ class AuthExtension(FieldExtension):
         
         self.scopes: Optional[List[str]] = scopes
         self.roles: Optional[List[str]] = roles
+        self.any_role_of: Optional[List[str]] = any_role_of
+        self.any_scope_of: Optional[List[str]] = any_scope_of
         
         
         
@@ -57,9 +59,16 @@ class AuthExtension(FieldExtension):
             
             if self.scopes and not token.has_scopes(self.scopes):
                 raise GraphQLError(f"User does not have the required scopes: {self.scopes}")
+            
+            if self.any_scope_of and not token.has_any_role(self.any_scope_of):
+                raise GraphQLError(f"User does not have any of of the required scopes: {self.any_scope_of}")
+            
         
             if self.roles and not token.has_roles(self.roles):
                 raise GraphQLError(f"User does not have the required roles: {', '.join(self.roles)}")
+            
+            if self.any_role_of and not token.has_any_role(self.any_role_of):
+                raise GraphQLError(f"User does not have any of the required roles: {', '.join(self.any_role_of)}")
             
             
         except KeyError:
