@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.23.0 (2025-07-18)
+
+### Features
+
+- Add any of role
+  ([`a1fcc48`](https://github.com/arkitektio/authentikate/commit/a1fcc48a58ec89ddf09023e5281d78482d4f34ba))
+
+
 ## v0.22.0 (2025-07-18)
 
 ### Features
