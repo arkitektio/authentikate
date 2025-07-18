@@ -27,6 +27,7 @@ def test_static_token(db, key_pair_str):
     x = authenticate_header(headers, settings)
     assert x.sub == "1", "User ID should be 1"
     assert x.iss == "XXXX", "Issuer should be 'XXXX'"
+    assert x.active_org == "static_org", "Active organization should be 'static_org'"
 
 
 

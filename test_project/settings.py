@@ -53,6 +53,12 @@ AUTHENTIKATE = {
             "public_key": "public_key.pem",
         }
     ],
+    "STATIC_TOKENS": {
+        "hallo": {
+            "sub": 1,
+            "iss": "lok",
+        }
+    },
 }
 
 

@@ -129,7 +129,8 @@ class StaticToken(JWTToken):
     """A static JWT token"""
 
     sub: str
-    iss: str
+    iss: str = "static_issuer"
+    """The issuer of the token"""
     iat: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now()
     )
@@ -137,9 +138,10 @@ class StaticToken(JWTToken):
         default_factory=lambda: datetime.datetime.now() + datetime.timedelta(days=1)
     )
     client_id: str = "static"
+    active_org: str  = "static_org"
     preferred_username: str = "static_user"
     scope: str = "openid profile email"
-    roles: list[str] = Field(default_factory=lambda: ["static"])
+    roles: list[str] = Field(default_factory=lambda: ["admin"])
     raw: str = Field(default_factory=lambda: "static_token")
     
     
