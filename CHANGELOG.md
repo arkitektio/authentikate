@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.22.0 (2025-07-18)
+
+### Features
+
+- Add static token with organization
+  ([`1ad00b7`](https://github.com/arkitektio/authentikate/commit/1ad00b777a132d9388e3925db4a5636149530202))
+
+
 ## v0.21.1 (2025-07-17)
 
 ### Bug Fixes
