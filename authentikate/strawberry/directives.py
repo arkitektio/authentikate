@@ -21,6 +21,7 @@ class Auth:
     
 
 class AuthExtension(FieldExtension):
+    """ A directive to enforce authentication and authorization on fields."""
     
     
     def __init__(self, scopes: Optional[List[str]] | str = None, roles: Optional[List[str]] = None, any_role_of: Optional[List[str]] = None , any_scope_of: Optional[List[str]] = None ) -> None:

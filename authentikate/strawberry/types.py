@@ -1,15 +1,15 @@
 
 from authentikate import models
-import strawberry_django
+import kante
 
 
-@strawberry_django.type(models.Organization)
+@kante.django_type(models.Organization)
 class Organization:
     """ This is the organization type """
     id: str
     slug: str
 
-@strawberry_django.type(models.User)
+@kante.django_type(models.User)
 class User:
     """ This is the user type """
     sub: str
@@ -18,7 +18,7 @@ class User:
     
     
     
-@strawberry_django.type(models.Client)
+@kante.django_type(models.Client)
 class Client:
     """ This is the client type """
     client_id: str

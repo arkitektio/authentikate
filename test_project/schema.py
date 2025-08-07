@@ -1,7 +1,6 @@
 from kante.types import Info
-import strawberry
+import kante
 from typing import AsyncGenerator, cast
-import strawberry_django
 from authentikate.vars import get_user, get_client
 from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension
@@ -10,26 +9,26 @@ from authentikate.strawberry.directives import Auth, AuthExtension, all_directiv
 
 
 
-@strawberry.type
+@kante.type
 class Query:
     """ This is the query class """
     
     
-    @strawberry_django.field
+    @kante.django_field
     def me(self, info: Info) -> User | None:
         """Get the current user"""
         
         user = get_user()
         return cast(User, user) if user else None
     
-    @strawberry_django.field
+    @kante.django_field
     def organization(self, info: Info) -> Organization | None:
         """Get the current organization"""
         
         return info.context.request._organization
     
     
-    @strawberry_django.field
+    @kante.django_field
     def client(self, info: Info) -> Client | None:
         """Get the current client"""
         
@@ -39,11 +38,11 @@ class Query:
         
 
 
-@strawberry.type
+@kante.type
 class Mutation:
     """ This is the mutation class """
     
-    @strawberry_django.mutation
+    @kante.django_mutation
     def create_user(self, info: Info, name: str) -> User:
         """Create a new user"""
         user = models.User.objects.create(username=name)
@@ -52,24 +51,24 @@ class Mutation:
     
     
     
-    @strawberry_django.mutation(extensions=[AuthExtension(scopes="write")])
+    @kante.mutation(extensions=[AuthExtension(scopes="write")])
     def require_write(self, info: Info) -> str:
         return "User"
     
-    @strawberry_django.mutation(extensions=[AuthExtension(scopes="write")])
+    @kante.mutation(extensions=[AuthExtension(scopes="write")])
     async def async_require_write(self, info: Info) -> str:
         return "User"
     
-    @strawberry_django.mutation(extensions=[AuthExtension(scopes="read")])
+    @kante.mutation(extensions=[AuthExtension(scopes="read")])
     def require_read(self, info: Info) -> str:
         return "User"
         
     
-@strawberry.type
+@kante.type
 class Subscription:
     """ This is the subscription class """
     
-    @strawberry.subscription(extensions=[AuthSubscribeExtension(scopes="read")])
+    @kante.subscription(extensions=[AuthSubscribeExtension(scopes="read")])
     async def yield_user(self, info: Info) -> AsyncGenerator[User,  None]:
         """Subscribe to user creation events"""
         # This is just a placeholder. In a real application, you would use channels or another method to send updates.
@@ -79,7 +78,7 @@ class Subscription:
             
 
 
-schema = strawberry.Schema(
+schema = kante.Schema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,
