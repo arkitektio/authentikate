@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.24.0 (2025-08-07)
+
+### Features
+
+- Add highest kante
+  ([`0b61811`](https://github.com/arkitektio/authentikate/commit/0b618112c6b61c6685641830997ddc5c46269615))
+
+
 ## v0.23.0 (2025-07-18)
 
 ### Features
