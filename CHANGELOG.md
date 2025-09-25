@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.25.0 (2025-09-25)
+
+### Features
+
+- We now have memberships
+  ([`f78ae6a`](https://github.com/arkitektio/authentikate/commit/f78ae6a672fbc61a81c73f71f590efe69051f06e))
+
+
 ## v0.24.0 (2025-08-07)
 
 ### Features
