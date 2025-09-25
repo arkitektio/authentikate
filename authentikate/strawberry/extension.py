@@ -4,7 +4,7 @@ from kante.context import WsContext, HttpContext
 from authentikate.vars import token_var, user_var, client_var, organization_var
 from authentikate.base_models import JWTToken
 from authentikate.utils import authenticate_token_or_none, authenticate_header_or_none
-from authentikate.protocols import UserModel, ClientModel, OrganizationModel
+from authentikate.protocols import UserModel, ClientModel, OrganizationModel, MembershipModel
 from typing import cast
 from authentikate.base_models import AuthentikateSettings
 
@@ -40,6 +40,14 @@ class AuthentikateExtension(SchemaExtension):
         # Call the async function to expand the organization
         organization = await aexpand_organization_from_token(token)
         return cast(OrganizationModel, organization)
+    
+    
+    async def aexpand_membership_from_user_and_organization(self, user: UserModel, organization: OrganizationModel) -> "MembershipModel":
+        """ Expand a membership from the provided JWT token """
+        from authentikate.expand import aexpand_membership
+        # Call the async function to expand the membership
+        membership = await aexpand_membership(user, organization)
+        return cast(MembershipModel, membership)
         
     
     
@@ -68,12 +76,16 @@ class AuthentikateExtension(SchemaExtension):
                 client = await self.aexpand_client_from_token(token)
                 organization = await self.aexpand_organization_from_token(token)
                 
+                
+                membership = await self.aexpand_membership_from_user_and_organization(user, organization)
+                
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
                 reset_organization = organization_var.set(organization)
                 
                 context.request.set_user(user)  
                 context.request.set_client(client)
+                context.request.set_membership(membership)
                 context.request.set_organization(organization)
                 context.request.set_extension("token", token)
                 
@@ -93,12 +105,16 @@ class AuthentikateExtension(SchemaExtension):
                 client = await self.aexpand_client_from_token(token)
                 organization = await self.aexpand_organization_from_token(token)
                 
+                membership = await self.aexpand_membership_from_user_and_organization(user, organization)
+                
+                
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
                 reset_organization = organization_var.set(organization)
                 
                 context.request.set_user(user)  
                 context.request.set_client(client)
+                context.request.set_membership(membership)
                 context.request.set_organization(organization)
                 context.request.set_extension("token", token)
         else:
@@ -120,6 +136,7 @@ class AuthentikateExtension(SchemaExtension):
             
         if reset_organization:
             organization_var.reset(reset_organization)
+            
         
         return 
         

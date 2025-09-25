@@ -36,3 +36,11 @@ class OrganizationModel(Protocol):
 
     slug: str
     """The name of orgnaization"""
+    
+    
+class MembershipModel(Protocol):    
+    """A protocol for the membership model"""
+    
+    id: int
+    """The id of the membership"""
+    

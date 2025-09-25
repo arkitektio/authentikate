@@ -36,6 +36,30 @@ class User(AbstractUser):
             )
         ]
         permissions = [("imitate", "Can imitate me")]
+        
+        
+        
+ 
+class Membership(models.Model):
+    """A Membership model to represent a user's membership in an organization"""
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="memberships"
+    )
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="memberships"
+    )
+    blocked = models.BooleanField(default=False)
+    roles = models.JSONField(default=list)
+
+    class Meta:
+        """Meta class for Membership"""
+
+        unique_together = ("user", "organization")
+
+    def __str__(self) -> str:
+        """String representation of Membership"""
+        return f"{self.user} in {self.organization}"       
+        
 
 
 class Client(models.Model):

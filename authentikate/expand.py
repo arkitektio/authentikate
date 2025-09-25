@@ -1,7 +1,8 @@
 from django.contrib.auth.models import Group
 from authentikate import base_models, models
 import logging
-
+from authentikate.protocols import UserModel, ClientModel, OrganizationModel, MembershipModel
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,19 @@ async def aexpand_organization_from_token(
         slug=token.active_org
     )
     return org
+
+async def aexpand_membership(
+    user: UserModel, organization: OrganizationModel,
+) -> models.Membership:
+    """
+    Expand a membership from the provided user and organization.
+    """
+    membership, _ = await models.Membership.objects.aget_or_create(
+        user_id=user.id,
+        organization_id=organization.id,
+    )
+    return membership
+    
 
 
 async def aexpand_user_from_token(
