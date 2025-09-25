@@ -77,13 +77,17 @@ async def aexpand_organization_from_token(
 
 async def aexpand_membership(
     user: UserModel, organization: OrganizationModel,
+    token: base_models.JWTToken
 ) -> models.Membership:
     """
     Expand a membership from the provided user and organization.
     """
-    membership, _ = await models.Membership.objects.aget_or_create(
+    membership, _ = await models.Membership.objects.aupdate_or_create(
         user_id=user.id,
         organization_id=organization.id,
+        defaults=dict(
+            roles=token.roles,
+        )
     )
     return membership
     

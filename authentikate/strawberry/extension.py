@@ -42,11 +42,11 @@ class AuthentikateExtension(SchemaExtension):
         return cast(OrganizationModel, organization)
     
     
-    async def aexpand_membership_from_user_and_organization(self, user: UserModel, organization: OrganizationModel) -> "MembershipModel":
+    async def aexpand_membership_from_user_and_organization(self, user: UserModel, organization: OrganizationModel, token: JWTToken) -> "MembershipModel":
         """ Expand a membership from the provided JWT token """
         from authentikate.expand import aexpand_membership
         # Call the async function to expand the membership
-        membership = await aexpand_membership(user, organization)
+        membership = await aexpand_membership(user, organization, token)
         return cast(MembershipModel, membership)
         
     
@@ -77,7 +77,7 @@ class AuthentikateExtension(SchemaExtension):
                 organization = await self.aexpand_organization_from_token(token)
                 
                 
-                membership = await self.aexpand_membership_from_user_and_organization(user, organization)
+                membership = await self.aexpand_membership_from_user_and_organization(user, organization, token)
                 
                 reset_client = client_var.set(client)
                 reset_user = user_var.set(user)
@@ -105,7 +105,7 @@ class AuthentikateExtension(SchemaExtension):
                 client = await self.aexpand_client_from_token(token)
                 organization = await self.aexpand_organization_from_token(token)
                 
-                membership = await self.aexpand_membership_from_user_and_organization(user, organization)
+                membership = await self.aexpand_membership_from_user_and_organization(user, organization, token)
                 
                 
                 reset_client = client_var.set(client)
