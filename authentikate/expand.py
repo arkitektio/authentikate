@@ -81,6 +81,8 @@ async def aexpand_membership(
 ) -> models.Membership:
     """
     Expand a membership from the provided user and organization.
+    
+    
     """
     membership, _ = await models.Membership.objects.aupdate_or_create(
         user_id=user.id,
@@ -89,6 +91,7 @@ async def aexpand_membership(
             roles=token.roles,
         )
     )
+    assert membership.blocked is False, "Membership is blocked"
     return membership
     
 
