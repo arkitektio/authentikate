@@ -10,7 +10,7 @@ dependencies = [
     "pydantic>2, <3",
     "django-guardian>=2.4.0,<3",
     "django>5",
-    "kante>=0.15",
+    "kante>=0.16",
     "joserfc>=1.0.4",
 ]
 

@@ -31,7 +31,7 @@ wheels = [
 
 [[package]]
 name = "authentikate"
-version = "0.24.0"
+version = "0.26.0"
 source = { editable = "." }
 dependencies = [
     { name = "django" },
@@ -61,7 +61,7 @@ requires-dist = [
     { name = "django", specifier = ">5" },
     { name = "django-guardian", specifier = ">=2.4.0,<3" },
     { name = "joserfc", specifier = ">=1.0.4" },
-    { name = "kante", specifier = ">=0.15" },
+    { name = "kante", specifier = ">=0.16" },
     { name = "pydantic", specifier = ">2,<3" },
 ]
 
@@ -565,7 +565,7 @@ wheels = [
 
 [[package]]
 name = "kante"
-version = "0.15.0"
+version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "channels" },
@@ -573,9 +573,9 @@ dependencies = [
     { name = "strawberry-graphql", extra = ["channels"] },
     { name = "strawberry-graphql-django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/56/e6/cc4e8d667f4ea13b221c399a3afd62b9e1cafa257a729c0c002e98c39626/kante-0.15.0.tar.gz", hash = "sha256:322cf6afd4ebded873749f316d3ed7dee435c6ceeaab9475aa765620dbaa40d5", size = 11999, upload-time = "2025-09-25T11:42:23.335Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/f3/b5620152f9660e90dc576e9e5cab9c06806804f88a3449e8b91e4e1bbb12/kante-0.16.0.tar.gz", hash = "sha256:767bf0c5b091a20e8cf37e33b5a42007d6099326a001d0cbbfe6645b682ba346", size = 12020, upload-time = "2025-09-25T11:58:47.778Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e0/53/1e15258394a858c66562cc0ca6754b5b91fa94146f5a945bde779e1aabaa/kante-0.15.0-py3-none-any.whl", hash = "sha256:e6f00e36ae5731b9b0851fcfbe714d48c14720f218940b73dabac859786eb453", size = 15439, upload-time = "2025-09-25T11:42:22.561Z" },
+    { url = "https://files.pythonhosted.org/packages/77/f7/c851d7e0ea1914745d14406199bdb59299952d2e83b40060a262691007c3/kante-0.16.0-py3-none-any.whl", hash = "sha256:7a237ad55ece051bc9b575e59c4ecd74bd9c15c7eceb0a027736bf19be2d119a", size = 15451, upload-time = "2025-09-25T11:58:46.663Z" },
 ]
 
 [[package]]
