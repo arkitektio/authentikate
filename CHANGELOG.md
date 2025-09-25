@@ -1,9 +1,15 @@
 # CHANGELOG
 
 
+## v0.28.0 (2025-09-25)
+
+
 ## v0.27.0 (2025-09-25)
 
 ### Features
+
+- Add membership blocked feature
+  ([`305ccf3`](https://github.com/arkitektio/authentikate/commit/305ccf38b13ec8e73463d0076617e45465127677))
 
 - Update kante
   ([`9ee5640`](https://github.com/arkitektio/authentikate/commit/9ee56409df887b1c3227c17d6dfc78719da82d0c))
