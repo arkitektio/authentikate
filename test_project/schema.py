@@ -4,78 +4,79 @@ from typing import AsyncGenerator, cast
 from authentikate.vars import get_user, get_client
 from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension
-from authentikate.strawberry.types import User, Client, Organization
-from authentikate.strawberry.directives import Auth, AuthExtension, all_directives, AuthSubscribeExtension
-
+from authentikate.strawberry.types import App, User, Client, Organization
+from authentikate.strawberry.directives import (
+    Auth,
+    AuthExtension,
+    all_directives,
+    AuthSubscribeExtension,
+)
 
 
 @kante.type
 class Query:
-    """ This is the query class """
-    
-    
+    """This is the query class"""
+
     @kante.django_field
     def me(self, info: Info) -> User | None:
         """Get the current user"""
-        
+
         user = get_user()
         return cast(User, user) if user else None
-    
+
     @kante.django_field
     def organization(self, info: Info) -> Organization | None:
         """Get the current organization"""
-        
+
         return info.context.request._organization
-    
-    
+
     @kante.django_field
     def client(self, info: Info) -> Client | None:
         """Get the current client"""
-        
+
         client = get_client()
         return cast(Client, client) if client else None
-        
-        
+
+    @kante.django_field
+    def app(self, info: Info) -> App | None:
+        """Get the current app name"""
+
+        client = get_client()
+        return client.release.app if client and client.release else None
 
 
 @kante.type
 class Mutation:
-    """ This is the mutation class """
-    
+    """This is the mutation class"""
+
     @kante.django_mutation
     def create_user(self, info: Info, name: str) -> User:
         """Create a new user"""
         user = models.User.objects.create(username=name)
         return cast(User, user)
-    
-    
-    
-    
+
     @kante.mutation(extensions=[AuthExtension(scopes="write")])
     def require_write(self, info: Info) -> str:
         return "User"
-    
+
     @kante.mutation(extensions=[AuthExtension(scopes="write")])
     async def async_require_write(self, info: Info) -> str:
         return "User"
-    
+
     @kante.mutation(extensions=[AuthExtension(scopes="read")])
     def require_read(self, info: Info) -> str:
         return "User"
-        
-    
+
+
 @kante.type
 class Subscription:
-    """ This is the subscription class """
-    
+    """This is the subscription class"""
+
     @kante.subscription(extensions=[AuthSubscribeExtension(scopes="read")])
-    async def yield_user(self, info: Info) -> AsyncGenerator[User,  None]:
+    async def yield_user(self, info: Info) -> AsyncGenerator[User, None]:
         """Subscribe to user creation events"""
         # This is just a placeholder. In a real application, you would use channels or another method to send updates.
         yield cast(User, info.context.request.user)
-    
-            
-            
 
 
 schema = kante.Schema(
@@ -83,7 +84,7 @@ schema = kante.Schema(
     mutation=Mutation,
     subscription=Subscription,
     extensions=[
-        AuthentikateExtension,   
+        AuthentikateExtension,
     ],
     schema_directives=all_directives,
 )

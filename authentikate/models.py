@@ -2,9 +2,9 @@ from django.db import models  # Create your models here.
 from django.contrib.auth.models import AbstractUser
 
 
-
 class Organization(models.Model):
     """An Organization model to represent an organization in the system"""
+
     slug = models.CharField(max_length=1000, unique=True)
 
     def __str__(self) -> str:
@@ -14,6 +14,7 @@ class Organization(models.Model):
 
 class User(AbstractUser):
     """A reflection on the real User"""
+
     sub = models.CharField(max_length=1000, null=True, blank=True)
     iss = models.CharField(max_length=1000, null=True, blank=True)
     active_organization = models.ForeignKey(
@@ -36,15 +37,12 @@ class User(AbstractUser):
             )
         ]
         permissions = [("imitate", "Can imitate me")]
-        
-        
-        
- 
+
+
 class Membership(models.Model):
     """A Membership model to represent a user's membership in an organization"""
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="memberships"
-    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="memberships")
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="memberships"
     )
@@ -58,8 +56,27 @@ class Membership(models.Model):
 
     def __str__(self) -> str:
         """String representation of Membership"""
-        return f"{self.user} in {self.organization}"       
-        
+        return f"{self.user} in {self.organization}"
+
+
+class App(models.Model):
+    """An App model to represent an application in the system"""
+
+    identifier = models.CharField(max_length=2000)
+
+    def __str__(self) -> str:
+        """String representation of App"""
+        return f"{self.identifier}"
+
+
+class Release(models.Model):
+    """A Release model to represent a release of an application in the system"""
+
+    app = models.ForeignKey(App, on_delete=models.CASCADE, related_name="releases")
+    version = models.CharField(max_length=2000)
+
+    class Meta:
+        """Meta class for Release"""
 
 
 class Client(models.Model):
@@ -72,6 +89,14 @@ class Client(models.Model):
     of users by app.
 
     """
+
+    release = models.ForeignKey(
+        Release,
+        on_delete=models.SET_NULL,
+        related_name="clients",
+        null=True,
+        blank=True,
+    )
     iss = models.CharField(max_length=2000, null=True, blank=True)
     client_id = models.CharField(unique=True, max_length=2000)
     name = models.CharField(max_length=2000, null=True, blank=True)

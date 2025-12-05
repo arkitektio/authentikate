@@ -1,7 +1,12 @@
 from django.contrib.auth.models import Group
 from authentikate import base_models, models
 import logging
-from authentikate.protocols import UserModel, ClientModel, OrganizationModel, MembershipModel
+from authentikate.protocols import (
+    UserModel,
+    ClientModel,
+    OrganizationModel,
+    MembershipModel,
+)
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -24,10 +29,9 @@ def token_to_username(token: base_models.JWTToken) -> str:
 
 
     """
+    # Generate a username based on the token's iss and sub
+    # and ensure it's unique
     return f"{token.iss}_{token.sub}"
-
-
-
 
 
 async def aset_user_groups(user: models.User, roles: list[str]) -> None:
@@ -70,30 +74,27 @@ async def aexpand_organization_from_token(
     """
     Expand an organization from the provided JWT token.
     """
-    org, _ = await models.Organization.objects.aget_or_create(
-        slug=token.active_org
-    )
+    org, _ = await models.Organization.objects.aget_or_create(slug=token.active_org)
     return org
 
+
 async def aexpand_membership(
-    user: UserModel, organization: OrganizationModel,
-    token: base_models.JWTToken
+    user: UserModel, organization: OrganizationModel, token: base_models.JWTToken
 ) -> models.Membership:
     """
     Expand a membership from the provided user and organization.
-    
-    
+
+
     """
     membership, _ = await models.Membership.objects.aupdate_or_create(
         user_id=user.id,
         organization_id=organization.id,
         defaults=dict(
             roles=token.roles,
-        )
+        ),
     )
     assert membership.blocked is False, "Membership is blocked"
     return membership
-    
 
 
 async def aexpand_user_from_token(
@@ -102,27 +103,24 @@ async def aexpand_user_from_token(
     """
     Expand a user from the provided JWT token.
     """
-    
+
     try:
         user = await models.User.objects.aget(sub=token.sub, iss=token.iss)
         if user.changed_hash != token.changed_hash:
             # User has changed, update the user object
             user.first_name = token.preferred_username
             user.changed_hash = token.changed_hash
-            
+
             if token.active_org:
                 current_org, _ = await models.Organization.objects.aget_or_create(
                     slug=token.active_org or "",
                 )
-                
+
                 user.active_organization = current_org
-                
-            
-            
+
             await user.asave()
             await aset_user_groups(user, token.roles)
-            
-            
+
         return user
 
     except models.User.DoesNotExist:
@@ -131,30 +129,29 @@ async def aexpand_user_from_token(
             sub=token.sub,
             username=token_to_username(token),
             iss=token.iss,
-            first_name=token.preferred_username,
         )
         user.set_unusable_password()
         user.first_name = token.preferred_username
         user.changed_hash = token.changed_hash
-        
+
         if token.active_org:
             current_org, _ = await models.Organization.objects.aget_or_create(
                 slug=token.active_org or "",
             )
-            
+
             user.active_organization = current_org
-        
+
         await user.asave()
-        await aset_user_groups(user, token.roles)
         return user
-   
+
+
 def expand_user_from_token(
     token: base_models.JWTToken,
 ) -> models.User:
     """
     Expand a user from the provided JWT token.
     """
-    
+
     try:
         user = models.User.objects.get(sub=token.sub, iss=token.iss)
         if user.changed_hash != token.changed_hash:
@@ -162,55 +159,68 @@ def expand_user_from_token(
             user.first_name = token.preferred_username
             user.changed_hash = token.changed_hash
             set_user_groups(user, token.roles)
-            
+
             if token.active_org:
                 current_org, _ = models.Organization.objects.get_or_create(
-                    identifier=token.active_org)
-                
+                    identifier=token.active_org
+                )
+
                 user.active_organization = current_org
-            
+
             user.save()
-            
+
         return user
 
     except models.User.DoesNotExist:
-        preexisting_user = models.User.objects.filter(
-            username=token.preferred_username
-        ).first()
 
         user = models.User(
             sub=token.sub,
-            username=token_to_username(token)
-            if preexisting_user
-            else token.preferred_username,
+            username=(token_to_username(token)),
             iss=token.iss,
             first_name=token.preferred_username,
         )
         user.set_unusable_password()
         user.first_name = token.preferred_username
         user.changed_hash = token.changed_hash
-        
+
         if token.active_org:
             current_org, _ = models.Organization.objects.get_or_create(
-                identifier=token.active_org)
-            
+                identifier=token.active_org
+            )
+
             user.active_organization = current_org
-        
-        
+
         user.save()
         set_user_groups(user, token.roles)
-        return user 
-    
+        return user
+
+
 async def aexpand_client_from_token(
     token: base_models.JWTToken,
 ) -> models.Client:
     """
     Expand a client from the provided JWT token.
     """
-    client, _ = await models.Client.objects.aget_or_create(
-        client_id=token.client_id, iss=token.iss
-    )
-    return client
+    try:
+        client = await models.Client.objects.aget(
+            client_id=token.client_id, iss=token.iss
+        )
+        return client
+    except models.Client.DoesNotExist:
+        if token.client_app and token.client_release:
+            app, _ = await models.App.objects.aget_or_create(
+                identifier=token.client_app
+            )
+            release, _ = await models.Release.objects.aget_or_create(
+                app=app, version=token.client_release
+            )
+        else:
+            app = None
+            release = None
+
+        return await models.Client.objects.acreate(
+            client_id=token.client_id, iss=token.iss, release=release
+        )
 
 
 def expand_client_from_token(
@@ -219,10 +229,19 @@ def expand_client_from_token(
     """
     Expand a client from the provided JWT token.
     """
-    client, _ = models.Client.objects.get_or_create(
-        client_id=token.client_id, iss=token.iss
-    )
-    return client
+    try:
+        client = models.Client.objects.get(client_id=token.client_id, iss=token.iss)
+        return client
+    except models.Client.DoesNotExist:
+        if token.client_app and token.client_release:
+            app, _ = models.App.objects.get_or_create(identifier=token.client_app)
+            release, _ = models.Release.objects.get_or_create(
+                app=app, version=token.client_release
+            )
+        else:
+            app = None
+            release = None
 
-
-
+        return models.Client.objects.create(
+            client_id=token.client_id, iss=token.iss, release=release
+        )

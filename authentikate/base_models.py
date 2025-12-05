@@ -1,6 +1,14 @@
 import logging
 from typing import Literal, Optional, Type, Union, Annotated
-from pydantic import BaseModel, Field, ConfigDict, field_validator, AliasChoices, Discriminator, FilePath
+from pydantic import (
+    BaseModel,
+    Field,
+    ConfigDict,
+    field_validator,
+    AliasChoices,
+    Discriminator,
+    FilePath,
+)
 import datetime
 from typing import Dict, Any
 from joserfc.jwk import KeySet, RSAKey, OctKey, ECKey
@@ -19,21 +27,20 @@ class JWTToken(BaseModel):
     The token is decoded using the `decode_token` function.
 
     """
-    model_config = ConfigDict(extra="forbid")
+
+    model_config = ConfigDict(extra="ignore")
 
     sub: str
     """A unique identifier for the user (is unique for the issuer)"""
     iss: str
     """The issuer of the token"""
-    
-    
+
     exp: datetime.datetime
     """The expiration time of the token"""
-    
-    
+
     active_org: str | None = None
     """The active organization of the user, if any"""
-    
+
     client_id: str
     """The client_id of the app that requested the token"""
     preferred_username: str
@@ -42,28 +49,38 @@ class JWTToken(BaseModel):
     """The roles of the user"""
     scope: str
     """The scope of the token"""
-    
+
     iat: datetime.datetime
     """The issued at time of the token"""
 
     aud: list[str] | None = None
     """The audience of the token"""
-    
+
     jti: str | None = None
     """The unique identifier for the token"""
 
     raw: str
     """ The raw original token string """
-    
-    
+
+    client_app: str | None = None
+    """ The client app name """
+
+    client_release: str | None = None
+    """ The client release version """
+
+    client_node: str | None = None
+    """ The client node name """
+
     @field_validator("aud", mode="before")
-    def aud_to_list(cls: Type["JWTToken"], v: str | list[str] | None) -> list[str] | None:
+    def aud_to_list(
+        cls: Type["JWTToken"], v: str | list[str] | None
+    ) -> list[str] | None:
         """Convert the aud to a list"""
         if not v:
             return None
         if isinstance(v, str):
             return [v]
-        
+
         return v
 
     @field_validator("sub", mode="before")
@@ -72,7 +89,7 @@ class JWTToken(BaseModel):
         if isinstance(v, int):
             return str(v)
         return v
-    
+
     @field_validator("iat", mode="before")
     def iat_to_datetime(cls: Type["JWTToken"], v: int) -> datetime.datetime:
         """Convert the iat to a datetime object"""
@@ -81,8 +98,7 @@ class JWTToken(BaseModel):
         if isinstance(v, int):
             return datetime.datetime.fromtimestamp(v)
         return v
-    
-    
+
     @field_validator("exp", mode="before")
     def exp_to_datetime(cls: Type["JWTToken"], v: int) -> datetime.datetime:
         """Convert the exp to a datetime object"""
@@ -93,43 +109,47 @@ class JWTToken(BaseModel):
     @property
     def changed_hash(self) -> str:
         """A hash that changes when the user changes"""
-        return str(hash(self.sub + self.preferred_username + " ".join(self.roles) + (self.active_org or "")))
+        return str(
+            hash(
+                self.sub
+                + self.preferred_username
+                + " ".join(self.roles)
+                + (self.active_org or "")
+            )
+        )
 
     @property
     def scopes(self) -> list[str]:
         """The scopes of the token. Each scope is a string separated by a space"""
         return self.scope.split(" ")
-    
-    
+
     def has_scopes(self, scopes: list[str]) -> bool:
         """Check if the user has the given scope"""
         if not scopes:
             return True
-        
+
         return all(scope in self.scopes for scope in scopes)
-    
+
     def has_any_role(self, roles: list[str]) -> bool:
         """Check if the user has any of the given roles"""
         if not roles:
             return True
-        
+
         return any(role in self.roles for role in roles)
-        
-    
+
     def has_roles(self, roles: list[str]) -> bool:
         """Check if the user has the given role"""
         if not roles:
             return True
-        
+
         return all(role in self.roles for role in roles)
-    
+
     def has_any_scope(self, scopes: list[str]) -> bool:
         """Check if the user has any of the given scopes"""
         if not scopes:
             return True
-        
-        return any(scope in self.scopes for scope in scopes)
 
+        return any(scope in self.scopes for scope in scopes)
 
 
 class StaticToken(JWTToken):
@@ -138,67 +158,69 @@ class StaticToken(JWTToken):
     sub: str
     iss: str = "static_issuer"
     """The issuer of the token"""
-    iat: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now()
-    )
+    iat: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now())
     exp: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now() + datetime.timedelta(days=1)
     )
     client_id: str = "static"
-    active_org: str  = "static_org"
+    client_app: str = "static_app"
+    client_release: str = "v1.0.0"
+    active_org: str = "static_org"
     preferred_username: str = "static_user"
     scope: str = "openid profile email"
     roles: list[str] = Field(default_factory=lambda: ["admin"])
     raw: str = Field(default_factory=lambda: "static_token")
-    
-    
+
 
 class ImitationRequest(BaseModel):
-    """ An imitation request"""
+    """An imitation request"""
+
     sub: str
     iss: str
-    
-   
-   
+
+
 class Issuer(BaseModel):
     """An issuer
 
     This is a pydantic model that represents an issuer.
     It is used to validate the issuer and to extract information from it.
     """
+
     model_config = ConfigDict(extra="forbid")
-    kind: str 
+    kind: str
     iss: str = Field(
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
-    """The issuer of the token""" 
-    
+    """The issuer of the token"""
+
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
-        raise NotImplementedError("get_jwks not implemented. Must be implemented in subclass")
-    
+        raise NotImplementedError(
+            "get_jwks not implemented. Must be implemented in subclass"
+        )
+
+
 class JWKIssuer(Issuer):
     """An issuer
 
     This is a pydantic model that represents an issuer.
     It is used to validate the issuer and to extract information from it.
     """
+
     kind: Literal["jwks_dict"] = Field(
         default="jwks_dict",
     )
-    
 
     iss: str = Field(
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
     """The issuer of the token"""
-    
+
     jwks: Dict[str, Any] = Field(
         validation_alias=AliasChoices("jwks", "JWKS", "JWKS_DICT")
     )
     """The jwks of the issuer"""
-    
-    
+
     @field_validator("jwks", mode="before")
     def validate_jwks_dict(cls: Type["JWKIssuer"], v: Dict[str, Any]) -> Dict[str, Any]:
         """Validate the jwks dict"""
@@ -209,20 +231,19 @@ class JWKIssuer(Issuer):
         if not isinstance(v["keys"], list):
             raise ValueError("jwks_dict keys must be a list")
         return v
-    
-    
+
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
         return self.jwks["keys"]
-    
-    
-    
+
+
 class RSAKeyIssuer(Issuer):
     """An issuer
 
     This is a pydantic model that represents an issuer.
     It is used to validate the issuer and to extract information from it.
     """
+
     model_config = ConfigDict(extra="forbid")
     kind: Literal["rsa"] = Field(
         default="rsa",
@@ -232,27 +253,24 @@ class RSAKeyIssuer(Issuer):
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
     key_id: str = Field(
-        default="1",
-        validation_alias=AliasChoices("key_id", "kid", "KID")
+        default="1", validation_alias=AliasChoices("key_id", "kid", "KID")
     )
     """The issuer of the token"""
-    public_key: str = Field(
-        validation_alias=AliasChoices("public_key", "PUBLIC_KEY")
-    )
-    
+    public_key: str = Field(validation_alias=AliasChoices("public_key", "PUBLIC_KEY"))
+
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
         t = RSAKey.import_key(self.public_key)
         return [t.as_dict(kid=self.key_id)]
-    
-    
-    
+
+
 class RSAKeyFileIssuer(Issuer):
     """An issuer
 
     This is a pydantic model that represents an issuer.
     It is used to validate the issuer and to extract information from it.
     """
+
     model_config = ConfigDict(extra="forbid")
     kind: Literal["rsa_file"] = Field(
         default="rsa_file",
@@ -262,31 +280,26 @@ class RSAKeyFileIssuer(Issuer):
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
     key_id: str = Field(
-        default="1",
-        validation_alias=AliasChoices("key_id", "kid", "KID")
+        default="1", validation_alias=AliasChoices("key_id", "kid", "KID")
     )
     """The issuer of the token"""
     public_key_pem_file: FilePath = Field(
         validation_alias=AliasChoices("public_key_pem_file", "PUBLIC_KEY_PEM_FILE")
     )
-    
+
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
-        
+
         with open(self.public_key_pem_file, "rb") as f:
             public_key = f.read()
-        
-        
-        
+
         t = RSAKey.import_key(public_key)
         return [t.as_dict(kid=self.key_id)]
-    
-    
-    
-       
-    
-    
-IssuerUnion = Annotated[Union[JWKIssuer, RSAKeyIssuer, RSAKeyFileIssuer], Discriminator("kind")]
+
+
+IssuerUnion = Annotated[
+    Union[JWKIssuer, RSAKeyIssuer, RSAKeyFileIssuer], Discriminator("kind")
+]
 
 
 class AuthentikateSettings(BaseModel):
@@ -295,11 +308,18 @@ class AuthentikateSettings(BaseModel):
     This is a pydantic model that represents the settings for authentikate.
     It is used to configure the library.
     """
+
     model_config = ConfigDict(extra="forbid")
-    
-    issuers: list[IssuerUnion] = Field(validation_alias=AliasChoices(
-        "issuers", "iss", "issuer", "issuer_url", "ISSUERS", 
-    ))
+
+    issuers: list[IssuerUnion] = Field(
+        validation_alias=AliasChoices(
+            "issuers",
+            "iss",
+            "issuer",
+            "issuer_url",
+            "ISSUERS",
+        )
+    )
     authorization_headers: list[str] = Field(
         default_factory=lambda: [
             "Authorization",
@@ -309,64 +329,51 @@ class AuthentikateSettings(BaseModel):
         ],
         validation_alias=AliasChoices(
             "authorization_headers", "AUTHORIZATION_HEADERS", "AUTHORIZATION_HEADERS"
-        )
+        ),
     )
-    static_tokens: dict[str, StaticToken] = Field(default_factory=dict, validation_alias=AliasChoices(
-        "static_tokens", "STATIC_TOKENS", "STATIC_TOKENS"
-    ))
+    static_tokens: dict[str, StaticToken] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices(
+            "static_tokens", "STATIC_TOKENS", "STATIC_TOKENS"
+        ),
+    )
     """A map of static tokens to their decoded values. Should only be used in tests."""
-    
-    
-    
-    
-    
-    
+
     def get_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
-            
+
         merged_jwks = {}
-        
+
         for issuer in self.issuers:
             keys = issuer.get_as_jwks()
-            
-            
+
             if not isinstance(keys, list):
                 raise ValueError("keys must be a list")
-            
+
             for key in keys:
                 if key.get("kid") is None:
                     raise ValueError("key must contain a kid field")
-                
+
                 if key["kid"] in merged_jwks:
                     raise ValueError(f"Duplicate kid found: {key['kid']}")
-                
+
                 merged_jwks[key["kid"]] = key
-                
+
         if not merged_jwks:
             raise ValueError("No keys found in jwks")
-        
-        
+
         validated_keys = []
-        
+
         for key in merged_jwks.values():
             validated_keys.append(key)
-                
-            
-            
-            
+
         return validated_keys
-    
-    
-    
+
     def load_key(self, obj: GuestProtocol) -> KeySet:
         """Resolve the key from the header"""
         kid = obj.headers().get("kid")
         if not kid:
             raise ValueError("Missing kid in header")
-        
-        
-        
-        
+
         key_set = KeySet.import_key_set({"keys": self.get_jwks()})
         return key_set
-

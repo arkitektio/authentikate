@@ -8,7 +8,12 @@ import datetime
 from joserfc import jwt
 import uuid
 from joserfc.jwk import RSAKey
-from authentikate.base_models import AuthentikateSettings, Issuer, RSAKeyIssuer, JWKIssuer
+from authentikate.base_models import (
+    AuthentikateSettings,
+    Issuer,
+    RSAKeyIssuer,
+    JWKIssuer,
+)
 
 
 # Generate a private key
@@ -67,36 +72,35 @@ def valid_claims():
         "iss": "XXXX",
         "jti": uuid.uuid4().hex,
         "iat": int(datetime.datetime.now().timestamp()),  # issued at
-        "exp": int(
-            (datetime.datetime.now() + datetime.timedelta(days=1)).timestamp()
-        ),
+        "exp": int((datetime.datetime.now() + datetime.timedelta(days=1)).timestamp()),
         "preferred_username": "farter",
         "client_id": "XXXX",
         "scope": "openid profile email read",
         "roles": ["XXXX"],
         "active_org": "kkk",
+        "client_app": "my_app",
+        "client_release": "v1.0.0",
     }
 
 
 @pytest.fixture(scope="session")
 def valid_jwt(valid_claims, key_pair_str: KeyPairStr):
-    
+
     key = RSAKey.import_key(key_pair_str.private_key)
-    
+
     header = {"alg": "RS256", "kid": "1"}
     return jwt.encode(
         header,
         valid_claims,
         key,
     )
-    
-    
+
+
 @pytest.fixture(scope="session")
 def valid_settings(key_pair_str: KeyPairStr):
-    
+
     key = RSAKey.import_key(key_pair_str.public_key)
-    
-    
+
     return AuthentikateSettings(
         issuers=[
             JWKIssuer(
@@ -105,14 +109,15 @@ def valid_settings(key_pair_str: KeyPairStr):
                     "keys": [
                         key.as_dict(kid="1"),
                     ]
-                }
+                },
             )
         ]
     )
-    
+
+
 @pytest.fixture(scope="session")
 def valid_rsa_key(key_pair_str: KeyPairStr):
-    
+
     return AuthentikateSettings(
         issuers=[
             RSAKeyIssuer(
@@ -121,8 +126,8 @@ def valid_rsa_key(key_pair_str: KeyPairStr):
             )
         ]
     )
-    
-    
+
+
 @pytest.fixture(scope="session")
 def valid_decode_key(key_pair_str: KeyPairStr):
     return RSAKey.import_key(key_pair_str.public_key)
