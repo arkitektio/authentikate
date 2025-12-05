@@ -2,6 +2,14 @@ from authentikate import models
 import kante
 
 
+@kante.django_type(models.Device)
+class Device:
+    """This is the devicetype"""
+
+    id: str
+    device_id: str
+
+
 @kante.django_type(models.App)
 class App:
     """This is the apptype"""

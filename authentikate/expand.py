@@ -202,9 +202,28 @@ async def aexpand_client_from_token(
     Expand a client from the provided JWT token.
     """
     try:
-        client = await models.Client.objects.aget(
+        client = await models.Client.objects.prefetch_related("device", "release").aget(
             client_id=token.client_id, iss=token.iss
         )
+
+        if not client.device and token.client_device:
+            device, _ = await models.Device.objects.aget_or_create(
+                device_id=token.client_device
+            )
+            client.device = device
+            await client.asave()
+
+        if not client.release and token.client_app and token.client_release:
+            app, _ = await models.App.objects.aget_or_create(
+                identifier=token.client_app
+            )
+            release, _ = await models.Release.objects.aget_or_create(
+                app=app, version=token.client_release
+            )
+
+            client.release = release
+            await client.asave()
+
         return client
     except models.Client.DoesNotExist:
         if token.client_app and token.client_release:
@@ -214,12 +233,19 @@ async def aexpand_client_from_token(
             release, _ = await models.Release.objects.aget_or_create(
                 app=app, version=token.client_release
             )
+
+        if token.client_device:
+            device, _ = await models.Device.objects.aget_or_create(
+                device_id=token.client_device
+            )
+
         else:
             app = None
             release = None
+            device = None
 
         return await models.Client.objects.acreate(
-            client_id=token.client_id, iss=token.iss, release=release
+            client_id=token.client_id, iss=token.iss, release=release, device=device
         )
 
 
@@ -230,7 +256,26 @@ def expand_client_from_token(
     Expand a client from the provided JWT token.
     """
     try:
-        client = models.Client.objects.get(client_id=token.client_id, iss=token.iss)
+        client = models.Client.objects.prefetch_related("device", "release").get(
+            client_id=token.client_id, iss=token.iss
+        )
+
+        if not client.device and token.client_device:
+            device, _ = models.Device.objects.get_or_create(
+                device_id=token.client_device
+            )
+            client.device = device
+            client.save()
+
+        if not client.release and token.client_app and token.client_release:
+            app, _ = models.App.objects.get_or_create(identifier=token.client_app)
+            release, _ = models.Release.objects.get_or_create(
+                app=app, version=token.client_release
+            )
+
+            client.release = release
+            client.save()
+
         return client
     except models.Client.DoesNotExist:
         if token.client_app and token.client_release:
@@ -238,10 +283,17 @@ def expand_client_from_token(
             release, _ = models.Release.objects.get_or_create(
                 app=app, version=token.client_release
             )
+
+        if token.client_device:
+            device, _ = models.Device.objects.get_or_create(
+                device_id=token.client_device
+            )
+
         else:
             app = None
             release = None
+            device = None
 
         return models.Client.objects.create(
-            client_id=token.client_id, iss=token.iss, release=release
+            client_id=token.client_id, iss=token.iss, release=release, device=device
         )

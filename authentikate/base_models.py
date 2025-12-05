@@ -68,8 +68,8 @@ class JWTToken(BaseModel):
     client_release: str | None = None
     """ The client release version """
 
-    client_node: str | None = None
-    """ The client node name """
+    client_device: str | None = None
+    """ The client device identifier """
 
     @field_validator("aud", mode="before")
     def aud_to_list(
@@ -165,6 +165,7 @@ class StaticToken(JWTToken):
     client_id: str = "static"
     client_app: str = "static_app"
     client_release: str = "v1.0.0"
+    client_device: str = "static_device"
     active_org: str = "static_org"
     preferred_username: str = "static_user"
     scope: str = "openid profile email"

@@ -4,7 +4,7 @@ from typing import AsyncGenerator, cast
 from authentikate.vars import get_user, get_client
 from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension
-from authentikate.strawberry.types import App, User, Client, Organization
+from authentikate.strawberry.types import App, Device, User, Client, Organization
 from authentikate.strawberry.directives import (
     Auth,
     AuthExtension,
@@ -43,6 +43,13 @@ class Query:
 
         client = get_client()
         return client.release.app if client and client.release else None
+
+    @kante.django_field
+    def device(self, info: Info) -> Device | None:
+        """Get the current client device identifier"""
+
+        client = get_client()
+        return client.device
 
 
 @kante.type

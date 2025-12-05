@@ -80,6 +80,7 @@ def valid_claims():
         "active_org": "kkk",
         "client_app": "my_app",
         "client_release": "v1.0.0",
+        "client_device": "device_12345",
     }
 
 

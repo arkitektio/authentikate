@@ -59,6 +59,16 @@ class Membership(models.Model):
         return f"{self.user} in {self.organization}"
 
 
+class Device(models.Model):
+    """A Device model to represent a user's device in the system"""
+
+    device_id = models.CharField(max_length=2000, unique=True)
+
+    def __str__(self) -> str:
+        """String representation of Device"""
+        return f"{self.device_id}"
+
+
 class App(models.Model):
     """An App model to represent an application in the system"""
 
@@ -90,6 +100,7 @@ class Client(models.Model):
 
     """
 
+    device = models.ForeignKey(Device, on_delete=models.SET_NULL, null=True, blank=True)
     release = models.ForeignKey(
         Release,
         on_delete=models.SET_NULL,

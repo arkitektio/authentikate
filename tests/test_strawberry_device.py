@@ -10,7 +10,7 @@ from django.conf import settings
 
 
 @pytest.mark.asyncio
-async def test_app_query(db, valid_auth_headers, key_pair_str) -> None:
+async def test_device_query(db, valid_auth_headers, key_pair_str) -> None:
     """Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
     # Initialize both clients
 
@@ -25,21 +25,21 @@ async def test_app_query(db, valid_auth_headers, key_pair_str) -> None:
     answer = await http_client.execute(
         query="""
         query {
-            app  {
-                identifier
+            device  {
+                deviceId
             }
         }
         """,
     )
 
-    assert answer["data"]["app"] is not None
+    assert answer["data"]["device"] is not None
     assert (
-        answer["data"]["app"]["identifier"] == "my_app"
-    ), f"Expected 'my_app', got {answer['data']['app']['identifier']}"
+        answer["data"]["device"]["deviceId"] == "device_12345"
+    ), f"Expected 'device_12345', got {answer['data']['device']['deviceId']}"
 
 
 @pytest.mark.asyncio
-async def test_app_query_static(db, valid_auth_headers, key_pair_str) -> None:
+async def test_device_query_static(db, valid_auth_headers, key_pair_str) -> None:
     """Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
     # Initialize both clients
 
@@ -56,14 +56,14 @@ async def test_app_query_static(db, valid_auth_headers, key_pair_str) -> None:
     answer = await http_client.execute(
         query="""
         query {
-            organization  {
-                slug
+            device  {
+                deviceId
             }
         }
         """,
     )
 
-    assert answer["data"]["organization"] is not None
+    assert answer["data"]["device"] is not None
     assert (
-        answer["data"]["organization"]["slug"] == "static_org"
-    ), f"Expected 'kkk', got {answer['data']['organization']['slug']}"
+        answer["data"]["device"]["deviceId"] == "static_device"
+    ), f"Expected 'static_device', got {answer['data']['device']['deviceId']}"
