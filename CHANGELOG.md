@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.29.0 (2025-12-05)
+
+### Features
+
+- Add app and release fields
+  ([`88e7816`](https://github.com/arkitektio/authentikate/commit/88e7816be504828db7bdeffcf460808d5a76ae7f))
+
+
 ## v0.28.0 (2025-09-25)
 
 
