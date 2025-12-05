@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.30.0 (2025-12-05)
+
+### Features
+
+- Add device id
+  ([`b20ae20`](https://github.com/arkitektio/authentikate/commit/b20ae2038f50ae6f161f77b0cf75e85290823554))
+
+
 ## v0.29.0 (2025-12-05)
 
 ### Features
