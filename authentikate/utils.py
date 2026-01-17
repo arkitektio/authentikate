@@ -1,6 +1,11 @@
 from authentikate.decode import decode_token
 from authentikate.settings import get_settings
 from authentikate.base_models import AuthentikateSettings, JWTToken
+from authentikate.errors import (
+    NoAuthorizationHeader,
+    MalformedAuthorizationHeader,
+    InvalidJwtTokenError,
+)
 import re
 import logging
 
@@ -47,7 +52,7 @@ def extract_plain_from_authorization(authorization: str) -> str:
         token = m.group("token")
         return token
 
-    raise ValueError("Not a valid token")
+    raise MalformedAuthorizationHeader("Not a valid token")
 
 
 def authenticate_header(
@@ -69,7 +74,7 @@ def authenticate_header(
             break
 
     if not authorization_header:
-        raise ValueError("No Authorization header")
+        raise NoAuthorizationHeader("No Authorization header")
 
     token = extract_plain_from_authorization(authorization_header)
     return authenticate_token(token, settings)

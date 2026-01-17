@@ -3,7 +3,7 @@ from strawberry.extensions import SchemaExtension
 from kante.context import WsContext, HttpContext
 from authentikate.vars import token_var, user_var, client_var, organization_var
 from authentikate.base_models import JWTToken
-from authentikate.utils import authenticate_token_or_none, authenticate_header_or_none
+from authentikate.utils import authenticate_header, authenticate_token, authenticate_token_or_none, authenticate_header_or_none
 from authentikate.protocols import UserModel, ClientModel, OrganizationModel, MembershipModel
 from typing import cast
 from authentikate.base_models import AuthentikateSettings
@@ -66,7 +66,7 @@ class AuthentikateExtension(SchemaExtension):
             # WebSocket context
             # Do something with the WebSocket context
             
-            token = authenticate_token_or_none(
+            token = authenticate_token(
                 context.connection_params.get("token", ""),
                 self.get_settings(),
             )
@@ -95,7 +95,7 @@ class AuthentikateExtension(SchemaExtension):
         elif isinstance(context, HttpContext):
             # HTTP context
             # Do something with the HTTP context
-            token = authenticate_header_or_none(
+            token = authenticate_header(
                 context.headers,
                 self.get_settings(),
             )

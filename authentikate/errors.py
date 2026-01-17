@@ -43,3 +43,27 @@ class AuthentikateUserNotFound(AuthentikatePermissionDenied):
     """Raised when a user is not found"""
 
     pass
+
+
+class NoAuthorizationHeader(AuthentikatePermissionDenied):
+    """Raised when no authorization header is found in the headers"""
+
+    pass
+
+
+class MalformedAuthorizationHeader(AuthentikatePermissionDenied):
+    """Raised when the authorization header is malformed (e.g. not Bearer)"""
+
+    pass
+
+
+class JwksError(AuthentikateError):
+    """Raised when there is an error with the JWKS"""
+
+    pass
+
+
+class KeyNotFoundError(AuthentikatePermissionDenied):
+    """Raised when the key is not found in the JWKS"""
+
+    pass

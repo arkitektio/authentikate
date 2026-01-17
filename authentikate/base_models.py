@@ -17,6 +17,7 @@ from typing import Dict, Any
 from joserfc.jwk import KeySet, RSAKey, OctKey, ECKey
 from joserfc import jwt
 from joserfc.jwk import GuestProtocol
+from authentikate.errors import JwksError, MalformedJwtTokenError
 
 
 logger = logging.getLogger(__name__)
@@ -334,9 +335,12 @@ class JWKSUriIssuer(Issuer):
 
     def refresh(self) -> None:
         """Refresh the jwks from the uri"""
-        with urllib.request.urlopen(self.jwks_uri) as response:
-            data = json.loads(response.read())
-            self._cache = data["keys"]
+        try:
+            with urllib.request.urlopen(self.jwks_uri) as response:
+                data = json.loads(response.read())
+                self._cache = data["keys"]
+        except Exception as e:
+            raise JwksError(f"Error fetching jwks from {self.jwks_uri}") from e
 
 
 IssuerUnion = Annotated[
@@ -391,19 +395,19 @@ class AuthentikateSettings(BaseModel):
             keys = issuer.get_as_jwks()
 
             if not isinstance(keys, list):
-                raise ValueError("keys must be a list")
+                raise JwksError("keys must be a list")
 
             for key in keys:
                 if key.get("kid") is None:
-                    raise ValueError("key must contain a kid field")
+                    raise JwksError("key must contain a kid field")
 
                 if key["kid"] in merged_jwks:
-                    raise ValueError(f"Duplicate kid found: {key['kid']}")
+                    raise JwksError(f"Duplicate kid found: {key['kid']}")
 
                 merged_jwks[key["kid"]] = key
 
         if not merged_jwks:
-            raise ValueError("No keys found in jwks")
+            raise JwksError("No keys found in jwks")
 
         validated_keys = []
 
@@ -416,7 +420,7 @@ class AuthentikateSettings(BaseModel):
         """Resolve the key from the header"""
         kid = obj.headers().get("kid")
         if not kid:
-            raise ValueError("Missing kid in header")
+            raise MalformedJwtTokenError("Missing kid in header")
 
         jwks = self.get_jwks()
 

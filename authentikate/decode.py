@@ -23,6 +23,8 @@ def decode_token(
     """
     try:
         decoded = jwt.decode(token, settings.load_key)
+    except (errors.AuthentikateError, errors.AuthentikatePermissionDenied) as e:
+        raise e
     except Exception as e:
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
