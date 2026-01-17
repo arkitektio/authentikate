@@ -1,4 +1,6 @@
 import logging
+import urllib.request
+import json
 from typing import Literal, Optional, Type, Union, Annotated
 from pydantic import (
     BaseModel,
@@ -8,6 +10,7 @@ from pydantic import (
     AliasChoices,
     Discriminator,
     FilePath,
+    PrivateAttr,
 )
 import datetime
 from typing import Dict, Any
@@ -200,6 +203,10 @@ class Issuer(BaseModel):
             "get_jwks not implemented. Must be implemented in subclass"
         )
 
+    def refresh(self) -> None:
+        """Refresh the issuer jwks if applicable"""
+        pass
+
 
 class JWKIssuer(Issuer):
     """An issuer
@@ -298,9 +305,44 @@ class RSAKeyFileIssuer(Issuer):
         return [t.as_dict(kid=self.key_id)]
 
 
+class JWKSUriIssuer(Issuer):
+    """An issuer
+
+    This is a pydantic model that represents an issuer.
+    It is used to validate the issuer and to extract information from it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["jwks_uri"] = Field(
+        default="jwks_uri",
+    )
+
+    iss: str = Field(
+        validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
+    )
+    """The issuer of the token"""
+    jwks_uri: str = Field(validation_alias=AliasChoices("jwks_uri", "JWKS_URI"))
+    _cache: list[Dict[str, Any]] | None = PrivateAttr(default=None)
+
+    def get_as_jwks(self) -> list[Dict[str, Any]]:
+        """Get the jwks of the issuer"""
+
+        if self._cache is None:
+            self.refresh()
+
+        return self._cache  # type: ignore
+
+    def refresh(self) -> None:
+        """Refresh the jwks from the uri"""
+        with urllib.request.urlopen(self.jwks_uri) as response:
+            data = json.loads(response.read())
+            self._cache = data["keys"]
+
+
 IssuerUnion = Annotated[
-    Union[JWKIssuer, RSAKeyIssuer, RSAKeyFileIssuer], Discriminator("kind")
+    Union[JWKIssuer, RSAKeyIssuer, RSAKeyFileIssuer, JWKSUriIssuer], Discriminator("kind")
 ]
+
 
 
 class AuthentikateSettings(BaseModel):
@@ -376,5 +418,21 @@ class AuthentikateSettings(BaseModel):
         if not kid:
             raise ValueError("Missing kid in header")
 
-        key_set = KeySet.import_key_set({"keys": self.get_jwks()})
+        jwks = self.get_jwks()
+
+        # Check if the kid is in the jwks
+        found = False
+        for key in jwks:
+            if key.get("kid") == kid:
+                found = True
+                break
+
+        if not found:
+            # Trigger refresh on all issuers
+            for issuer in self.issuers:
+                issuer.refresh()
+            # Re-fetch
+            jwks = self.get_jwks()
+
+        key_set = KeySet.import_key_set({"keys": jwks})
         return key_set

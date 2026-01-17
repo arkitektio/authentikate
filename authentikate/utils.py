@@ -60,7 +60,7 @@ def authenticate_header(
     """
     if not settings:
         settings = get_settings()
-        
+
     authorization_header = None
 
     for i in settings.authorization_headers:
@@ -72,8 +72,7 @@ def authenticate_header(
         raise ValueError("No Authorization header")
 
     token = extract_plain_from_authorization(authorization_header)
-    return authenticate_token(token, settings) 
-    
+    return authenticate_token(token, settings)
 
 
 def authenticate_header_or_none(
@@ -100,7 +99,6 @@ def authenticate_header_or_none(
     try:
         return authenticate_header(headers, settings)
     except Exception:
-        logger.error("Error authenticating header. Skipping!", exc_info=True)
         return None
 
 
@@ -135,9 +133,5 @@ def authenticate_token_or_none(
     try:
         return authenticate_token(token, settings)
     except Exception:
-        logger.error("Error authenticating token. Skipping!", exc_info=True)
+        logger.debug("Token authentication failed", exc_info=True)
         return None
-
-
-
-
