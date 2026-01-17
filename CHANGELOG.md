@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.31.0 (2026-01-17)
+
+### Features
+
+- Implement jwks_uri
+  ([`82198f5`](https://github.com/arkitektio/authentikate/commit/82198f5ea2c045881365a30b65e3484dd186ef2b))
+
+
 ## v0.30.0 (2025-12-05)
 
 ### Features
