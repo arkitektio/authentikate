@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.32.0 (2026-01-17)
+
+### Features
+
+- Better raise errors
+  ([`22c630d`](https://github.com/arkitektio/authentikate/commit/22c630dd19fe3a9943bb29472cab47a0e0121473))
+
+
 ## v0.31.0 (2026-01-17)
 
 ### Features
