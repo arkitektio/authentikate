@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-03-11)
+
+### Features
+
+- Removal of the protocols and bake to just the device
+  ([`2ed271d`](https://github.com/arkitektio/authentikate/commit/2ed271df3e7d14420e00b3539dbcc92fe56ef683))
+
+
 ## v0.32.0 (2026-01-17)
 
 ### Features
