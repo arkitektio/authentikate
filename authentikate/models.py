@@ -109,7 +109,7 @@ class Client(models.Model):
         blank=True,
     )
     iss = models.CharField(max_length=2000, null=True, blank=True)
-    client_id = models.CharField(unique=True, max_length=2000)
+    client_id = models.CharField(max_length=2000)
     name = models.CharField(max_length=2000, null=True, blank=True)
 
     class Meta:

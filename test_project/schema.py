@@ -62,15 +62,15 @@ class Mutation:
         user = models.User.objects.create(username=name)
         return cast(User, user)
 
-    @kante.mutation(extensions=[AuthExtension(scopes="write")])
+    @kante.django_mutation(extensions=[AuthExtension(scopes="write")])
     def require_write(self, info: Info) -> str:
         return "User"
 
-    @kante.mutation(extensions=[AuthExtension(scopes="write")])
+    @kante.django_mutation(extensions=[AuthExtension(scopes="write")])
     async def async_require_write(self, info: Info) -> str:
         return "User"
 
-    @kante.mutation(extensions=[AuthExtension(scopes="read")])
+    @kante.django_mutation(extensions=[AuthExtension(scopes="read")])
     def require_read(self, info: Info) -> str:
         return "User"
 
