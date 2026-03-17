@@ -1,12 +1,13 @@
 from authentikate import models
 import kante
+import strawberry
 
 
 @kante.django_type(models.Device)
 class Device:
     """This is the devicetype"""
 
-    id: str
+    id: strawberry.ID
     device_id: str
 
 
@@ -14,7 +15,7 @@ class Device:
 class App:
     """This is the apptype"""
 
-    id: str
+    id: strawberry.ID
     identifier: str
 
 
@@ -22,8 +23,8 @@ class App:
 class Release:
     """This is the release type"""
 
+    id: strawberry.ID
     app: App
-    id: str
     version: str
 
 
@@ -31,7 +32,7 @@ class Release:
 class Organization:
     """This is the organization type"""
 
-    id: str
+    id: strawberry.ID
     slug: str
 
 
@@ -39,6 +40,7 @@ class Organization:
 class User:
     """This is the user type"""
 
+    id: strawberry.ID
     sub: str
     preferred_username: str
     active_organization: Organization | None = None
@@ -48,6 +50,7 @@ class User:
 class Client:
     """This is the client type"""
 
+    id: strawberry.ID
     release: Release | None = None
     client_id: str
     name: str
