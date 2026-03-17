@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.1 (2026-03-17)
+
+### Bug Fixes
+
+- Add ids to fit the new kante federation types
+  ([`f3dd6fe`](https://github.com/arkitektio/authentikate/commit/f3dd6fea3d51368bc7cfe919bbda4aec3f9e30e9))
+
+
 ## v1.0.0 (2026-03-11)
 
 ### Features
