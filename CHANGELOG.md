@@ -1,6 +1,16 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-04-27)
+
+### Features
+
+- Fix the aiohttp error?
+  ([`65330b0`](https://github.com/arkitektio/authentikate/commit/65330b045ffe4482a1d45266e497491f16579e3e))
+
+Co-authored-by: Copilot <copilot@github.com>
+
+
 ## v1.0.1 (2026-03-17)
 
 ### Bug Fixes
