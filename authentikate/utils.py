@@ -1,10 +1,9 @@
-from authentikate.decode import decode_token
+from authentikate.decode import adecode_token
 from authentikate.settings import get_settings
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.errors import (
     NoAuthorizationHeader,
     MalformedAuthorizationHeader,
-    InvalidJwtTokenError,
 )
 import re
 import logging
@@ -12,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)  #
 
 
-def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTToken:
+async def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTToken:
     """
     Authenticate a token and return the auth context
     (containing user, app and scopes)
@@ -23,7 +22,7 @@ def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTToken:
     if token in settings.static_tokens:
         decoded = settings.static_tokens[token]
     else:
-        decoded = decode_token(token, settings)
+        decoded = await adecode_token(token, settings)
 
     return decoded
 
@@ -55,7 +54,7 @@ def extract_plain_from_authorization(authorization: str) -> str:
     raise MalformedAuthorizationHeader("Not a valid token")
 
 
-def authenticate_header(
+async def authenticate_header(
     headers: dict[str, str], settings: AuthentikateSettings | None = None
 ) -> JWTToken:
     """
@@ -77,10 +76,10 @@ def authenticate_header(
         raise NoAuthorizationHeader("No Authorization header")
 
     token = extract_plain_from_authorization(authorization_header)
-    return authenticate_token(token, settings)
+    return await authenticate_token(token, settings)
 
 
-def authenticate_header_or_none(
+async def authenticate_header_or_none(
     headers: dict[str, str], settings: AuthentikateSettings | None = None
 ) -> JWTToken | None:
     """
@@ -102,12 +101,12 @@ def authenticate_header_or_none(
 
     """
     try:
-        return authenticate_header(headers, settings)
+        return await authenticate_header(headers, settings)
     except Exception:
         return None
 
 
-def authenticate_token_or_none(
+async def authenticate_token_or_none(
     token: str, settings: AuthentikateSettings | None = None
 ) -> JWTToken | None:
     """
@@ -136,7 +135,7 @@ def authenticate_token_or_none(
         settings = get_settings()
 
     try:
-        return authenticate_token(token, settings)
+        return await authenticate_token(token, settings)
     except Exception:
         logger.debug("Token authentication failed", exc_info=True)
         return None

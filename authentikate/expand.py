@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from django.contrib.auth.models import Group
 from authentikate import base_models, models
 import logging
@@ -7,6 +8,16 @@ from authentikate.protocols import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class ExpandedTokenContext:
+    """Expanded models derived from a single authenticated token."""
+
+    user: models.User
+    client: models.Client
+    organization: models.Organization
+    membership: models.Membership
 
 
 async def aresolve_client_relations(
@@ -111,6 +122,9 @@ async def aexpand_organization_from_token(
     """
     Expand an organization from the provided JWT token.
     """
+    if not token.active_org:
+        raise AssertionError("Token does not contain an active organization")
+
     org, _ = await models.Organization.objects.aget_or_create(slug=token.active_org)
     return org
 
@@ -136,6 +150,7 @@ async def aexpand_membership(
 
 async def aexpand_user_from_token(
     token: base_models.JWTToken,
+    organization: models.Organization | None = None,
 ) -> models.User:
     """
     Expand a user from the provided JWT token.
@@ -148,11 +163,12 @@ async def aexpand_user_from_token(
             user.first_name = token.preferred_username
             user.changed_hash = token.changed_hash
 
-            if token.active_org:
+            if organization is not None:
+                user.active_organization = organization
+            elif token.active_org:
                 current_org, _ = await models.Organization.objects.aget_or_create(
-                    slug=token.active_org or "",
+                    slug=token.active_org,
                 )
-
                 user.active_organization = current_org
 
             await user.asave()
@@ -171,15 +187,34 @@ async def aexpand_user_from_token(
         user.first_name = token.preferred_username
         user.changed_hash = token.changed_hash
 
-        if token.active_org:
+        if organization is not None:
+            user.active_organization = organization
+        elif token.active_org:
             current_org, _ = await models.Organization.objects.aget_or_create(
-                slug=token.active_org or "",
+                slug=token.active_org,
             )
-
             user.active_organization = current_org
 
         await user.asave()
         return user
+
+
+async def aexpand_token_context(
+    token: base_models.JWTToken,
+) -> ExpandedTokenContext:
+    """Expand all request-scoped auth models for a token in one code path."""
+
+    organization = await aexpand_organization_from_token(token)
+    user = await aexpand_user_from_token(token, organization=organization)
+    client = await aexpand_client_from_token(token)
+    membership = await aexpand_membership(user, organization, token)
+
+    return ExpandedTokenContext(
+        user=user,
+        client=client,
+        organization=organization,
+        membership=membership,
+    )
 
 
 def expand_user_from_token(

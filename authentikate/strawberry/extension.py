@@ -19,6 +19,20 @@ class AuthentikateExtension(SchemaExtension):
         settings = get_settings()
         return settings
 
+    async def aexpand_token_context(
+        self, token: JWTToken
+    ) -> tuple[User, Client, OrganizationModel, MembershipModel]:
+        """Expand the full auth context for a token through one helper."""
+        from authentikate.expand import aexpand_token_context
+
+        expanded = await aexpand_token_context(token)
+        return (
+            cast(User, expanded.user),
+            cast(Client, expanded.client),
+            cast(OrganizationModel, expanded.organization),
+            cast(MembershipModel, expanded.membership),
+        )
+
     async def aexpand_user_from_token(self, token: JWTToken) -> User:
         """Expand a user from the provided JWT token"""
         from authentikate.expand import aexpand_user_from_token
@@ -69,18 +83,14 @@ class AuthentikateExtension(SchemaExtension):
             # WebSocket context
             # Do something with the WebSocket context
 
-            token = authenticate_token(
+            token = await authenticate_token(
                 context.connection_params.get("token", ""),
                 self.get_settings(),
             )
             reset_token = token_var.set(token)
             if token:
-                user = await self.aexpand_user_from_token(token)
-                client = await self.aexpand_client_from_token(token)
-                organization = await self.aexpand_organization_from_token(token)
-
-                membership = await self.aexpand_membership_from_user_and_organization(
-                    cast(UserModel, user), organization, token
+                user, client, organization, membership = (
+                    await self.aexpand_token_context(token)
                 )
 
                 reset_client = client_var.set(client)
@@ -96,18 +106,14 @@ class AuthentikateExtension(SchemaExtension):
         elif isinstance(context, HttpContext):
             # HTTP context
             # Do something with the HTTP context
-            token = authenticate_header(
+            token = await authenticate_header(
                 dict(context.headers),
                 self.get_settings(),
             )
             reset_token = token_var.set(token)
             if token:
-                user = await self.aexpand_user_from_token(token)
-                client = await self.aexpand_client_from_token(token)
-                organization = await self.aexpand_organization_from_token(token)
-
-                membership = await self.aexpand_membership_from_user_and_organization(
-                    cast(UserModel, user), organization, token
+                user, client, organization, membership = (
+                    await self.aexpand_token_context(token)
                 )
 
                 reset_client = client_var.set(client)

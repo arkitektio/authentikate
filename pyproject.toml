@@ -12,6 +12,7 @@ dependencies = [
     "django>5",
     "kante>=0.16",
     "joserfc>=1.0.4",
+    "httpx>=0.28.1",
 ]
 
 [tool.uv]

@@ -1,7 +1,8 @@
 import logging
-import urllib.request
+import asyncio
 import json
-from typing import Literal, Optional, Type, Union, Annotated
+from typing import Literal, Optional, Type, Union, Annotated, cast
+import httpx
 from pydantic import (
     BaseModel,
     Field,
@@ -324,6 +325,7 @@ class JWKSUriIssuer(Issuer):
     """The issuer of the token"""
     jwks_uri: str = Field(validation_alias=AliasChoices("jwks_uri", "JWKS_URI"))
     _cache: list[Dict[str, Any]] | None = PrivateAttr(default=None)
+    _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
 
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
@@ -331,22 +333,54 @@ class JWKSUriIssuer(Issuer):
         if self._cache is None:
             self.refresh()
 
-        return self._cache  # type: ignore
+        return cast(list[Dict[str, Any]], self._cache)
+
+    async def aget_as_jwks(self) -> list[Dict[str, Any]]:
+        """Get the jwks of the issuer without blocking the event loop."""
+
+        if self._cache is None:
+            async with self._cache_lock:
+                if self._cache is None:
+                    await self._fetch_jwks()
+
+        return cast(list[Dict[str, Any]], self._cache)
 
     def refresh(self) -> None:
         """Refresh the jwks from the uri"""
+
         try:
-            with urllib.request.urlopen(self.jwks_uri) as response:
-                data = json.loads(response.read())
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(self.arefresh())
+            return
+
+        raise JwksError(
+            "Cannot refresh JWKS synchronously while an event loop is running; use arefresh instead"
+        )
+
+    async def arefresh(self) -> None:
+        """Refresh the jwks from the uri without blocking the event loop."""
+
+        async with self._cache_lock:
+            await self._fetch_jwks()
+
+    async def _fetch_jwks(self) -> None:
+        """Fetch and cache the JWKS document from the issuer."""
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(self.jwks_uri)
+                response.raise_for_status()
+                data = response.json()
                 self._cache = data["keys"]
         except Exception as e:
             raise JwksError(f"Error fetching jwks from {self.jwks_uri}") from e
 
 
 IssuerUnion = Annotated[
-    Union[JWKIssuer, RSAKeyIssuer, RSAKeyFileIssuer, JWKSUriIssuer], Discriminator("kind")
+    Union[JWKIssuer, RSAKeyIssuer, RSAKeyFileIssuer, JWKSUriIssuer],
+    Discriminator("kind"),
 ]
-
 
 
 class AuthentikateSettings(BaseModel):
@@ -386,14 +420,15 @@ class AuthentikateSettings(BaseModel):
     )
     """A map of static tokens to their decoded values. Should only be used in tests."""
 
-    def get_jwks(self) -> list[Dict[str, Any]]:
-        """Get the jwks of the issuer"""
+    @staticmethod
+    def _validate_and_merge_jwks(
+        jwks_by_issuer: list[list[Dict[str, Any]]],
+    ) -> list[Dict[str, Any]]:
+        """Validate and merge keys returned by all issuers."""
 
         merged_jwks = {}
 
-        for issuer in self.issuers:
-            keys = issuer.get_as_jwks()
-
+        for keys in jwks_by_issuer:
             if not isinstance(keys, list):
                 raise JwksError("keys must be a list")
 
@@ -409,12 +444,27 @@ class AuthentikateSettings(BaseModel):
         if not merged_jwks:
             raise JwksError("No keys found in jwks")
 
-        validated_keys = []
+        return list(merged_jwks.values())
 
-        for key in merged_jwks.values():
-            validated_keys.append(key)
+    def get_jwks(self) -> list[Dict[str, Any]]:
+        """Get the jwks of the issuer"""
 
-        return validated_keys
+        return self._validate_and_merge_jwks(
+            [issuer.get_as_jwks() for issuer in self.issuers]
+        )
+
+    async def aget_jwks(self) -> list[Dict[str, Any]]:
+        """Get the jwks of the issuer without blocking the event loop."""
+
+        jwks_by_issuer = []
+
+        for issuer in self.issuers:
+            if isinstance(issuer, JWKSUriIssuer):
+                jwks_by_issuer.append(await issuer.aget_as_jwks())
+            else:
+                jwks_by_issuer.append(issuer.get_as_jwks())
+
+        return self._validate_and_merge_jwks(jwks_by_issuer)
 
     def load_key(self, obj: GuestProtocol) -> KeySet:
         """Resolve the key from the header"""
@@ -440,3 +490,19 @@ class AuthentikateSettings(BaseModel):
 
         key_set = KeySet.import_key_set({"keys": jwks})
         return key_set
+
+    async def aload_key(self, kid: str) -> KeySet:
+        """Resolve the key set for a given key id without blocking the event loop."""
+
+        jwks = await self.aget_jwks()
+
+        if not any(key.get("kid") == kid for key in jwks):
+            for issuer in self.issuers:
+                if isinstance(issuer, JWKSUriIssuer):
+                    await issuer.arefresh()
+                else:
+                    issuer.refresh()
+
+            jwks = await self.aget_jwks()
+
+        return KeySet.import_key_set({"keys": jwks})
