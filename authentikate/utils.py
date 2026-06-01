@@ -3,6 +3,7 @@ from authentikate.settings import get_settings
 from authentikate.base_models import AuthentikateSettings, JWTToken, Task
 from authentikate import models
 from authentikate.errors import (
+    AuthentikatePermissionDenied,
     NoAuthorizationHeader,
     MalformedAuthorizationHeader,
     InvalidTaskAssignment,
@@ -210,7 +211,7 @@ async def authenticate_header_or_none(
     """
     try:
         return await authenticate_header(headers, settings)
-    except Exception:
+    except AuthentikatePermissionDenied:
         return None
 
 
@@ -244,6 +245,6 @@ async def authenticate_token_or_none(
 
     try:
         return await authenticate_token(token, settings)
-    except Exception:
+    except AuthentikatePermissionDenied:
         logger.debug("Token authentication failed", exc_info=True)
         return None

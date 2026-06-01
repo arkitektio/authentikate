@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from django.contrib.auth.models import Group
 from authentikate import base_models, models
 import logging
+from typing import cast
+from authentikate.errors import BlockedMembership, MissingActiveOrganization
 from authentikate.protocols import (
     UserModel,
     OrganizationModel,
@@ -123,7 +125,7 @@ async def aexpand_organization_from_token(
     Expand an organization from the provided JWT token.
     """
     if not token.active_org:
-        raise AssertionError("Token does not contain an active organization")
+        raise MissingActiveOrganization("Token does not contain an active organization")
 
     org, _ = await models.Organization.objects.aget_or_create(slug=token.active_org)
     return org
@@ -144,7 +146,8 @@ async def aexpand_membership(
             roles=token.roles,
         ),
     )
-    assert membership.blocked is False, "Membership is blocked"
+    if membership.blocked:
+        raise BlockedMembership("Membership is blocked")
     return membership
 
 
@@ -207,7 +210,11 @@ async def aexpand_token_context(
     organization = await aexpand_organization_from_token(token)
     user = await aexpand_user_from_token(token, organization=organization)
     client = await aexpand_client_from_token(token)
-    membership = await aexpand_membership(user, organization, token)
+    membership = await aexpand_membership(
+        cast(UserModel, user),
+        cast(OrganizationModel, organization),
+        token,
+    )
 
     return ExpandedTokenContext(
         user=user,

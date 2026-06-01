@@ -7,7 +7,11 @@ from authentikate.errors import (
     MalformedJwtTokenError,
     InvalidJwtTokenError,
 )
-from authentikate.utils import authenticate_header
+from authentikate.utils import (
+    authenticate_header,
+    authenticate_header_or_none,
+    authenticate_token_or_none,
+)
 from authentikate.base_models import AuthentikateSettings, JWKSUriIssuer
 from authentikate.decode import decode_token
 from joserfc import jwt
@@ -51,6 +55,34 @@ async def test_malformed_authorization_header():
 
     with pytest.raises(MalformedAuthorizationHeader):
         await authenticate_header(headers, settings)
+
+
+@pytest.mark.asyncio
+async def test_authenticate_header_or_none_returns_none_for_auth_failure():
+    settings = AuthentikateSettings(issuers=[])
+    headers = {"Content-Type": "application/json"}
+
+    assert await authenticate_header_or_none(headers, settings) is None
+
+
+@pytest.mark.asyncio
+async def test_authenticate_header_or_none_reraises_unexpected_errors():
+    with patch(
+        "authentikate.utils.authenticate_header",
+        new=AsyncMock(side_effect=RuntimeError("boom")),
+    ):
+        with pytest.raises(RuntimeError, match="boom"):
+            await authenticate_header_or_none({}, None)
+
+
+@pytest.mark.asyncio
+async def test_authenticate_token_or_none_reraises_unexpected_errors():
+    with patch(
+        "authentikate.utils.authenticate_token",
+        new=AsyncMock(side_effect=RuntimeError("boom")),
+    ):
+        with pytest.raises(RuntimeError, match="boom"):
+            await authenticate_token_or_none("token", None)
 
 
 def test_jwks_fetch_error():
@@ -105,11 +137,11 @@ def test_key_not_found(key_pair_str):
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
         settings = AuthentikateSettings(
             issuers=[
-                {
-                    "kind": "jwks_uri",
-                    "iss": "http://test",
-                    "jwks_uri": "http://test/jwks",
-                }
+                JWKSUriIssuer(
+                    kind="jwks_uri",
+                    iss="http://test",
+                    jwks_uri="http://test/jwks",
+                )
             ]
         )
 

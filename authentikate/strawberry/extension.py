@@ -83,78 +83,78 @@ class AuthentikateExtension(SchemaExtension):
         reset_token = None
         reset_organization = None
 
-        if isinstance(context, WsContext):
-            # WebSocket context
-            # Do something with the WebSocket context
+        try:
+            if isinstance(context, WsContext):
+                # WebSocket context
+                # Do something with the WebSocket context
 
-            token = await authenticate_token(
-                context.connection_params.get("token", ""),
-                self.get_settings(),
-            )
-            reset_token = token_var.set(token)
-            if token:
-                user, client, organization, membership = (
-                    await self.aexpand_token_context(token)
+                token = await authenticate_token(
+                    context.connection_params.get("token", ""),
+                    self.get_settings(),
+                )
+                reset_token = token_var.set(token)
+                if token:
+                    user, client, organization, membership = (
+                        await self.aexpand_token_context(token)
+                    )
+
+                    reset_client = client_var.set(client)
+                    reset_user = user_var.set(cast(UserModel, user))
+                    reset_organization = organization_var.set(organization)
+
+                    context.request.set_user(cast(Any, user))
+                    context.request.set_client(cast(Any, client))
+                    context.request.set_membership(membership)
+                    context.request.set_organization(organization)
+                    context.request.set_extension("token", token)
+
+            elif isinstance(context, HttpContext):
+                # HTTP context
+                # Do something with the HTTP context
+                task = extract_task_from_rekuest_header(
+                    dict(context.headers),
+                    self.get_settings(),
+                )
+                token = await authenticate_header(
+                    dict(context.headers),
+                    self.get_settings(),
+                    task=task,
+                )
+                reset_token = token_var.set(token)
+                if token:
+                    user, client, organization, membership = (
+                        await self.aexpand_token_context(token)
+                    )
+
+                    reset_client = client_var.set(client)
+                    reset_user = user_var.set(cast(UserModel, user))
+                    reset_organization = organization_var.set(organization)
+
+                    context.request.set_user(cast(Any, user))
+                    context.request.set_client(cast(Any, client))
+                    context.request.set_membership(membership)
+                    context.request.set_organization(organization)
+                    context.request.set_extension("token", token)
+                    if task is not None:
+                        context.request.set_task(task)
+                        context.request.set_extension("task", task)
+            else:
+                raise ValueError(
+                    "Unknown context type. Cannot determine if it's WebSocket or HTTP."
                 )
 
-                reset_client = client_var.set(client)
-                reset_user = user_var.set(cast(UserModel, user))
-                reset_organization = organization_var.set(organization)
+            yield
+        finally:
+            if reset_user:
+                user_var.reset(reset_user)
 
-                context.request.set_user(cast(Any, user))
-                context.request.set_client(cast(Any, client))
-                context.request.set_membership(membership)
-                context.request.set_organization(organization)
-                context.request.set_extension("token", token)
+            if reset_client:
+                client_var.reset(reset_client)
 
-        elif isinstance(context, HttpContext):
-            # HTTP context
-            # Do something with the HTTP context
-            task = extract_task_from_rekuest_header(
-                dict(context.headers),
-                self.get_settings(),
-            )
-            token = await authenticate_header(
-                dict(context.headers),
-                self.get_settings(),
-                task=task,
-            )
-            reset_token = token_var.set(token)
-            if token:
-                user, client, organization, membership = (
-                    await self.aexpand_token_context(token)
-                )
+            if reset_token:
+                token_var.reset(reset_token)
 
-                reset_client = client_var.set(client)
-                reset_user = user_var.set(cast(UserModel, user))
-                reset_organization = organization_var.set(organization)
-
-                context.request.set_user(cast(Any, user))
-                context.request.set_client(cast(Any, client))
-                context.request.set_membership(membership)
-                context.request.set_organization(organization)
-                context.request.set_extension("token", token)
-                if task is not None:
-                    context.request.set_task(task)
-                    context.request.set_extension("task", task)
-        else:
-            raise ValueError(
-                "Unknown context type. Cannot determine if it's WebSocket or HTTP."
-            )
-
-        yield
-
-        # Cleanup
-        if reset_user:
-            user_var.reset(reset_user)
-
-        if reset_client:
-            client_var.reset(reset_client)
-
-        if reset_token:
-            token_var.reset(reset_token)
-
-        if reset_organization:
-            organization_var.reset(reset_organization)
+            if reset_organization:
+                organization_var.reset(reset_organization)
 
         return

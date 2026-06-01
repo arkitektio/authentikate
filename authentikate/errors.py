@@ -63,6 +63,18 @@ class InvalidTaskAssignment(AuthentikatePermissionDenied):
     pass
 
 
+class MissingActiveOrganization(AuthentikatePermissionDenied):
+    """Raised when an authenticated token does not provide an active organization."""
+
+    pass
+
+
+class BlockedMembership(AuthentikatePermissionDenied):
+    """Raised when the resolved membership is blocked."""
+
+    pass
+
+
 class JwksError(AuthentikateError):
     """Raised when there is an error with the JWKS"""
 
