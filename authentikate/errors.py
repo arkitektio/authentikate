@@ -57,6 +57,12 @@ class MalformedAuthorizationHeader(AuthentikatePermissionDenied):
     pass
 
 
+class InvalidTaskAssignment(AuthentikatePermissionDenied):
+    """Raised when a Rekuest task is assigned outside the authenticated org."""
+
+    pass
+
+
 class JwksError(AuthentikateError):
     """Raised when there is an error with the JWKS"""
 

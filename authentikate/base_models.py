@@ -155,6 +155,20 @@ class JWTToken(BaseModel):
             return True
 
         return any(scope in self.scopes for scope in scopes)
+    
+    
+     
+    
+    
+class Task(BaseModel):
+    id: str = Field(description="The unique identifier for the task (rekuest_local)")
+    parent: str | None = Field(default=None, validation_alias=AliasChoices("parent", "PARENT"), description="The parent task id, if any (rekuest_local)")
+    args: Dict[str, Any] = Field(description="The arguments that were sent")
+    user: str = Field(..., description="The assinging user (sub claim)")
+    app: str = Field(description="The assinging app (rekuest_local)")
+    action: str = Field(description="The action hash.")
+        
+    
 
 
 class StaticToken(JWTToken):
@@ -410,6 +424,17 @@ class AuthentikateSettings(BaseModel):
         ],
         validation_alias=AliasChoices(
             "authorization_headers", "AUTHORIZATION_HEADERS", "AUTHORIZATION_HEADERS"
+        ),
+    )
+    rekuest_header: list[str] = Field(
+        default_factory=lambda: [
+            "Rekuest-Task",
+            "X-Rekuest-Task",
+            "REKUEST_TASK",
+            "rekuest_task",
+        ],
+        validation_alias=AliasChoices(
+            "rekuest_header", "REKUEST_HEADER", "REKUEST_HEADER"
         ),
     )
     static_tokens: dict[str, StaticToken] = Field(

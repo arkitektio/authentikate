@@ -4,7 +4,11 @@ from kante.context import WsContext, HttpContext
 from authentikate.vars import token_var, user_var, client_var, organization_var
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.models import Client, User
-from authentikate.utils import authenticate_header, authenticate_token
+from authentikate.utils import (
+    authenticate_header,
+    authenticate_token,
+    extract_task_from_rekuest_header,
+)
 from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
 
 
@@ -106,9 +110,14 @@ class AuthentikateExtension(SchemaExtension):
         elif isinstance(context, HttpContext):
             # HTTP context
             # Do something with the HTTP context
+            task = extract_task_from_rekuest_header(
+                dict(context.headers),
+                self.get_settings(),
+            )
             token = await authenticate_header(
                 dict(context.headers),
                 self.get_settings(),
+                task=task,
             )
             reset_token = token_var.set(token)
             if token:
@@ -125,6 +134,9 @@ class AuthentikateExtension(SchemaExtension):
                 context.request.set_membership(membership)
                 context.request.set_organization(organization)
                 context.request.set_extension("token", token)
+                if task is not None:
+                    context.request.set_task(task)
+                    context.request.set_extension("task", task)
         else:
             raise ValueError(
                 "Unknown context type. Cannot determine if it's WebSocket or HTTP."
