@@ -1,9 +1,15 @@
 # CHANGELOG
 
 
+## v1.3.0 (2026-06-01)
+
+
 ## v1.2.0 (2026-06-01)
 
 ### Features
+
+- Harden malformed headers
+  ([`62f6ab1`](https://github.com/arkitektio/authentikate/commit/62f6ab1b0c72ba218257c011eb0ee6c25a4a4c8d))
 
 - Task framework
   ([`b03f235`](https://github.com/arkitektio/authentikate/commit/b03f235b309492ed16db9be4b3675bf8e0d8fd01))
