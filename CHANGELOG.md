@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-06-01)
+
+### Features
+
+- Task framework
+  ([`b03f235`](https://github.com/arkitektio/authentikate/commit/b03f235b309492ed16db9be4b3675bf8e0d8fd01))
+
+
 ## v1.1.0 (2026-04-27)
 
 ### Features
