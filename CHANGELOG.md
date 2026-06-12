@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v2.0.1 (2026-06-12)
+
+### Bug Fixes
+
+- Search lowercase rekuest task header names (ASGI lowercases headers)
+  ([`20342b5`](https://github.com/arkitektio/authentikate/commit/20342b52b4bead1c750d6bf410665688a0650869))
+
+ASGI servers and strawberry's channels handler deliver header names lowercased, so the default
+  rekuest_header candidates never matched a real Rekuest-Task header over HTTP.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+
 ## v2.0.0 (2026-06-12)
 
 ### Features
