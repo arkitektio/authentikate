@@ -5,5 +5,9 @@ from .directives import AuthExtension, Auth, all_directives, AuthSubscribeExtens
 
 
 __all__ = [
-    "AuthentikateExtension"
+    "AuthentikateExtension",
+    "AuthExtension",
+    "Auth",
+    "all_directives",
+    "AuthSubscribeExtension",
 ]

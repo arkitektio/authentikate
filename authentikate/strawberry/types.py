@@ -1,11 +1,12 @@
 from authentikate import models
 import kante
 import strawberry
+import strawberry_django
 
 
 @kante.django_type(models.Device)
 class Device:
-    """This is the devicetype"""
+    """A device a client was registered on, identified by its device id."""
 
     id: strawberry.ID
     device_id: str
@@ -13,7 +14,7 @@ class Device:
 
 @kante.django_type(models.App)
 class App:
-    """This is the apptype"""
+    """An application known to the system, identified by its identifier."""
 
     id: strawberry.ID
     identifier: str
@@ -21,7 +22,7 @@ class App:
 
 @kante.django_type(models.Release)
 class Release:
-    """This is the release type"""
+    """A specific version (release) of an application."""
 
     id: strawberry.ID
     app: App
@@ -30,7 +31,7 @@ class Release:
 
 @kante.django_type(models.Organization)
 class Organization:
-    """This is the organization type"""
+    """An organization that users can be members of, identified by its slug."""
 
     id: strawberry.ID
     slug: str
@@ -38,17 +39,18 @@ class Organization:
 
 @kante.django_type(models.User)
 class User:
-    """This is the user type"""
+    """An authenticated user, mirrored from the token's sub and iss claims."""
 
     id: strawberry.ID
     sub: str
-    preferred_username: str
+    # The token's preferred_username is persisted on first_name (see expand.py)
+    preferred_username: str = strawberry_django.field(field_name="first_name")
     active_organization: Organization | None = None
 
 
 @kante.django_type(models.Client)
 class Client:
-    """This is the client type"""
+    """An OAuth2 client (app instance) that requested a token."""
 
     id: strawberry.ID
     release: Release | None = None

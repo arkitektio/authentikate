@@ -1,7 +1,7 @@
+import hashlib
 import logging
 import asyncio
-import json
-from typing import Literal, Optional, Type, Union, Annotated, cast
+from typing import Literal, Type, Union, Annotated, cast
 import httpx
 from pydantic import (
     BaseModel,
@@ -15,8 +15,7 @@ from pydantic import (
 )
 import datetime
 from typing import Dict, Any
-from joserfc.jwk import KeySet, RSAKey, OctKey, ECKey
-from joserfc import jwt
+from joserfc.jwk import KeySet, RSAKey
 from joserfc.jwk import GuestProtocol
 from authentikate.errors import JwksError, MalformedJwtTokenError
 
@@ -101,27 +100,25 @@ class JWTToken(BaseModel):
         if v is None:
             return None
         if isinstance(v, int):
-            return datetime.datetime.fromtimestamp(v)
+            return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
         return v
 
     @field_validator("exp", mode="before")
     def exp_to_datetime(cls: Type["JWTToken"], v: int) -> datetime.datetime:
         """Convert the exp to a datetime object"""
         if isinstance(v, int):
-            return datetime.datetime.fromtimestamp(v)
+            return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
         return v
 
     @property
     def changed_hash(self) -> str:
         """A hash that changes when the user changes"""
-        return str(
-            hash(
-                self.sub
-                + self.preferred_username
-                + " ".join(self.roles)
-                + (self.active_org or "")
-            )
+        # Must be stable across processes and restarts (the value is persisted
+        # on the user model), so the salted builtin hash() cannot be used.
+        fingerprint = "|".join(
+            [self.sub, self.preferred_username, *self.roles, self.active_org or ""]
         )
+        return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
 
     @property
     def scopes(self) -> list[str]:
@@ -155,63 +152,89 @@ class JWTToken(BaseModel):
             return True
 
         return any(scope in self.scopes for scope in scopes)
-    
-    
-     
-    
-    
+
+
 class Task(BaseModel):
+    """A Rekuest task assignment
+
+    Represents a task that was assigned alongside a request, deserialized
+    from the Rekuest task header (see `extract_task_from_rekuest_header`).
+    """
+
     id: str = Field(description="The unique identifier for the task (rekuest_local)")
     parent: str | None = Field(default=None, validation_alias=AliasChoices("parent", "PARENT"), description="The parent task id, if any (rekuest_local)")
     args: Dict[str, Any] = Field(description="The arguments that were sent")
-    user: str = Field(..., description="The assinging user (sub claim)")
-    app: str = Field(description="The assinging app (rekuest_local)")
+    user: str = Field(..., description="The assigning user (sub claim)")
+    app: str = Field(description="The assigning app (rekuest_local)")
     action: str = Field(description="The action hash.")
-        
-    
 
 
 class StaticToken(JWTToken):
-    """A static JWT token"""
+    """A static JWT token
+
+    A pre-defined token that bypasses signature verification. Configured via
+    `AuthentikateSettings.static_tokens` and intended for tests only.
+    """
 
     sub: str
+    """A unique identifier for the user (is unique for the issuer)"""
     iss: str = "static_issuer"
     """The issuer of the token"""
-    iat: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now())
-    exp: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now() + datetime.timedelta(days=1)
+    iat: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
     )
+    """The issued at time of the token (defaults to now, UTC)"""
+    exp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1)
+    )
+    """The expiration time of the token (defaults to one day from now, UTC)"""
     client_id: str = "static"
+    """The client_id of the app that requested the token"""
     client_app: str = "static_app"
+    """The client app name"""
     client_release: str = "v1.0.0"
+    """The client release version"""
     client_device: str = "static_device"
+    """The client device identifier"""
     active_org: str = "static_org"
+    """The active organization of the user"""
     preferred_username: str = "static_user"
+    """The username of the user"""
     scope: str = "openid profile email"
+    """The space-separated scopes of the token"""
     roles: list[str] = Field(default_factory=lambda: ["admin"])
+    """The roles of the user"""
     raw: str = Field(default_factory=lambda: "static_token")
+    """The raw original token string"""
 
 
 class ImitationRequest(BaseModel):
-    """An imitation request"""
+    """An imitation request
+
+    Identifies the user (by sub and iss) that should be imitated.
+    """
 
     sub: str
+    """The sub claim of the user to imitate"""
     iss: str
+    """The issuer of the user to imitate"""
 
 
 class Issuer(BaseModel):
-    """An issuer
+    """A token issuer
 
-    This is a pydantic model that represents an issuer.
-    It is used to validate the issuer and to extract information from it.
+    Base class for all issuer kinds. An issuer is a trusted party whose
+    signing keys (JWKS) are used to verify incoming JWT tokens.
     """
 
     model_config = ConfigDict(extra="forbid")
     kind: str
+    """The discriminator that selects the concrete issuer kind"""
     iss: str = Field(
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
-    """The issuer of the token"""
+    """The issuer url (must match the iss claim of incoming tokens)"""
 
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
@@ -225,25 +248,26 @@ class Issuer(BaseModel):
 
 
 class JWKIssuer(Issuer):
-    """An issuer
+    """An issuer configured with an inline JWKS document
 
-    This is a pydantic model that represents an issuer.
-    It is used to validate the issuer and to extract information from it.
+    The full JWKS dict (with a "keys" list) is provided directly in the
+    settings, so no key retrieval is needed at runtime.
     """
 
     kind: Literal["jwks_dict"] = Field(
         default="jwks_dict",
     )
+    """The discriminator for this issuer kind"""
 
     iss: str = Field(
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
-    """The issuer of the token"""
+    """The issuer url (must match the iss claim of incoming tokens)"""
 
     jwks: Dict[str, Any] = Field(
         validation_alias=AliasChoices("jwks", "JWKS", "JWKS_DICT")
     )
-    """The jwks of the issuer"""
+    """The JWKS document of the issuer (a dict with a "keys" list)"""
 
     @field_validator("jwks", mode="before")
     def validate_jwks_dict(cls: Type["JWKIssuer"], v: Dict[str, Any]) -> Dict[str, Any]:
@@ -262,25 +286,28 @@ class JWKIssuer(Issuer):
 
 
 class RSAKeyIssuer(Issuer):
-    """An issuer
+    """An issuer configured with a single RSA public key
 
-    This is a pydantic model that represents an issuer.
-    It is used to validate the issuer and to extract information from it.
+    The PEM-encoded public key is provided inline and exposed as a
+    one-key JWKS under the configured key id.
     """
 
     model_config = ConfigDict(extra="forbid")
     kind: Literal["rsa"] = Field(
         default="rsa",
     )
+    """The discriminator for this issuer kind"""
 
     iss: str = Field(
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
+    """The issuer url (must match the iss claim of incoming tokens)"""
     key_id: str = Field(
         default="1", validation_alias=AliasChoices("key_id", "kid", "KID")
     )
-    """The issuer of the token"""
+    """The key id (kid) under which the public key is published"""
     public_key: str = Field(validation_alias=AliasChoices("public_key", "PUBLIC_KEY"))
+    """The PEM-encoded RSA public key used to verify token signatures"""
 
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
@@ -289,27 +316,30 @@ class RSAKeyIssuer(Issuer):
 
 
 class RSAKeyFileIssuer(Issuer):
-    """An issuer
+    """An issuer configured with an RSA public key read from a PEM file
 
-    This is a pydantic model that represents an issuer.
-    It is used to validate the issuer and to extract information from it.
+    Like RSAKeyIssuer, but the public key is loaded from a file on disk
+    each time the JWKS is requested.
     """
 
     model_config = ConfigDict(extra="forbid")
     kind: Literal["rsa_file"] = Field(
         default="rsa_file",
     )
+    """The discriminator for this issuer kind"""
 
     iss: str = Field(
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
+    """The issuer url (must match the iss claim of incoming tokens)"""
     key_id: str = Field(
         default="1", validation_alias=AliasChoices("key_id", "kid", "KID")
     )
-    """The issuer of the token"""
+    """The key id (kid) under which the public key is published"""
     public_key_pem_file: FilePath = Field(
         validation_alias=AliasChoices("public_key_pem_file", "PUBLIC_KEY_PEM_FILE")
     )
+    """Path to the PEM file containing the RSA public key"""
 
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
@@ -322,22 +352,24 @@ class RSAKeyFileIssuer(Issuer):
 
 
 class JWKSUriIssuer(Issuer):
-    """An issuer
+    """An issuer whose JWKS is fetched from a remote endpoint
 
-    This is a pydantic model that represents an issuer.
-    It is used to validate the issuer and to extract information from it.
+    The JWKS document is retrieved from the configured uri on first use and
+    cached; it is re-fetched when an unknown key id is encountered.
     """
 
     model_config = ConfigDict(extra="forbid")
     kind: Literal["jwks_uri"] = Field(
         default="jwks_uri",
     )
+    """The discriminator for this issuer kind"""
 
     iss: str = Field(
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
-    """The issuer of the token"""
+    """The issuer url (must match the iss claim of incoming tokens)"""
     jwks_uri: str = Field(validation_alias=AliasChoices("jwks_uri", "JWKS_URI"))
+    """The url of the remote JWKS endpoint (e.g. .../.well-known/jwks.json)"""
     _cache: list[Dict[str, Any]] | None = PrivateAttr(default=None)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
 
@@ -415,6 +447,7 @@ class AuthentikateSettings(BaseModel):
             "ISSUERS",
         )
     )
+    """The trusted issuers whose keys are used to verify incoming tokens"""
     authorization_headers: list[str] = Field(
         default_factory=lambda: [
             "Authorization",
@@ -426,6 +459,7 @@ class AuthentikateSettings(BaseModel):
             "authorization_headers", "AUTHORIZATION_HEADERS", "AUTHORIZATION_HEADERS"
         ),
     )
+    """The request header names that are searched (in order) for a Bearer token"""
     rekuest_header: list[str] = Field(
         default_factory=lambda: [
             "Rekuest-Task",
@@ -437,6 +471,7 @@ class AuthentikateSettings(BaseModel):
             "rekuest_header", "REKUEST_HEADER", "REKUEST_HEADER"
         ),
     )
+    """The request header names that are searched (in order) for a Rekuest task"""
     static_tokens: dict[str, StaticToken] = Field(
         default_factory=dict,
         validation_alias=AliasChoices(

@@ -1,11 +1,9 @@
 import strawberry
-from typing import Awaitable, Callable, Any, Optional, List, Union
+from typing import Awaitable, Callable, Any, Optional, List
 from graphql import GraphQLError
-from strawberry.extensions.field_extension import AsyncExtensionResolver
 from strawberry.schema_directive import Location
 from kante.types import Info
 from strawberry.extensions import FieldExtension
-from strawberry.schema_directive import Location
 from strawberry.types.field import StrawberryField
 from authentikate.base_models import JWTToken
 
@@ -71,9 +69,9 @@ class AuthExtension(FieldExtension):
                     f"User does not have the required scopes: {self.scopes}"
                 )
 
-            if self.any_scope_of and not token.has_any_role(self.any_scope_of):
+            if self.any_scope_of and not token.has_any_scope(self.any_scope_of):
                 raise GraphQLError(
-                    f"User does not have any of of the required scopes: {self.any_scope_of}"
+                    f"User does not have any of the required scopes: {self.any_scope_of}"
                 )
 
             if self.roles and not token.has_roles(self.roles):
@@ -110,9 +108,19 @@ class AuthExtension(FieldExtension):
                     f"User does not have the required scopes: {self.scopes}"
                 )
 
+            if self.any_scope_of and not token.has_any_scope(self.any_scope_of):
+                raise GraphQLError(
+                    f"User does not have any of the required scopes: {self.any_scope_of}"
+                )
+
             if self.roles and not token.has_roles(self.roles):
                 raise GraphQLError(
                     f"User does not have the required roles: {', '.join(self.roles)}"
+                )
+
+            if self.any_role_of and not token.has_any_role(self.any_role_of):
+                raise GraphQLError(
+                    f"User does not have any of the required roles: {', '.join(self.any_role_of)}"
                 )
 
         except KeyError:
@@ -122,6 +130,7 @@ class AuthExtension(FieldExtension):
 
 
 class AuthSubscribeExtension(FieldExtension):
+    """A field extension enforcing authentication and authorization on subscriptions."""
 
     def __init__(
         self,

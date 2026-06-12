@@ -85,37 +85,43 @@ def token_to_username(token: base_models.JWTToken) -> str:
 
 
 async def aset_user_groups(user: models.User, roles: list[str]) -> None:
-    """Add a list of roles to a user
+    """Sync a user's groups with a list of roles
 
-    Roles are added as groups
+    Roles are mirrored as groups: groups for roles no longer present
+    are removed from the user.
 
     Parameters
     ----------
     user : models.User
-        The user to add the roles to
+        The user to sync the roles on
     roles : list[str]
-        The roles to add
+        The roles to sync
     """
+    groups = []
     for role in roles:
         g, _ = await Group.objects.aget_or_create(name=role)
-        await user.groups.aadd(g)
+        groups.append(g)
+    await user.groups.aset(groups)
 
 
 def set_user_groups(user: models.User, roles: list[str]) -> None:
-    """Add a list of roles to a user
+    """Sync a user's groups with a list of roles
 
-    Roles are added as groups
+    Roles are mirrored as groups: groups for roles no longer present
+    are removed from the user.
 
     Parameters
     ----------
     user : models.User
-        The user to add the roles to
+        The user to sync the roles on
     roles : list[str]
-        The roles to add
+        The roles to sync
     """
+    groups = []
     for role in roles:
         g, _ = Group.objects.get_or_create(name=role)
-        user.groups.add(g)
+        groups.append(g)
+    user.groups.set(groups)
 
 
 async def aexpand_organization_from_token(
@@ -199,6 +205,7 @@ async def aexpand_user_from_token(
             user.active_organization = current_org
 
         await user.asave()
+        await aset_user_groups(user, token.roles)
         return user
 
 
@@ -241,7 +248,7 @@ def expand_user_from_token(
 
             if token.active_org:
                 current_org, _ = models.Organization.objects.get_or_create(
-                    identifier=token.active_org
+                    slug=token.active_org
                 )
 
                 user.active_organization = current_org
@@ -256,7 +263,6 @@ def expand_user_from_token(
             sub=token.sub,
             username=(token_to_username(token)),
             iss=token.iss,
-            first_name=token.preferred_username,
         )
         user.set_unusable_password()
         user.first_name = token.preferred_username
@@ -264,7 +270,7 @@ def expand_user_from_token(
 
         if token.active_org:
             current_org, _ = models.Organization.objects.get_or_create(
-                identifier=token.active_org
+                slug=token.active_org
             )
 
             user.active_organization = current_org
