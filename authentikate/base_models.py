@@ -462,6 +462,10 @@ class AuthentikateSettings(BaseModel):
     """The request header names that are searched (in order) for a Bearer token"""
     rekuest_header: list[str] = Field(
         default_factory=lambda: [
+            # ASGI servers (and strawberry's channels handler) deliver header
+            # names lowercased, so the lowercase variants must be included.
+            "rekuest-task",
+            "x-rekuest-task",
             "Rekuest-Task",
             "X-Rekuest-Task",
             "REKUEST_TASK",
