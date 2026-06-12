@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.0.0 (2026-06-12)
+
+### Features
+
+- Major fixes for types and stuff
+  ([`01b9bc1`](https://github.com/arkitektio/authentikate/commit/01b9bc19faa8407c7bea0808ac1b5105772dae7d))
+
+
 ## v1.3.0 (2026-06-01)
 
 

@@ -1,6 +1,6 @@
 [project]
 name = "authentikate"
-version = "1.3.0"
+version = "2.0.0"
 description = ""
 authors = [{ name = "jhnnsrs", email = "jhnnsrs@gmail.com" }]
 requires-python = ">=3.12, <4.0"
