@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.1.1 (2026-06-18)
+
+### Bug Fixes
+
+- New stuff
+  ([`0c03627`](https://github.com/arkitektio/authentikate/commit/0c036277dcd8f530ffd6c7af9677c7c4d3ec2955))
+
+
 ## v2.1.0 (2026-06-18)
 
 ### Features
