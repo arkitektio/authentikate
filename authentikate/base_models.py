@@ -165,21 +165,6 @@ class JWTToken(BaseModel):
         return any(scope in self.scopes for scope in scopes)
 
 
-class Task(BaseModel):
-    """A Rekuest task assignment
-
-    Represents a task that was assigned alongside a request, deserialized
-    from the Rekuest task header (see `extract_task_from_rekuest_header`).
-    """
-
-    id: str = Field(description="The unique identifier for the task (rekuest_local)")
-    parent: str | None = Field(default=None, validation_alias=AliasChoices("parent", "PARENT"), description="The parent task id, if any (rekuest_local)")
-    args: Dict[str, Any] = Field(description="The arguments that were sent")
-    user: str = Field(..., description="The assigning user (sub claim)")
-    app: str = Field(description="The assigning app (rekuest_local)")
-    action: str = Field(description="The action hash.")
-
-
 class StaticToken(JWTToken):
     """A static JWT token
 
@@ -545,6 +530,20 @@ class ProvenanceSettings(BaseModel):
     )
     """The signature algorithms allowed for provenance tokens (alg is pinned)."""
 
+    @field_validator("algorithms")
+    def reject_unsafe_algorithms(cls: Type["ProvenanceSettings"], v: list[str]) -> list[str]:
+        """Pin the alg per RFC 8725: forbid an empty list and the ``none`` alg.
+
+        An empty allow-list or ``alg: none`` would let an attacker present an
+        unsigned (or arbitrarily-signed) provenance token, defeating the whole
+        point of verification.
+        """
+        if not v:
+            raise ValueError("Provenance algorithms must not be empty")
+        if any(alg.strip().lower() == "none" for alg in v):
+            raise ValueError("The 'none' algorithm is not allowed for provenance tokens")
+        return v
+
     def get_jwks(self) -> list[Dict[str, Any]]:
         """Get the merged jwks of all provenance issuers."""
         return _collect_jwks(self.issuers)
@@ -593,26 +592,18 @@ class AuthentikateSettings(BaseModel):
         ),
     )
     """The request header names that are searched (in order) for a Bearer token"""
-    rekuest_header: list[str] = Field(
+    provenance_header: list[str] = Field(
         default_factory=lambda: [
-            # ASGI servers (and strawberry's channels handler) deliver header
-            # names lowercased, so the lowercase variants must be included.
+            # The provenance token is delivered under the Rekuest task header
+            # (the legacy plaintext task payload is gone). ASGI servers deliver
+            # header names lowercased, so the lowercase variants must be
+            # included; the provenance-token names are kept as a fallback.
             "rekuest-task",
             "x-rekuest-task",
             "Rekuest-Task",
             "X-Rekuest-Task",
             "REKUEST_TASK",
             "rekuest_task",
-        ],
-        validation_alias=AliasChoices(
-            "rekuest_header", "REKUEST_HEADER", "REKUEST_HEADER"
-        ),
-    )
-    """The request header names that are searched (in order) for a Rekuest task"""
-    provenance_header: list[str] = Field(
-        default_factory=lambda: [
-            # ASGI servers deliver header names lowercased, so the lowercase
-            # variants must be included.
             "provenance-token",
             "x-provenance-token",
             "Provenance-Token",

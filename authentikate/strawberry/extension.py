@@ -7,8 +7,8 @@ from authentikate.models import Client, User
 from authentikate.utils import (
     authenticate_header,
     authenticate_token,
-    extract_task_from_rekuest_header,
 )
+from authentikate.provenance import aauthenticate_provenance_header_or_none
 from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
 
 
@@ -111,14 +111,10 @@ class AuthentikateExtension(SchemaExtension):
             elif isinstance(context, HttpContext):
                 # HTTP context
                 # Do something with the HTTP context
-                task = extract_task_from_rekuest_header(
-                    dict(context.headers),
-                    self.get_settings(),
-                )
+                settings = self.get_settings()
                 token = await authenticate_header(
                     dict(context.headers),
-                    self.get_settings(),
-                    task=task,
+                    settings,
                 )
                 reset_token = token_var.set(token)
                 if token:
@@ -135,9 +131,19 @@ class AuthentikateExtension(SchemaExtension):
                     context.request.set_membership(membership)
                     context.request.set_organization(organization)
                     context.request.set_extension("token", token)
-                    if task is not None:
-                        context.request.set_task(task)
-                        context.request.set_extension("task", task)
+
+                    # The provenance token (when configured) arrives under the
+                    # Rekuest task header; attach it so resolvers can read it
+                    # contextually via ``info.context.request.provenance``. A
+                    # malformed/unverifiable token degrades to "no provenance"
+                    # (logged) rather than failing the whole request.
+                    if settings.provenance is not None:
+                        provenance = await aauthenticate_provenance_header_or_none(
+                            dict(context.headers), settings
+                        )
+                        if provenance is not None:
+                            context.request.set_provenance(provenance)
+                            context.request.set_extension("provenance", provenance)
             else:
                 raise ValueError(
                     "Unknown context type. Cannot determine if it's WebSocket or HTTP."

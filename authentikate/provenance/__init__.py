@@ -27,6 +27,7 @@ from authentikate.provenance.decode import (
 from authentikate.provenance.models import Actor, ProvenanceToken
 from authentikate.provenance.verify import (
     aauthenticate_provenance_header,
+    aauthenticate_provenance_header_or_none,
     verify_actor,
     verify_args,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "verify_actor",
     "verify_args",
     "aauthenticate_provenance_header",
+    "aauthenticate_provenance_header_or_none",
     "args_hash",
     "canonicalize_v1",
     "CANONICALIZATION_VERSION",

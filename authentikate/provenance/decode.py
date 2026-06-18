@@ -15,9 +15,13 @@ from authentikate.provenance.models import ProvenanceToken
 
 
 def _build_token(token: str, claims: dict[str, object]) -> ProvenanceToken:
-    """Build and validate a ProvenanceToken from decoded claims."""
+    """Build and validate a ProvenanceToken from decoded claims.
+
+    ``raw`` is applied last so a token cannot spoof it via a ``raw`` claim; it
+    always reflects the actual verified token string.
+    """
     try:
-        return ProvenanceToken(**{"raw": token, **claims})
+        return ProvenanceToken(**{**claims, "raw": token})
     except (TypeError, ValidationError) as e:
         raise errors.MalformedProvenanceTokenError(
             "Error decoding provenance token"

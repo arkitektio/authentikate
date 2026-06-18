@@ -7,6 +7,7 @@ provenance store need a database and remain the host application's job; the
 ``jti`` claim is exposed on :class:`ProvenanceToken` for that purpose.
 """
 
+import logging
 from typing import Any
 
 from authentikate import errors
@@ -15,10 +16,13 @@ from authentikate.provenance.decode import adecode_provenance_token
 from authentikate.provenance.models import ProvenanceToken
 from authentikate.settings import get_settings
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "verify_actor",
     "verify_args",
     "aauthenticate_provenance_header",
+    "aauthenticate_provenance_header_or_none",
 ]
 
 
@@ -81,3 +85,31 @@ async def aauthenticate_provenance_header(
         return None
 
     return await adecode_provenance_token(raw, settings)
+
+
+async def aauthenticate_provenance_header_or_none(
+    headers: dict[str, str],
+    settings: AuthentikateSettings | None = None,
+) -> ProvenanceToken | None:
+    """Like :func:`aauthenticate_provenance_header`, but never raises on a bad token.
+
+    Returns the decoded token when present and valid, ``None`` when no provenance
+    header is present, and ``None`` (after logging *why*) when a header is present
+    but cannot be decoded/verified. Use this where a malformed or unverifiable
+    provenance token should degrade gracefully rather than fail the request; the
+    log records the reason so the failure is still observable.
+    """
+    try:
+        return await aauthenticate_provenance_header(headers, settings)
+    except (
+        errors.JwtTokenError,
+        errors.AuthentikateTokenExpired,
+        errors.ProvenanceNotConfiguredError,
+    ) as exc:
+        logger.warning(
+            "Could not decode provenance token from request headers (%s): %s",
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
+        return None
