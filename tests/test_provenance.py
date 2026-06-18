@@ -28,6 +28,7 @@ from authentikate.provenance import (
 from authentikate.provenance.verify import (
     aauthenticate_provenance_header,
     aauthenticate_provenance_header_or_none,
+    aauthenticate_provenance_header_or_raise,
 )
 
 PROV_KID = "prov-1"
@@ -377,6 +378,79 @@ async def test_or_none_not_configured_logs_and_returns_none(ed_key, bare_setting
         )
     assert result is None
     assert "ProvenanceNotConfiguredError" in caplog.records[0].getMessage()
+
+
+# --- fail-closed extraction (raises on a present-but-invalid token) ----------
+
+
+@pytest.mark.asyncio
+async def test_or_raise_returns_token_when_valid(ed_key, settings):
+    token = _sign(ed_key, _provenance_claims())
+    decoded = await aauthenticate_provenance_header_or_raise(
+        {"rekuest-task": token}, settings
+    )
+    assert decoded is not None
+    assert decoded.sub == "user-42"
+
+
+@pytest.mark.asyncio
+async def test_or_raise_absent_returns_none(settings):
+    # No provenance header present at all -> proceed unprovenanced.
+    assert await aauthenticate_provenance_header_or_raise({}, settings) is None
+
+
+@pytest.mark.asyncio
+async def test_or_raise_invalid_signature_raises(other_ed_key, settings):
+    token = _sign(other_ed_key, _provenance_claims())
+    with pytest.raises(errors.ProvenanceValidationError) as exc_info:
+        await aauthenticate_provenance_header_or_raise(
+            {"rekuest-task": token}, settings
+        )
+    # The specific underlying failure is chained as the cause.
+    assert isinstance(exc_info.value.__cause__, errors.InvalidProvenanceTokenError)
+
+
+@pytest.mark.asyncio
+async def test_or_raise_expired_raises(ed_key, settings):
+    now = int(datetime.datetime.now().timestamp())
+    token = _sign(ed_key, _provenance_claims(iat=now - 7200, exp=now - 3600))
+    with pytest.raises(errors.ProvenanceValidationError) as exc_info:
+        await aauthenticate_provenance_header_or_raise(
+            {"rekuest-task": token}, settings
+        )
+    assert isinstance(exc_info.value.__cause__, errors.AuthentikateTokenExpired)
+
+
+@pytest.mark.asyncio
+async def test_or_raise_malformed_raises(ed_key, settings):
+    claims = _provenance_claims()
+    claims.pop("tsk")
+    token = _sign(ed_key, claims)
+    with pytest.raises(errors.ProvenanceValidationError) as exc_info:
+        await aauthenticate_provenance_header_or_raise(
+            {"rekuest-task": token}, settings
+        )
+    assert isinstance(exc_info.value.__cause__, errors.MalformedProvenanceTokenError)
+
+
+@pytest.mark.asyncio
+async def test_or_raise_audience_mismatch_raises(ed_key, settings):
+    token = _sign(ed_key, _provenance_claims(aud=["someone-else"]))
+    with pytest.raises(errors.ProvenanceValidationError) as exc_info:
+        await aauthenticate_provenance_header_or_raise(
+            {"rekuest-task": token}, settings
+        )
+    assert isinstance(exc_info.value.__cause__, errors.ProvenanceAudienceError)
+
+
+@pytest.mark.asyncio
+async def test_or_raise_not_configured_raises(ed_key, bare_settings):
+    token = _sign(ed_key, _provenance_claims())
+    with pytest.raises(errors.ProvenanceValidationError) as exc_info:
+        await aauthenticate_provenance_header_or_raise(
+            {"rekuest-task": token}, bare_settings
+        )
+    assert isinstance(exc_info.value.__cause__, errors.ProvenanceNotConfiguredError)
 
 
 # --- algorithm pinning at config time (RFC 8725) -----------------------------

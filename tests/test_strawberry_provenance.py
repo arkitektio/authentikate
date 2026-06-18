@@ -10,7 +10,6 @@ so the test does not depend on the kante release that renames ``set_task`` to
 """
 
 import datetime
-import logging
 import uuid
 from types import SimpleNamespace
 from typing import Any, cast
@@ -21,6 +20,7 @@ from joserfc import jwt
 from joserfc.jwk import OKPKey
 from kante.context import HttpContext
 
+from authentikate import errors
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.provenance import CANONICALIZATION_VERSION
 from authentikate.strawberry.extension import AuthentikateExtension
@@ -186,8 +186,8 @@ async def test_attaches_provenance_from_rekuest_task_header(
 
 
 @pytest.mark.asyncio
-async def test_invalid_provenance_token_logs_and_request_proceeds(
-    token: JWTToken, settings: AuthentikateSettings, caplog
+async def test_present_but_invalid_provenance_token_raises(
+    token: JWTToken, settings: AuthentikateSettings
 ) -> None:
     request = _FakeRequest()
     extension, _ = _make_extension(
@@ -203,20 +203,15 @@ async def test_invalid_provenance_token_logs_and_request_proceeds(
         "authentikate.strawberry.extension.authenticate_header",
         new=AsyncMock(return_value=token),
     ):
-        with caplog.at_level(
-            logging.WARNING, logger="authentikate.provenance.verify"
-        ):
-            await _run(extension)
+        operation = extension.on_operation()
+        # A provenance token IS present but cannot be validated, so the whole
+        # operation fails closed instead of silently proceeding unprovenanced.
+        with pytest.raises(errors.ProvenanceValidationError):
+            await operation.__anext__()
 
-    # The request still completed and the auth context is intact ...
-    assert get_token() is None  # reset after the operation finished
-    assert request._user is not None
-    # ... but no provenance was attached, and the failure was logged.
+    # No provenance was attached, and the context vars were reset on the way out.
     assert request._provenance is None
-    assert any(
-        "Could not decode provenance token" in r.getMessage()
-        for r in caplog.records
-    )
+    assert get_token() is None
 
 
 @pytest.mark.asyncio

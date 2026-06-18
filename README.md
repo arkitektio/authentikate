@@ -72,13 +72,21 @@ AUTH_USER_MODEL = "authentikate.User"
 
 
 AUTHENTIKATE = {
-    "KEY_TYPE": "RS256",
-    "PUBLIC_KEY_PEM_FILE": "public_key.pem",
-    "FORCE_CLIENT": False, # allows non Oauth2 JWTs to be used
-
+    "ISSUERS": [
+        {
+            "kind": "jwks_uri",
+            "iss": "https://lok.my-org.com",
+            "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
+        }
+    ],
 }
 
 ```
+
+`ISSUERS` is the only required key. Each entry is selected by its `kind`
+(`jwks_uri`, `jwks_dict`, `rsa`, or `rsa_file`). For the full settings shape —
+issuers, static tokens, provenance, headers, the public API and error model —
+see [`docs/USAGE.md`](docs/USAGE.md).
 
 
 ### Standard Usage
@@ -108,20 +116,27 @@ boilerplate code that is required to make this work.
 
 
 ```python
-from authentikate.strawberry.permissions import IsAuthenticated, NeedsScopes
+import strawberry
+from authentikate.strawberry import AuthentikateExtension, AuthExtension
+
+schema = strawberry.Schema(query=Query, extensions=[AuthentikateExtension])
+
 
 @strawberry.type
-class Query
+class Query:
 
-    @strawberry.field(permission_classes=[IsAuthenticated])
+    @strawberry.field(extensions=[AuthExtension()])
     def me(self, info: Info) -> User:
-        return info.context.auth.user
+        return info.context.request.user
 
-    @strawberry.field(permission_classes=[NeedsScopes(["read:users"])])
+    @strawberry.field(extensions=[AuthExtension(scopes=["read:users"])])
     def users(self, info: Info) -> List[User]:
         return User.objects.all()
 
 ```
+
+`AuthExtension` accepts `scopes`, `roles`, `any_scope_of` and `any_role_of`. Use
+`AuthSubscribeExtension` on subscription fields.
 
 ### Static Tokens
 
@@ -131,14 +146,19 @@ not be used in production.
 ```python
 
 AUTHENTIKATE = {
-    "KEY_TYPE": "RS256",
-    "PUBLIC_KEY_PEM_FILE": "public_key.pem",
-    "FORCE_CLIENT": False, # allows non Oauth2 JWTs to be used
+    "ISSUERS": [
+        {
+            "kind": "jwks_uri",
+            "iss": "https://lok.my-org.com",
+            "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
+        }
+    ],
     "STATIC_TOKENS": {
         "my_token": {
-            "user": "my_user",
-            "app": "my_app",
-            "scopes": ["read:users"]
+            "sub": "my_user",
+            "iss": "https://lok.my-org.com",
+            "scope": "read:users",
+            "roles": ["admin"],
         }
     }
 }

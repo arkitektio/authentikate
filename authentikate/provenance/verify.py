@@ -23,6 +23,7 @@ __all__ = [
     "verify_args",
     "aauthenticate_provenance_header",
     "aauthenticate_provenance_header_or_none",
+    "aauthenticate_provenance_header_or_raise",
 ]
 
 
@@ -85,6 +86,35 @@ async def aauthenticate_provenance_header(
         return None
 
     return await adecode_provenance_token(raw, settings)
+
+
+async def aauthenticate_provenance_header_or_raise(
+    headers: dict[str, str],
+    settings: AuthentikateSettings | None = None,
+) -> ProvenanceToken | None:
+    """Extract and decode a provenance token, failing closed on a bad one.
+
+    Returns the decoded token when a configured provenance header is present and
+    valid, and ``None`` only when *no* provenance header is present at all. When a
+    header IS present but the token cannot be decoded/verified, a
+    :class:`~authentikate.errors.ProvenanceValidationError` is raised (with the
+    underlying failure chained as its cause) so the request is rejected rather
+    than silently proceeding without the provenance it was given.
+
+    This is the fail-closed counterpart to
+    :func:`aauthenticate_provenance_header_or_none`.
+    """
+    try:
+        return await aauthenticate_provenance_header(headers, settings)
+    except (
+        errors.JwtTokenError,
+        errors.AuthentikateTokenExpired,
+        errors.ProvenanceNotConfiguredError,
+    ) as exc:
+        raise errors.ProvenanceValidationError(
+            "A provenance token was present on the request but could not be "
+            f"validated ({type(exc).__name__}: {exc})"
+        ) from exc
 
 
 async def aauthenticate_provenance_header_or_none(

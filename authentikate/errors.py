@@ -117,6 +117,21 @@ class ProvenanceArgsMismatchError(ProvenanceTokenError):
     pass
 
 
+class ProvenanceValidationError(ProvenanceTokenError):
+    """Raised when a provenance token is present on a request but fails validation.
+
+    The graceful ``*_or_none`` path swallows an unverifiable provenance token and
+    lets the request proceed as if none were supplied. This error is raised in the
+    opposite, fail-closed case: once a request actually carries a provenance
+    token, that token must validate — otherwise the request is rejected rather
+    than silently treated as unprovenanced. The specific underlying failure
+    (signature, expiry, audience, malformed payload, missing configuration) is
+    chained as the cause.
+    """
+
+    pass
+
+
 class ProvenanceNotConfiguredError(AuthentikateError):
     """Raised when provenance verification is attempted without configuration."""
 

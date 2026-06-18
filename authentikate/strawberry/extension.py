@@ -8,7 +8,7 @@ from authentikate.utils import (
     authenticate_header,
     authenticate_token,
 )
-from authentikate.provenance import aauthenticate_provenance_header_or_none
+from authentikate.provenance import aauthenticate_provenance_header_or_raise
 from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
 
 
@@ -134,11 +134,13 @@ class AuthentikateExtension(SchemaExtension):
 
                     # The provenance token (when configured) arrives under the
                     # Rekuest task header; attach it so resolvers can read it
-                    # contextually via ``info.context.request.provenance``. A
-                    # malformed/unverifiable token degrades to "no provenance"
-                    # (logged) rather than failing the whole request.
+                    # contextually via ``info.context.request.provenance``. This
+                    # path fails closed: if no provenance header is present the
+                    # request proceeds unprovenanced, but a header that is present
+                    # yet malformed/unverifiable raises ProvenanceValidationError
+                    # and fails the whole operation rather than being ignored.
                     if settings.provenance is not None:
-                        provenance = await aauthenticate_provenance_header_or_none(
+                        provenance = await aauthenticate_provenance_header_or_raise(
                             dict(context.headers), settings
                         )
                         if provenance is not None:
