@@ -23,6 +23,24 @@ from authentikate.errors import JwksError, MalformedJwtTokenError
 logger = logging.getLogger(__name__)
 
 
+def coerce_aud_to_list(v: str | list[str] | None) -> list[str] | None:
+    """Coerce an ``aud`` claim into a list (or None when absent)."""
+    if not v:
+        return None
+    if isinstance(v, str):
+        return [v]
+    return v
+
+
+def coerce_unix_to_datetime(v: int | datetime.datetime | None) -> datetime.datetime | None:
+    """Coerce a unix-seconds timestamp claim into a tz-aware datetime."""
+    if v is None:
+        return None
+    if isinstance(v, int):
+        return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
+    return v
+
+
 class JWTToken(BaseModel):
     """A JWT token
 
@@ -80,12 +98,7 @@ class JWTToken(BaseModel):
         cls: Type["JWTToken"], v: str | list[str] | None
     ) -> list[str] | None:
         """Convert the aud to a list"""
-        if not v:
-            return None
-        if isinstance(v, str):
-            return [v]
-
-        return v
+        return coerce_aud_to_list(v)
 
     @field_validator("sub", mode="before")
     def sub_to_username(cls: Type["JWTToken"], v: str) -> str:
@@ -95,20 +108,18 @@ class JWTToken(BaseModel):
         return v
 
     @field_validator("iat", mode="before")
-    def iat_to_datetime(cls: Type["JWTToken"], v: int) -> datetime.datetime:
+    def iat_to_datetime(
+        cls: Type["JWTToken"], v: int
+    ) -> datetime.datetime | None:
         """Convert the iat to a datetime object"""
-        if v is None:
-            return None
-        if isinstance(v, int):
-            return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
-        return v
+        return coerce_unix_to_datetime(v)
 
     @field_validator("exp", mode="before")
-    def exp_to_datetime(cls: Type["JWTToken"], v: int) -> datetime.datetime:
+    def exp_to_datetime(
+        cls: Type["JWTToken"], v: int
+    ) -> datetime.datetime | None:
         """Convert the exp to a datetime object"""
-        if isinstance(v, int):
-            return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
-        return v
+        return coerce_unix_to_datetime(v)
 
     @property
     def changed_hash(self) -> str:
@@ -429,6 +440,128 @@ IssuerUnion = Annotated[
 ]
 
 
+def _merge_jwks(
+    jwks_by_issuer: list[list[Dict[str, Any]]],
+) -> list[Dict[str, Any]]:
+    """Validate and merge the keys returned by a set of issuers.
+
+    Rejects duplicate or missing ``kid``s, since key resolution is by ``kid``.
+    """
+
+    merged_jwks: Dict[str, Dict[str, Any]] = {}
+
+    for keys in jwks_by_issuer:
+        if not isinstance(keys, list):
+            raise JwksError("keys must be a list")
+
+        for key in keys:
+            if key.get("kid") is None:
+                raise JwksError("key must contain a kid field")
+
+            if key["kid"] in merged_jwks:
+                raise JwksError(f"Duplicate kid found: {key['kid']}")
+
+            merged_jwks[key["kid"]] = key
+
+    if not merged_jwks:
+        raise JwksError("No keys found in jwks")
+
+    return list(merged_jwks.values())
+
+
+def _collect_jwks(issuers: list[IssuerUnion]) -> list[Dict[str, Any]]:
+    """Collect and merge the JWKS of every issuer (blocking)."""
+
+    return _merge_jwks([issuer.get_as_jwks() for issuer in issuers])
+
+
+async def _acollect_jwks(issuers: list[IssuerUnion]) -> list[Dict[str, Any]]:
+    """Collect and merge the JWKS of every issuer without blocking the loop."""
+
+    jwks_by_issuer = []
+    for issuer in issuers:
+        if isinstance(issuer, JWKSUriIssuer):
+            jwks_by_issuer.append(await issuer.aget_as_jwks())
+        else:
+            jwks_by_issuer.append(issuer.get_as_jwks())
+
+    return _merge_jwks(jwks_by_issuer)
+
+
+def _resolve_key_set(issuers: list[IssuerUnion], kid: str | None) -> KeySet:
+    """Resolve a KeySet for ``kid``, refreshing issuers on a miss (blocking)."""
+
+    if not kid:
+        raise MalformedJwtTokenError("Missing kid in header")
+
+    jwks = _collect_jwks(issuers)
+
+    if not any(key.get("kid") == kid for key in jwks):
+        for issuer in issuers:
+            issuer.refresh()
+        jwks = _collect_jwks(issuers)
+
+    return KeySet.import_key_set({"keys": jwks})
+
+
+async def _aresolve_key_set(issuers: list[IssuerUnion], kid: str) -> KeySet:
+    """Resolve a KeySet for ``kid``, refreshing issuers on a miss (async)."""
+
+    jwks = await _acollect_jwks(issuers)
+
+    if not any(key.get("kid") == kid for key in jwks):
+        for issuer in issuers:
+            if isinstance(issuer, JWKSUriIssuer):
+                await issuer.arefresh()
+            else:
+                issuer.refresh()
+        jwks = await _acollect_jwks(issuers)
+
+    return KeySet.import_key_set({"keys": jwks})
+
+
+class ProvenanceSettings(BaseModel):
+    """Configuration for verifying inbound provenance tokens.
+
+    Provenance tokens are an orthogonal trust domain to the auth token: a
+    different issuer (Rekuest), a different signing algorithm (EdDSA), and a
+    different JWKS endpoint. This block scopes those issuers separately so a
+    provenance token is never verified against an auth issuer and vice versa.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    issuers: list[IssuerUnion] = Field(
+        validation_alias=AliasChoices("issuers", "ISSUERS")
+    )
+    """The trusted provenance issuers (typically one JWKSUriIssuer at Rekuest)."""
+    audience: str | None = Field(
+        default=None, validation_alias=AliasChoices("audience", "AUDIENCE")
+    )
+    """This service's identifier (e.g. "mikro"); checked against the token aud."""
+    algorithms: list[str] = Field(
+        default_factory=lambda: ["EdDSA"],
+        validation_alias=AliasChoices("algorithms", "ALGORITHMS"),
+    )
+    """The signature algorithms allowed for provenance tokens (alg is pinned)."""
+
+    def get_jwks(self) -> list[Dict[str, Any]]:
+        """Get the merged jwks of all provenance issuers."""
+        return _collect_jwks(self.issuers)
+
+    async def aget_jwks(self) -> list[Dict[str, Any]]:
+        """Get the merged jwks of all provenance issuers without blocking."""
+        return await _acollect_jwks(self.issuers)
+
+    def load_key(self, obj: GuestProtocol) -> KeySet:
+        """Resolve the key set from a JWS header (joserfc callable resolver)."""
+        return _resolve_key_set(self.issuers, obj.headers().get("kid"))
+
+    async def aload_key(self, kid: str) -> KeySet:
+        """Resolve the key set for a given key id without blocking the loop."""
+        return await _aresolve_key_set(self.issuers, kid)
+
+
 class AuthentikateSettings(BaseModel):
     """The settings for authentikate
 
@@ -476,6 +609,20 @@ class AuthentikateSettings(BaseModel):
         ),
     )
     """The request header names that are searched (in order) for a Rekuest task"""
+    provenance_header: list[str] = Field(
+        default_factory=lambda: [
+            # ASGI servers deliver header names lowercased, so the lowercase
+            # variants must be included.
+            "provenance-token",
+            "x-provenance-token",
+            "Provenance-Token",
+            "X-Provenance-Token",
+            "PROVENANCE_TOKEN",
+            "provenance_token",
+        ],
+        validation_alias=AliasChoices("provenance_header", "PROVENANCE_HEADER"),
+    )
+    """The request header names that are searched (in order) for a provenance token"""
     static_tokens: dict[str, StaticToken] = Field(
         default_factory=dict,
         validation_alias=AliasChoices(
@@ -483,90 +630,28 @@ class AuthentikateSettings(BaseModel):
         ),
     )
     """A map of static tokens to their decoded values. Should only be used in tests."""
-
-    @staticmethod
-    def _validate_and_merge_jwks(
-        jwks_by_issuer: list[list[Dict[str, Any]]],
-    ) -> list[Dict[str, Any]]:
-        """Validate and merge keys returned by all issuers."""
-
-        merged_jwks = {}
-
-        for keys in jwks_by_issuer:
-            if not isinstance(keys, list):
-                raise JwksError("keys must be a list")
-
-            for key in keys:
-                if key.get("kid") is None:
-                    raise JwksError("key must contain a kid field")
-
-                if key["kid"] in merged_jwks:
-                    raise JwksError(f"Duplicate kid found: {key['kid']}")
-
-                merged_jwks[key["kid"]] = key
-
-        if not merged_jwks:
-            raise JwksError("No keys found in jwks")
-
-        return list(merged_jwks.values())
+    provenance: ProvenanceSettings | None = Field(
+        default=None,
+        validation_alias=AliasChoices("provenance", "PROVENANCE"),
+    )
+    """Configuration for verifying inbound provenance tokens (None disables it)."""
 
     def get_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
 
-        return self._validate_and_merge_jwks(
-            [issuer.get_as_jwks() for issuer in self.issuers]
-        )
+        return _collect_jwks(self.issuers)
 
     async def aget_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer without blocking the event loop."""
 
-        jwks_by_issuer = []
-
-        for issuer in self.issuers:
-            if isinstance(issuer, JWKSUriIssuer):
-                jwks_by_issuer.append(await issuer.aget_as_jwks())
-            else:
-                jwks_by_issuer.append(issuer.get_as_jwks())
-
-        return self._validate_and_merge_jwks(jwks_by_issuer)
+        return await _acollect_jwks(self.issuers)
 
     def load_key(self, obj: GuestProtocol) -> KeySet:
         """Resolve the key from the header"""
-        kid = obj.headers().get("kid")
-        if not kid:
-            raise MalformedJwtTokenError("Missing kid in header")
 
-        jwks = self.get_jwks()
-
-        # Check if the kid is in the jwks
-        found = False
-        for key in jwks:
-            if key.get("kid") == kid:
-                found = True
-                break
-
-        if not found:
-            # Trigger refresh on all issuers
-            for issuer in self.issuers:
-                issuer.refresh()
-            # Re-fetch
-            jwks = self.get_jwks()
-
-        key_set = KeySet.import_key_set({"keys": jwks})
-        return key_set
+        return _resolve_key_set(self.issuers, obj.headers().get("kid"))
 
     async def aload_key(self, kid: str) -> KeySet:
         """Resolve the key set for a given key id without blocking the event loop."""
 
-        jwks = await self.aget_jwks()
-
-        if not any(key.get("kid") == kid for key in jwks):
-            for issuer in self.issuers:
-                if isinstance(issuer, JWKSUriIssuer):
-                    await issuer.arefresh()
-                else:
-                    issuer.refresh()
-
-            jwks = await self.aget_jwks()
-
-        return KeySet.import_key_set({"keys": jwks})
+        return await _aresolve_key_set(self.issuers, kid)

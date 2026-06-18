@@ -85,3 +85,51 @@ class KeyNotFoundError(AuthentikatePermissionDenied):
     """Raised when the key is not found in the JWKS"""
 
     pass
+
+
+class ProvenanceTokenError(JwtTokenError):
+    """Base class for all provenance token errors."""
+
+    pass
+
+
+class MalformedProvenanceTokenError(ProvenanceTokenError):
+    """Raised when a provenance token payload is malformed."""
+
+    pass
+
+
+class InvalidProvenanceTokenError(ProvenanceTokenError):
+    """Raised when a provenance token signature or claims are invalid."""
+
+    pass
+
+
+class ProvenanceAudienceError(ProvenanceTokenError):
+    """Raised when the configured service is not in the token's audience."""
+
+    pass
+
+
+class ProvenanceActorMismatchError(ProvenanceTokenError):
+    """Raised when the token's actor does not match the presenting auth token."""
+
+    pass
+
+
+class ProvenanceArgsMismatchError(ProvenanceTokenError):
+    """Raised when the cleartext args do not match the token's args hash."""
+
+    pass
+
+
+class ProvenanceNotConfiguredError(AuthentikateError):
+    """Raised when provenance verification is attempted without configuration."""
+
+    pass
+
+
+class UnsupportedCanonicalizationError(AuthentikateError):
+    """Raised when an args-hash canonicalization version is not supported."""
+
+    pass
