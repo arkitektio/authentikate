@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.1.2 (2026-06-18)
+
+### Bug Fixes
+
+- With strict proevenance
+  ([`07764d3`](https://github.com/arkitektio/authentikate/commit/07764d3054532e4d15b8ae2f2a436a8a55794fc8))
+
+
 ## v2.1.1 (2026-06-18)
 
 ### Bug Fixes
