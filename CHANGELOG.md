@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.1.0 (2026-06-18)
+
+### Features
+
+- Add provenance-token verification for the consuming/audience end. A new
+  ([`dde9dcb`](https://github.com/arkitektio/authentikate/commit/dde9dcb24e2e206285dca8edfa241ffb2c9ab138))
+
+
 ## v2.0.1 (2026-06-12)
 
 ### Bug Fixes
