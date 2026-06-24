@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.2.0 (2026-06-24)
+
+### Features
+
+- Fix to new Ed22519
+  ([`6b1a241`](https://github.com/arkitektio/authentikate/commit/6b1a241cfef566641b3189dea21df6aaa065622c))
+
+
 ## v2.1.2 (2026-06-18)
 
 ### Bug Fixes
