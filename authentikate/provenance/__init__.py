@@ -1,6 +1,6 @@
 """Provenance-token verification (consuming / audience end).
 
-Audience servers (e.g. Mikro / koherent) receive an EdDSA-signed provenance
+Audience servers (e.g. Mikro / koherent) receive an Ed25519-signed provenance
 token minted by Rekuest alongside the cleartext args, and record a verified
 provenance fact offline against Rekuest's published JWKS. This subpackage
 provides that decode/verify path:

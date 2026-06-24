@@ -10,8 +10,8 @@ dependencies = [
     "pydantic>2, <3",
     "django-guardian>=2.4.0,<3",
     "django>5",
-    "kante>=2",
-    "joserfc>=1.0.4",
+    "kante>=2.0.1",
+    "joserfc>=1.7.1",
     "httpx>=0.28.1",
 ]
 
@@ -20,7 +20,7 @@ dev-dependencies =  [
     "pytest-django>=4.5.2,<5",
     "pytest>=7.4.0,<8",
     "pytest-cov>=4.1.0,<5",
-    "cryptography>=41.0.3,<42",
+    "cryptography>=45.0.1",
     "ruff>=0.0.282,<0.0.283",
     "black>=22",
     "django-stubs>=4.2.7,<5",

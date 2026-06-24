@@ -509,7 +509,7 @@ class ProvenanceSettings(BaseModel):
     """Configuration for verifying inbound provenance tokens.
 
     Provenance tokens are an orthogonal trust domain to the auth token: a
-    different issuer (Rekuest), a different signing algorithm (EdDSA), and a
+    different issuer (Rekuest), a different signing algorithm (Ed25519), and a
     different JWKS endpoint. This block scopes those issuers separately so a
     provenance token is never verified against an auth issuer and vice versa.
     """
@@ -525,7 +525,7 @@ class ProvenanceSettings(BaseModel):
     )
     """This service's identifier (e.g. "mikro"); checked against the token aud."""
     algorithms: list[str] = Field(
-        default_factory=lambda: ["EdDSA"],
+        default_factory=lambda: ["Ed25519"],
         validation_alias=AliasChoices("algorithms", "ALGORITHMS"),
     )
     """The signature algorithms allowed for provenance tokens (alg is pinned)."""

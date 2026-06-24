@@ -126,7 +126,7 @@ def _provenance_token(ed_key: OKPKey) -> str:
         "aha": CANONICALIZATION_VERSION,
     }
     return jwt.encode(
-        {"alg": "EdDSA", "kid": PROV_KID}, claims, ed_key, algorithms=["EdDSA"]
+        {"alg": "Ed25519", "kid": PROV_KID}, claims, ed_key, algorithms=["Ed25519"]
     )
 
 

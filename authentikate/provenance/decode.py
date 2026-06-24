@@ -2,7 +2,7 @@
 
 Mirrors ``authentikate.decode`` for the auth token, but resolves keys from the
 *provenance* issuer(s) — a separate trust domain with its own JWKS endpoint —
-and pins the signature algorithm (``EdDSA`` by default, never ``none``), as
+and pins the signature algorithm (``Ed25519`` by default, never ``none``), as
 required by RFC 8725.
 """
 
@@ -44,7 +44,7 @@ def decode_provenance_token(
 ) -> ProvenanceToken:
     """Decode and verify a provenance token.
 
-    Verifies the EdDSA signature against the configured provenance issuers,
+    Verifies the Ed25519 signature against the configured provenance issuers,
     validates the registered claims (expiry), and checks audience membership.
 
     Raises
@@ -113,4 +113,5 @@ async def adecode_provenance_token(
 
     built = _build_token(token, decoded.claims)
     _check_audience(built, provenance)
+    print("Built provenance token:", built)
     return built

@@ -10,7 +10,7 @@ framework.
 Supported Token Types
 - JWT (JSON Web Tokens) (with client_id, user_id, scopes, and expiration)
 - Static tokens (for testing and pre-defined tokens)
-- Provenance tokens (EdDSA-signed attestations minted by Rekuest, verified on
+- Provenance tokens (Ed25519-signed attestations minted by Rekuest, verified on
   the consuming/audience end via :mod:`authentikate.provenance`)
 
 

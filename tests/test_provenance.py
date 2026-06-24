@@ -66,7 +66,9 @@ def other_ed_key() -> OKPKey:
 
 
 def _sign(key: OKPKey, claims: dict, *, kid: str = PROV_KID) -> str:
-    return jwt.encode({"alg": "EdDSA", "kid": kid}, claims, key, algorithms=["EdDSA"])
+    return jwt.encode(
+        {"alg": "Ed25519", "kid": kid}, claims, key, algorithms=["Ed25519"]
+    )
 
 
 @pytest.fixture
@@ -463,10 +465,10 @@ def test_default_algorithm_is_eddsa(ed_key):
         provenance={"issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}]},
     )
     assert settings.provenance is not None
-    assert settings.provenance.algorithms == ["EdDSA"]
+    assert settings.provenance.algorithms == ["Ed25519"]
 
 
-@pytest.mark.parametrize("bad", [["none"], ["NONE"], [" none "], ["EdDSA", "none"], []])
+@pytest.mark.parametrize("bad", [["none"], ["NONE"], [" none "], ["Ed25519", "none"], []])
 def test_rejects_unsafe_algorithm_config(ed_key, bad):
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     with pytest.raises(ValidationError):
