@@ -144,7 +144,10 @@ class AuthentikateExtension(SchemaExtension):
                             dict(context.headers), settings
                         )
                         if provenance is not None:
-                            context.request.set_provenance(provenance)
+                            # ProvenanceToken structurally satisfies kante's
+                            # Provenance protocol at runtime; the nested Actor
+                            # types differ only by protocol invariance.
+                            context.request.set_provenance(provenance)  # pyright: ignore[reportArgumentType]
                             context.request.set_extension("provenance", provenance)
             else:
                 raise ValueError(

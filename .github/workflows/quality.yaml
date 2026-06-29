@@ -26,5 +26,5 @@ jobs:
       - name: Check Ruff
         run: uvx ruff check .
 
-      - name: Check MyPy
-        run: uv run mypy .
+      - name: Check basedpyright
+        run: uv run basedpyright
