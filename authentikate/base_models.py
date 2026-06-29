@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import asyncio
-from typing import Literal, Type, Union, Annotated, cast
+from typing import Literal, Union, Annotated, cast
 import httpx
 from pydantic import (
     BaseModel,
@@ -94,30 +94,28 @@ class JWTToken(BaseModel):
     """ The client device identifier """
 
     @field_validator("aud", mode="before")
-    def aud_to_list(
-        cls: Type["JWTToken"], v: str | list[str] | None
-    ) -> list[str] | None:
+    @classmethod
+    def aud_to_list(cls, v: str | list[str] | None) -> list[str] | None:
         """Convert the aud to a list"""
         return coerce_aud_to_list(v)
 
     @field_validator("sub", mode="before")
-    def sub_to_username(cls: Type["JWTToken"], v: str) -> str:
+    @classmethod
+    def sub_to_username(cls, v: str) -> str:
         """Convert the sub to a username compatible string"""
         if isinstance(v, int):
             return str(v)
         return v
 
     @field_validator("iat", mode="before")
-    def iat_to_datetime(
-        cls: Type["JWTToken"], v: int
-    ) -> datetime.datetime | None:
+    @classmethod
+    def iat_to_datetime(cls, v: int) -> datetime.datetime | None:
         """Convert the iat to a datetime object"""
         return coerce_unix_to_datetime(v)
 
     @field_validator("exp", mode="before")
-    def exp_to_datetime(
-        cls: Type["JWTToken"], v: int
-    ) -> datetime.datetime | None:
+    @classmethod
+    def exp_to_datetime(cls, v: int) -> datetime.datetime | None:
         """Convert the exp to a datetime object"""
         return coerce_unix_to_datetime(v)
 
@@ -266,7 +264,8 @@ class JWKIssuer(Issuer):
     """The JWKS document of the issuer (a dict with a "keys" list)"""
 
     @field_validator("jwks", mode="before")
-    def validate_jwks_dict(cls: Type["JWKIssuer"], v: Dict[str, Any]) -> Dict[str, Any]:
+    @classmethod
+    def validate_jwks_dict(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         """Validate the jwks dict"""
         if not isinstance(v, dict):
             raise ValueError("jwks_dict must be a dict")
@@ -531,7 +530,8 @@ class ProvenanceSettings(BaseModel):
     """The signature algorithms allowed for provenance tokens (alg is pinned)."""
 
     @field_validator("algorithms")
-    def reject_unsafe_algorithms(cls: Type["ProvenanceSettings"], v: list[str]) -> list[str]:
+    @classmethod
+    def reject_unsafe_algorithms(cls, v: list[str]) -> list[str]:
         """Pin the alg per RFC 8725: forbid an empty list and the ``none`` alg.
 
         An empty allow-list or ``alg: none`` would let an attacker present an

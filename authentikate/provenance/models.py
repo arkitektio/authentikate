@@ -7,7 +7,7 @@ verification entrypoint.
 """
 
 import datetime
-from typing import Any, Type
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -73,23 +73,20 @@ class ProvenanceToken(BaseModel):
     """The raw original token string."""
 
     @field_validator("aud", mode="before")
-    def aud_to_list(
-        cls: Type["ProvenanceToken"], v: str | list[str] | None
-    ) -> list[str] | None:
+    @classmethod
+    def aud_to_list(cls, v: str | list[str] | None) -> list[str] | None:
         """Convert the aud to a list"""
         return coerce_aud_to_list(v)
 
     @field_validator("iat", mode="before")
-    def iat_to_datetime(
-        cls: Type["ProvenanceToken"], v: int
-    ) -> datetime.datetime | None:
+    @classmethod
+    def iat_to_datetime(cls, v: int) -> datetime.datetime | None:
         """Convert the iat to a datetime object"""
         return coerce_unix_to_datetime(v)
 
     @field_validator("exp", mode="before")
-    def exp_to_datetime(
-        cls: Type["ProvenanceToken"], v: int
-    ) -> datetime.datetime | None:
+    @classmethod
+    def exp_to_datetime(cls, v: int) -> datetime.datetime | None:
         """Convert the exp to a datetime object"""
         return coerce_unix_to_datetime(v)
 
