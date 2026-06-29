@@ -1,6 +1,59 @@
 # CHANGELOG
 
 
+## v2.2.1 (2026-06-29)
+
+### Bug Fixes
+
+- Make concurrent authentication race-safe
+  ([`47a6c48`](https://github.com/arkitektio/authentikate/commit/47a6c4803a79a0b4ecb1c2724842f63218cd364c))
+
+Concurrent requests authenticating the same not-yet-existing token could race in
+  expand_user_from_token / aexpand_user_from_token: both passed the get() lookup, both attempted an
+  INSERT, and the loser hit the (sub, iss) unique constraint with an IntegrityError ("cannot create
+  because it exists"). Wrap the create save in try/except IntegrityError and re-fetch the winner's
+  row on conflict, mirroring what get_or_create does internally while preserving the existing
+  creation side-effects (unusable password, group sync, active-org resolution). No lock needed.
+
+Also add unique constraints so the App/Release get_or_create paths cannot silently create duplicate
+  rows under concurrency: - App.identifier is now unique - Release is now unique per (app, version)
+  (migration 0006). Note: applying 0006 to a database that already contains duplicate App/Release
+  rows will fail and requires manual dedup first.
+
+Add tests/test_concurrent_access.py covering the recovery path (async and sync), repeated-expansion
+  idempotency, and the new uniqueness constraints.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01TXJvUceiFdV5on23ct7tjz
+
+### Chores
+
+- Replace mypy with basedpyright
+  ([`ccc5f8b`](https://github.com/arkitektio/authentikate/commit/ccc5f8b159e3df7e2ba66cd79940b5eac24765d4))
+
+Swap the type checker from mypy (with mypy_django_plugin + pydantic.mypy) to basedpyright:
+
+- Drop django-stubs; add basedpyright and django-types (the pyright-compatible Django stubs that
+  teach the checker about Model.objects, field descriptors, etc.). - Replace
+  [tool.mypy]/[tool.django-stubs] config with [tool.basedpyright] (standard mode,
+  migrations/tests/examples excluded). Disable reportIncompatibleVariableOverride since Pydantic
+  models intentionally narrow inherited fields (discriminator literals, optional->required in
+  subclasses). - Update the CI quality workflow to run `uv run basedpyright`.
+
+Code fixes to satisfy the new checker (no behavior change): - Convert pydantic field_validators to
+  the idiomatic `@classmethod` form with a bare `cls`, dropping the explicit `cls: Type[...]`
+  annotations; remove the now unused `Type` imports. - Ignore ANN102 in ruff (consistent with the
+  already-ignored ANN101) now that `cls` is unannotated. - Add a targeted pyright ignore on
+  set_provenance for the cross-library ProvenanceToken/Provenance protocol invariance.
+
+basedpyright, ruff, and the full test suite (103) all pass.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01TXJvUceiFdV5on23ct7tjz
+
+
 ## v2.2.0 (2026-06-24)
 
 ### Features
