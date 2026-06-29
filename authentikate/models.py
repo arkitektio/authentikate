@@ -82,7 +82,7 @@ class Device(models.Model):
 class App(models.Model):
     """An App model to represent an application in the system"""
 
-    identifier = models.CharField(max_length=2000)
+    identifier = models.CharField(max_length=2000, unique=True)
     """The application identifier (from the token's client_app claim)"""
 
     def __str__(self) -> str:
@@ -100,6 +100,8 @@ class Release(models.Model):
 
     class Meta:
         """Meta class for Release"""
+
+        unique_together = ("app", "version")
 
 
 class Client(models.Model):

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from django.contrib.auth.models import Group
+from django.db import IntegrityError
 from authentikate import base_models, models
 import logging
 from typing import cast
@@ -167,26 +168,7 @@ async def aexpand_user_from_token(
 
     try:
         user = await models.User.objects.aget(sub=token.sub, iss=token.iss)
-        if user.changed_hash != token.changed_hash:
-            # User has changed, update the user object
-            user.first_name = token.preferred_username
-            user.changed_hash = token.changed_hash
-
-            if organization is not None:
-                user.active_organization = organization
-            elif token.active_org:
-                current_org, _ = await models.Organization.objects.aget_or_create(
-                    slug=token.active_org,
-                )
-                user.active_organization = current_org
-
-            await user.asave()
-            await aset_user_groups(user, token.roles)
-
-        return user
-
     except models.User.DoesNotExist:
-
         user = models.User(
             sub=token.sub,
             username=token_to_username(token),
@@ -204,9 +186,34 @@ async def aexpand_user_from_token(
             )
             user.active_organization = current_org
 
+        try:
+            await user.asave()
+            await aset_user_groups(user, token.roles)
+            return user
+        except IntegrityError:
+            # Lost a concurrent create race: another request authenticating the
+            # same token already inserted this (sub, iss) user. Fall through to
+            # treat the winner's row as an existing user instead of propagating
+            # the IntegrityError.
+            user = await models.User.objects.aget(sub=token.sub, iss=token.iss)
+
+    if user.changed_hash != token.changed_hash:
+        # The token's user metadata changed since we last saw it: sync it across.
+        user.first_name = token.preferred_username
+        user.changed_hash = token.changed_hash
+
+        if organization is not None:
+            user.active_organization = organization
+        elif token.active_org:
+            current_org, _ = await models.Organization.objects.aget_or_create(
+                slug=token.active_org,
+            )
+            user.active_organization = current_org
+
         await user.asave()
         await aset_user_groups(user, token.roles)
-        return user
+
+    return user
 
 
 async def aexpand_token_context(
@@ -240,25 +247,7 @@ def expand_user_from_token(
 
     try:
         user = models.User.objects.get(sub=token.sub, iss=token.iss)
-        if user.changed_hash != token.changed_hash:
-            # User has changed, update the user object
-            user.first_name = token.preferred_username
-            user.changed_hash = token.changed_hash
-            set_user_groups(user, token.roles)
-
-            if token.active_org:
-                current_org, _ = models.Organization.objects.get_or_create(
-                    slug=token.active_org
-                )
-
-                user.active_organization = current_org
-
-            user.save()
-
-        return user
-
     except models.User.DoesNotExist:
-
         user = models.User(
             sub=token.sub,
             username=(token_to_username(token)),
@@ -275,9 +264,33 @@ def expand_user_from_token(
 
             user.active_organization = current_org
 
+        try:
+            user.save()
+            set_user_groups(user, token.roles)
+            return user
+        except IntegrityError:
+            # Lost a concurrent create race: another request authenticating the
+            # same token already inserted this (sub, iss) user. Fall through to
+            # treat the winner's row as an existing user instead of propagating
+            # the IntegrityError.
+            user = models.User.objects.get(sub=token.sub, iss=token.iss)
+
+    if user.changed_hash != token.changed_hash:
+        # The token's user metadata changed since we last saw it: sync it across.
+        user.first_name = token.preferred_username
+        user.changed_hash = token.changed_hash
+
+        if token.active_org:
+            current_org, _ = models.Organization.objects.get_or_create(
+                slug=token.active_org
+            )
+
+            user.active_organization = current_org
+
         user.save()
         set_user_groups(user, token.roles)
-        return user
+
+    return user
 
 
 async def aexpand_client_from_token(
