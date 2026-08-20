@@ -1,6 +1,46 @@
 # CHANGELOG
 
 
+## v3.1.0 (2026-08-20)
+
+### Features
+
+- Report auth failures with a machine-readable code and reason
+  ([`fad68c2`](https://github.com/arkitektio/authentikate/commit/fad68c2d9d24466b8d007f7533efbd0fc16fc3b2))
+
+Authentication and authorization failures reached the client as prose and nothing else: a bare
+  GraphQLError whose message was the only signal. A client could not tell an expired token (refresh
+  and retry) from a missing scope (never going to work) without parsing English.
+
+Every failure now carries kante's coarse `extensions.code` (UNAUTHENTICATED / PERMISSION_DENIED /
+  INTERNAL_ERROR) plus `extensions.reason` for the specific one (TOKEN_EXPIRED, INSUFFICIENT_SCOPE,
+  MEMBERSHIP_BLOCKED, PROVENANCE_ACTOR_MISMATCH, ...). Two levels rather than one flat vocabulary:
+  `code` is the branch clients act on, so a new `reason` can be added without breaking a handler
+  that switches on `code`. This reuses kante.errors rather than forking a parallel set of codes.
+
+`code`, `reason` and `client_message` are plain class attributes on the exceptions, so
+  authentikate.errors stays free of any GraphQL import -- those exceptions must remain django
+  PermissionDenied subclasses for the non-GraphQL callers documented in the README. The translation
+  lives in authentikate.strawberry.errors and is applied in exactly two places: the field
+  directives, and the schema extension's authenticate/expand block (deliberately not around the
+  yield, so a resolver's own failure is not relabelled as an auth failure).
+
+Authorization failures name the requirement and carry it in extensions (requiredScopes,
+  requiredRoles, requiredOrganizationRoles). That discloses nothing new -- the Auth schema directive
+  already publishes required scopes and roles into the introspectable schema.
+
+Authentication failures no longer echo the rejected value. The issuer, audience or key id in a bad
+  token is attacker-supplied, and reflecting it turns the error surface into a probe for what this
+  service trusts; the detail is logged at WARNING instead. Callers asserting on authentication
+  message text should assert on extensions.reason.
+
+Also fixes a latent test-isolation bug: get_settings() memoises into a module global while several
+  tests mutate settings.AUTHENTIKATE in place, so whichever test ran first decided the cached value
+  for the whole session. An autouse fixture now clears it around each test.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+
 ## v3.0.0 (2026-08-20)
 
 ### Features
