@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v3.2.0 (2026-08-20)
+
+### Features
+
+- Accept AUDIENCE="*" as an explicit "any audience"
+  ([`4855a59`](https://github.com/arkitektio/authentikate/commit/4855a59f08aab7c0bd26d65cba10a1d2afc4483e))
+
+3.0.0 made the `aud` claim checkable, but left no way to say "this service deliberately accepts any
+  audience". The only way to get that behaviour was to leave AUDIENCE unset, which is
+  indistinguishable from having forgotten it -- and which 4.0 will reject outright.
+
+AUDIENCE="*" now means accept any audience, on the auth-token check and the provenance one alike. It
+  carries the same security posture as leaving the setting unset, so it still warns at startup, but
+  it reads as a decision rather than an oversight and will satisfy the 4.0 requirement. For
+  provenance, where AUDIENCE is required, it is simply how you spell "any" -- the choice still has
+  to be written down.
+
+The wildcard drops the `aud` constraint entirely rather than widening it, so a token with no `aud`
+  at all is accepted too. That is deliberate: "*" must never end up *stricter* than omitting the
+  setting, which is what would happen if `aud` stayed an essential claim.
+
+"*" is config-side only. It says what this service accepts; a token whose own `aud` claim contains
+  "*" gains nothing, and a service configured with a literal audience still rejects it. A token-side
+  wildcard would let an issuer mint one credential valid at every service, re-opening exactly the
+  cross-service replay that audience checking exists to prevent. Two tests pin that distinction --
+  one per check -- so the two readings cannot be conflated later.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+
 ## v3.1.0 (2026-08-20)
 
 ### Features
