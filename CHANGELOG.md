@@ -1,6 +1,60 @@
 # CHANGELOG
 
 
+## v3.0.0 (2026-08-20)
+
+### Features
+
+- Bind tokens to their issuer, enforce audience, ship a typed API
+  ([`d74aaad`](https://github.com/arkitektio/authentikate/commit/d74aaadb93518a7086cef08286f3a9ed6a8f88a3))
+
+Security audit remediation plus API hardening.
+
+Two authentication bypasses are fixed:
+
+* Cross-issuer token forgery. Every configured issuer's JWKS was merged into one flat key set
+  indexed by kid, and the iss claim was never checked against the issuer that owned the key -- so
+  with two or more issuers configured, any one of them could mint a token claiming to be another and
+  impersonate its users with arbitrary roles and organization. Keys are now resolved *from* the iss
+  claim and scoped to that single issuer, and an unknown issuer is rejected before any I/O. * No
+  audience validation. Only exp was validated, so a token an issuer minted for one service was
+  accepted verbatim by every other. AUDIENCE is now enforced when configured (warned about when
+  not).
+
+Also fixed: provenance actor binding was never enforced (verify_actor existed but nothing called it,
+  so a valid provenance token could be replayed under another agent's credentials); two rsa issuers
+  on the default key_id broke every authentication with JwksError; static tokens ignored exp and had
+  no production guard; a debug print leaked the full signed provenance token on every decode;
+  blocked memberships were skipped on several expansion paths; and usernames derived from a URL
+  issuer failed Django's own username validator, leaving token-provisioned users uneditable in the
+  admin.
+
+API: the package now ships py.typed -- under PEP 561 consumers of this fully annotated, strictly
+  typed package previously got no types at all -- and exports a curated public API from the package
+  root. Those exports resolve lazily (PEP 562) because Django imports the app before the registry is
+  ready.
+
+BREAKING CHANGE: token roles are no longer mirrored onto Django Groups; an IdP role matching a
+  permission-bearing group silently granted those permissions. Use AuthExtension(roles=...) or the
+  new AuthExtension(org_roles=...) instead. expand_user_from_token and aexpand_user_from_token now
+  require an active_org claim and enforce blocked memberships. AuthentikateSettings.load_key /
+  aload_key are removed in favour of resolve_key_set(iss, kid) -- they were the mechanism behind the
+  cross-issuer forgery. Provenance AUDIENCE is now required. Static tokens raise
+  ImproperlyConfigured when DEBUG is False. Minimum kante is now 2.1.1. See docs/UPGRADING.md.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- Token roles are no longer mirrored onto Django Groups; an IdP role matching a permission-bearing
+  group silently granted those permissions. Use AuthExtension(roles=...) or the new
+  AuthExtension(org_roles=...) instead. expand_user_from_token and aexpand_user_from_token now
+  require an active_org claim and enforce blocked memberships. AuthentikateSettings.load_key /
+  aload_key are removed in favour of resolve_key_set(iss, kid) -- they were the mechanism behind the
+  cross-issuer forgery. Provenance AUDIENCE is now required. Static tokens raise
+  ImproperlyConfigured when DEBUG is False. Minimum kante is now 2.1.1. See docs/UPGRADING.md.
+
+
 ## v2.2.1 (2026-06-29)
 
 ### Bug Fixes
