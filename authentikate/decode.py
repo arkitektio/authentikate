@@ -25,9 +25,14 @@ def _validate_claims(
     if issuer is not None:
         claims_options["iss"] = {"essential": True, "value": issuer}
 
-    if audience is not None:
+    if audience is not None and audience != base_models.ANY_AUDIENCE:
         # joserfc treats a scalar "value" for aud as membership in a
         # list-valued claim, so this handles both aud shapes.
+        #
+        # ANY_AUDIENCE drops the constraint entirely rather than widening it,
+        # which also means a token with no `aud` at all is accepted: "*" must
+        # never end up *stricter* than leaving the setting unset, and keeping
+        # `aud` essential here would do exactly that.
         claims_options["aud"] = {"essential": True, "value": audience}
 
     registry = jwt.JWTClaimsRegistry(**claims_options)

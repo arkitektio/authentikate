@@ -1,7 +1,7 @@
 import logging
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from authentikate.base_models import AuthentikateSettings
+from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings
 from typing import Optional
 from pydantic import ValidationError
 
@@ -38,8 +38,16 @@ def _check_deployment_safety(parsed: AuthentikateSettings) -> None:
         logger.warning(
             "AUTHENTIKATE.AUDIENCE is not set, so the 'aud' claim is not "
             "checked: a token this issuer minted for any other service is "
-            "accepted here. Set it to this service's identifier. This will "
-            "become required in authentikate 4.0."
+            "accepted here. Set it to this service's identifier, or to '*' to "
+            "accept any audience deliberately. This will become required in "
+            "authentikate 4.0."
+        )
+    elif parsed.audience == ANY_AUDIENCE:
+        # Deliberate, but the posture is the same as leaving it unset, so an
+        # operator reading the logs should still be able to see it.
+        logger.warning(
+            "AUTHENTIKATE.AUDIENCE is '*', so the 'aud' claim is not checked: "
+            "a token this issuer minted for any other service is accepted here."
         )
 
 

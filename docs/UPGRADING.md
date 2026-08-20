@@ -108,6 +108,13 @@ startup and `aud` is not checked.
 **Your issuer must actually mint scoped `aud` claims before you turn this on**,
 or every token will be rejected. Roll it out issuer-first.
 
+If you want to accept any audience deliberately rather than by omission, set
+`AUDIENCE` to `"*"`. It behaves exactly like leaving it unset (and warns at
+startup for the same reason), but it reads as a decision and will satisfy the 4.0
+requirement. The same value works for the provenance `AUDIENCE`, which is
+required. Note `"*"` is config-side only: a token carrying `aud: ["*"]` is still
+rejected by a service configured with a literal audience.
+
 ### 2. kante 2.1.1 is now the minimum
 
 The requirement moves from `kante>=2.0.1` to `kante>=2.1.1`, which carries two

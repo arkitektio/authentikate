@@ -396,3 +396,31 @@ def test_provisioned_user_passes_full_clean(db) -> None:
     user = expand_user_from_token(token)
 
     user.full_clean(exclude=["password"])
+
+
+def test_wildcard_audience_still_warns(settings: Any, caplog: Any) -> None:
+    """`"*"` is deliberate, but the posture matches leaving AUDIENCE unset.
+
+    An operator reading the logs should be able to see that this service accepts
+    a token minted for any other service.
+    """
+    settings.DEBUG = True
+    settings.AUTHENTIKATE = {"ISSUERS": [], "AUDIENCE": "*"}
+    _reset_settings_cache()
+
+    with caplog.at_level("WARNING", logger="authentikate.settings"):
+        parsed = prepare_settings()
+
+    assert parsed.audience == "*"
+    assert "'*'" in caplog.text and "not checked" in caplog.text
+
+
+def test_configured_audience_does_not_warn(settings: Any, caplog: Any) -> None:
+    settings.DEBUG = True
+    settings.AUTHENTIKATE = {"ISSUERS": [], "AUDIENCE": "mikro"}
+    _reset_settings_cache()
+
+    with caplog.at_level("WARNING", logger="authentikate.settings"):
+        prepare_settings()
+
+    assert "AUDIENCE" not in caplog.text

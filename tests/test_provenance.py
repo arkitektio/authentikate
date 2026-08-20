@@ -517,3 +517,47 @@ def test_provenance_token_from_an_unconfigured_issuer_is_rejected(ed_key, settin
 
     with pytest.raises(errors.InvalidJwtTokenError, match="Untrusted issuer"):
         decode_provenance_token(token, settings)
+
+
+# --- the "*" audience wildcard ----------------------------------------------
+
+
+@pytest.fixture
+def any_audience_settings(ed_key: OKPKey) -> AuthentikateSettings:
+    """Provenance configured to accept a token scoped to any service."""
+    pub = ed_key.as_dict(private=False, kid=PROV_KID)
+    return AuthentikateSettings(
+        issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
+        provenance={
+            "issuers": [
+                {"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}
+            ],
+            "audience": "*",
+        },
+    )
+
+
+def test_wildcard_audience_accepts_any_service(ed_key, any_audience_settings):
+    token = _sign(ed_key, _provenance_claims(aud=["someone-else"]))
+
+    decoded = decode_provenance_token(token, any_audience_settings)
+
+    assert decoded.aud == ["someone-else"]
+
+
+def test_wildcard_audience_still_requires_the_claim(ed_key, any_audience_settings):
+    """"*" means "any service", not "no service": `aud` is still a required claim."""
+    claims = _provenance_claims()
+    claims.pop("aud")
+    token = _sign(ed_key, claims)
+
+    with pytest.raises(errors.MalformedProvenanceTokenError):
+        decode_provenance_token(token, any_audience_settings)
+
+
+def test_provenance_wildcard_is_config_side_not_token_side(ed_key, settings):
+    """A provenance token cannot award itself a wildcard audience either."""
+    token = _sign(ed_key, _provenance_claims(aud=["*"]))
+
+    with pytest.raises(errors.ProvenanceAudienceError):
+        decode_provenance_token(token, settings)

@@ -24,6 +24,18 @@ from authentikate.errors import JwksError, InvalidJwtTokenError
 logger = logging.getLogger(__name__)
 
 
+ANY_AUDIENCE = "*"
+"""Configured ``audience`` value meaning "accept a token for any audience".
+
+A property of *this service*, not of a token: it says this verifier does not care
+which service a token was minted for. A token whose own ``aud`` claim contains
+``"*"`` gains nothing by it -- a service configured with a literal audience still
+rejects that token. Making the wildcard token-side instead would let an issuer
+mint one credential valid at every service, which is exactly the cross-service
+replay that audience checking exists to prevent.
+"""
+
+
 def coerce_aud_to_list(v: str | list[str] | None) -> list[str] | None:
     """Coerce an ``aud`` claim into a list (or None when absent)."""
     if not v:
@@ -625,10 +637,11 @@ class ProvenanceSettings(BaseModel):
     audience: str = Field(validation_alias=AliasChoices("audience", "AUDIENCE"))
     """This service's identifier (e.g. "mikro"); checked against the token aud.
 
-    Required: a provenance token exists to attest *which service* a unit of work
-    was scoped to, so accepting one with an unchecked audience would defeat its
-    purpose. Unlike the auth-token audience this has few enough deployments to
-    make mandatory outright.
+    Required, so the choice is always deliberate: a provenance token exists to
+    attest *which service* a unit of work was scoped to, and accepting one with an
+    unchecked audience would defeat its purpose. Set it to :data:`ANY_AUDIENCE`
+    (``"*"``) to accept a provenance token scoped to any service -- you still have
+    to write it down.
     """
     algorithms: list[str] = Field(
         default_factory=lambda: ["Ed25519"],
@@ -733,6 +746,11 @@ class AuthentikateSettings(BaseModel):
     recommended: without it, a token the IdP minted for *any* service is accepted
     by this one. ``prepare_settings`` warns when it is unset, and it becomes
     required in 4.0.
+
+    Set it to :data:`ANY_AUDIENCE` (``"*"``) to accept any audience deliberately.
+    That is the same security posture as leaving it unset, but it reads as a
+    decision rather than an oversight, and it will still satisfy the 4.0
+    requirement.
     """
     algorithms: list[str] = Field(
         default_factory=lambda: list(ASYMMETRIC_ALGORITHMS),

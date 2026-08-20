@@ -35,7 +35,15 @@ def _build_token(token: str, claims: dict[str, object]) -> ProvenanceToken:
 def _check_audience(
     token: ProvenanceToken, provenance: base_models.ProvenanceSettings
 ) -> None:
-    """Enforce that the configured service is in the token's audience."""
+    """Enforce that the configured service is in the token's audience.
+
+    ``ANY_AUDIENCE`` accepts a token scoped to any service. The token must still
+    *carry* an ``aud`` -- it is a required claim on ``ProvenanceToken`` -- but
+    this verifier stops caring which service it names.
+    """
+    if provenance.audience == base_models.ANY_AUDIENCE:
+        return
+
     if provenance.audience and not token.has_audience(provenance.audience):
         raise errors.ProvenanceAudienceError(
             f"Provenance token audience {token.aud} does not include "

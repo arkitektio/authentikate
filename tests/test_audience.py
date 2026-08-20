@@ -130,3 +130,53 @@ def test_unsafe_algorithm_config_is_rejected(bad: list[str]) -> None:
             issuers=[{"kind": "rsa", "iss": ISS, "public_key": "unused"}],
             algorithms=bad,
         )
+
+
+# --- the "*" wildcard --------------------------------------------------------
+
+
+def test_wildcard_accepts_a_token_for_another_service(key_pair_str) -> None:
+    """`AUDIENCE = "*"` is how a service says it accepts any audience."""
+    settings = _settings(key_pair_str.public_key, audience="*")
+    token = _token(key_pair_str.private_key, ["some-other-service"])
+
+    assert decode_token(token, settings).aud == ["some-other-service"]
+
+
+def test_wildcard_accepts_a_token_with_no_aud_claim(key_pair_str) -> None:
+    """`"*"` must not end up *stricter* than leaving AUDIENCE unset.
+
+    A literal audience makes `aud` an essential claim; the wildcard drops the
+    constraint entirely, so a token without the claim is accepted too.
+    """
+    settings = _settings(key_pair_str.public_key, audience="*")
+    token = _token(key_pair_str.private_key, None)
+
+    assert decode_token(token, settings).aud is None
+
+
+def test_wildcard_is_config_side_not_token_side(key_pair_str) -> None:
+    """A token cannot award *itself* a wildcard.
+
+    This is the security pin for the whole feature. If `"*"` were honoured in the
+    `aud` claim, an issuer could mint one credential valid at every service --
+    exactly the cross-service replay that audience checking exists to prevent.
+    """
+    settings = _settings(key_pair_str.public_key, audience="mikro")
+    token = _token(key_pair_str.private_key, ["*"])
+
+    with pytest.raises(InvalidJwtTokenError):
+        decode_token(token, settings)
+
+
+def test_a_literal_audience_is_unaffected_by_the_wildcard_support(key_pair_str) -> None:
+    """Regression guard: configuring a real audience still enforces it."""
+    settings = _settings(key_pair_str.public_key, audience="mikro")
+
+    with pytest.raises(InvalidJwtTokenError):
+        decode_token(_token(key_pair_str.private_key, ["fluss"]), settings)
+
+    with pytest.raises(InvalidJwtTokenError):
+        decode_token(_token(key_pair_str.private_key, None), settings)
+
+    assert decode_token(_token(key_pair_str.private_key, ["mikro"]), settings)

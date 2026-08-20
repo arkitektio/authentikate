@@ -73,7 +73,7 @@ so a typo raises `ImproperlyConfigured` at startup rather than failing silently.
 | `PROVENANCE_HEADER` | list of strings | no | Rekuest task + provenance-token header variants | Header names searched (in order) for a provenance token. |
 | `STATIC_TOKENS` | map of `str → token dict` | no | `{}` | Hard-coded tokens that bypass signature verification. **Tests only** — refused when `DEBUG` is `False`. |
 | `PROVENANCE` | provenance dict | no | `None` | Configuration for verifying inbound provenance tokens. `None` disables provenance verification. |
-| `AUDIENCE` | string | no | `None` | This service's identifier, checked against the token's `aud`. **Strongly recommended**; see below. Becomes required in 4.0. |
+| `AUDIENCE` | string | no | `None` | This service's identifier, checked against the token's `aud`; `"*"` accepts any audience. **Strongly recommended**; see below. Becomes required in 4.0. |
 | `ALGORITHMS` | list of strings | no | every asymmetric algorithm | Allowed signature algorithms. The default blocks the `HS*`/`none` confusion attacks; narrow it to the one your issuer uses (RFC 8725 §3.1). An empty list and `none` are rejected. |
 | `ALLOWED_ORGANIZATIONS` | list of strings | no | `None` | Organizations this service accepts. `None` accepts whatever the token names. |
 | `ALLOW_STATIC_TOKENS_IN_PRODUCTION` | bool | no | `False` | Escape hatch permitting `STATIC_TOKENS` while `DEBUG` is `False`. |
@@ -111,6 +111,24 @@ list-valued `aud` matches on membership, so a token scoped to several services i
 valid at each of them). When unset, a warning is logged at startup and `aud` is
 not checked — this is for backwards compatibility only and becomes an error in
 4.0.
+
+To accept any audience *deliberately*, set it to `"*"`:
+
+```python
+AUTHENTIKATE = {"ISSUERS": [...], "AUDIENCE": "*"}
+```
+
+That is the same security posture as leaving it unset — and it still warns at
+startup for that reason — but it reads as a decision rather than an oversight,
+and it will satisfy the 4.0 requirement. With `"*"` a token carrying no `aud` at
+all is accepted too, so the wildcard is never *stricter* than omitting the
+setting.
+
+> **`"*"` is config-side only.** It says what *this service* accepts. A token
+> whose own `aud` claim contains `"*"` gains nothing — a service configured with
+> a literal audience still rejects it. A token-side wildcard would let the issuer
+> mint one credential valid at every service, which is precisely the
+> cross-service replay that audience checking exists to prevent.
 
 ### Organization allow-list (`ALLOWED_ORGANIZATIONS`)
 
@@ -263,7 +281,7 @@ disable provenance entirely.
 | Key | Type | Required | Default | Purpose |
 |-----|------|----------|---------|---------|
 | `ISSUERS` | list of issuer dicts | **yes** | — | Trusted provenance issuers (same issuer shapes as §3; typically one `jwks_uri` at Rekuest). |
-| `AUDIENCE` | string | **yes** | — | This service's identifier (e.g. `"mikro"`), checked against the token's `aud`. Required: a provenance token exists to attest which service a unit of work was scoped to. |
+| `AUDIENCE` | string | **yes** | — | This service's identifier (e.g. `"mikro"`), checked against the token's `aud`; `"*"` accepts a token scoped to any service. Required so the choice is always deliberate — a provenance token exists to attest which service a unit of work was scoped to. |
 | `ALGORITHMS` | list of strings | no | `["Ed25519"]` | Allowed signature algorithms. The algorithm is pinned per RFC 8725: an empty list and the `none` algorithm are rejected. |
 
 ```python
