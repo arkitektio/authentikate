@@ -1,7 +1,7 @@
 import contextvars
 from authentikate.base_models import JWTToken
 from authentikate.models import Client
-from authentikate.protocols import UserModel, OrganizationModel
+from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
 
 
 token_var: contextvars.ContextVar[JWTToken | None] = contextvars.ContextVar(
@@ -15,6 +15,9 @@ client_var: contextvars.ContextVar[Client | None] = contextvars.ContextVar(
 )
 organization_var: contextvars.ContextVar[OrganizationModel | None] = (
     contextvars.ContextVar("organization_var", default=None)
+)
+membership_var: contextvars.ContextVar[MembershipModel | None] = contextvars.ContextVar(
+    "membership_var", default=None
 )
 
 
@@ -64,3 +67,18 @@ def get_organization() -> OrganizationModel | None:
         The current organization
     """
     return organization_var.get()
+
+
+def get_membership() -> MembershipModel | None:
+    """
+    Get the current membership from the context variable
+
+    The membership carries the roles the user holds *within* the request's
+    active organization, which is what org-scoped role checks read.
+
+    Returns
+    -------
+    MembershipModel | None
+        The current membership
+    """
+    return membership_var.get()

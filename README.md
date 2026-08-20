@@ -79,6 +79,10 @@ AUTHENTIKATE = {
             "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
         }
     ],
+    # This service's identifier, checked against the token's `aud`. Optional
+    # today (a warning is logged when unset) and required from 4.0 — without it
+    # a token your issuer minted for any other service is accepted here.
+    "AUDIENCE": "my-service",
 }
 
 ```
@@ -87,6 +91,11 @@ AUTHENTIKATE = {
 (`jwks_uri`, `jwks_dict`, `rsa`, or `rsa_file`). For the full settings shape —
 issuers, static tokens, provenance, headers, the public API and error model —
 see [`docs/USAGE.md`](docs/USAGE.md).
+
+> **Upgrading from 2.x?** 3.0 fixes two authentication bypasses and contains
+> breaking changes (most notably: token roles are no longer mirrored onto Django
+> `Group`s). See
+> [`docs/UPGRADING.md`](docs/UPGRADING.md).
 
 
 ### Standard Usage
@@ -153,12 +162,15 @@ AUTHENTIKATE = {
             "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
         }
     ],
+    # Static tokens bypass signature verification entirely. They are for tests
+    # and local development only: configuring them while DEBUG is False raises
+    # ImproperlyConfigured at startup.
     "STATIC_TOKENS": {
         "my_token": {
             "sub": "my_user",
             "iss": "https://lok.my-org.com",
             "scope": "read:users",
-            "roles": ["admin"],
+            "roles": ["reader"],
         }
     }
 }

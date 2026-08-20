@@ -33,10 +33,14 @@ def verify_actor(provenance: ProvenanceToken, auth_token: JWTToken) -> None:
     The provenance token names the executing agent in ``act``; this confirms the
     auth token presented alongside it really belongs to that agent.
 
+    ``act.iss`` is checked only when the minter supplies it; ``sub`` is unique
+    per issuer, so without it the binding cannot distinguish two issuers that
+    happen to use the same subject identifier.
+
     Raises
     ------
     ProvenanceActorMismatchError
-        When ``act.sub``/``act.cid`` do not match the auth token.
+        When ``act.sub``/``act.cid``/``act.iss`` do not match the auth token.
     """
     if provenance.act.sub != auth_token.sub:
         raise errors.ProvenanceActorMismatchError(
@@ -45,6 +49,10 @@ def verify_actor(provenance: ProvenanceToken, auth_token: JWTToken) -> None:
     if provenance.act.cid != auth_token.client_id:
         raise errors.ProvenanceActorMismatchError(
             "Provenance actor client_id does not match the auth token client_id"
+        )
+    if provenance.act.iss is not None and provenance.act.iss != auth_token.iss:
+        raise errors.ProvenanceActorMismatchError(
+            "Provenance actor issuer does not match the auth token issuer"
         )
 
 
@@ -110,6 +118,7 @@ async def aauthenticate_provenance_header_or_raise(
         errors.JwtTokenError,
         errors.AuthentikateTokenExpired,
         errors.ProvenanceNotConfiguredError,
+        errors.JwksError,
     ) as exc:
         raise errors.ProvenanceValidationError(
             "A provenance token was present on the request but could not be "
@@ -135,6 +144,7 @@ async def aauthenticate_provenance_header_or_none(
         errors.JwtTokenError,
         errors.AuthentikateTokenExpired,
         errors.ProvenanceNotConfiguredError,
+        errors.JwksError,
     ) as exc:
         logger.warning(
             "Could not decode provenance token from request headers (%s): %s",

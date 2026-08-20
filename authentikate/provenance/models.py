@@ -28,6 +28,14 @@ class Actor(BaseModel):
     """The executing agent's user sub."""
     cid: str
     """The executing agent's OAuth client_id."""
+    iss: str | None = None
+    """The issuer that authenticated the agent, when the minter supplies it.
+
+    ``sub`` is only unique *per issuer* (see the ``(sub, iss)`` uniqueness
+    constraint on the user model), so binding it alone is ambiguous across
+    issuers. Optional for compatibility with minters that do not yet emit it;
+    ``verify.verify_actor`` checks it whenever it is present.
+    """
 
 
 class ProvenanceToken(BaseModel):

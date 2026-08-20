@@ -108,13 +108,18 @@ def bare_settings(ed_key: OKPKey) -> AuthentikateSettings:
     )
 
 
-def _provenance_token(ed_key: OKPKey) -> str:
+def _provenance_token(ed_key: OKPKey, act: dict[str, Any] | None = None) -> str:
+    """Mint a provenance token.
+
+    ``act`` defaults to the agent described by the ``token`` fixture, since the
+    extension binds the provenance actor to the auth token presenting it.
+    """
     now = int(datetime.datetime.now().timestamp())
     claims = {
         "iss": "rekuest",
         "aud": ["mikro"],
         "sub": "user-42",
-        "act": {"sub": "agent-7", "cid": "imagej-app"},
+        "act": act or {"sub": "1", "cid": "client-1", "iss": "test-issuer"},
         "iat": now,
         "exp": now + 3600,
         "jti": uuid.uuid4().hex,
@@ -181,7 +186,7 @@ async def test_attaches_provenance_from_rekuest_task_header(
 
     assert request._provenance is not None
     assert request._provenance.sub == "user-42"
-    assert request._provenance.act.sub == "agent-7"
+    assert request._provenance.act.sub == "1"
     assert request.get_extension("provenance").tsk == "9b1a"
 
 
@@ -285,3 +290,64 @@ async def test_context_vars_reset_when_operation_raises(
     assert get_user() is None
     assert get_client() is None
     assert get_organization() is None
+
+
+@pytest.mark.asyncio
+async def test_provenance_token_for_another_actor_is_rejected(
+    token: JWTToken, settings: AuthentikateSettings, ed_key: OKPKey
+) -> None:
+    """A valid provenance token minted for a *different* agent must not be honoured.
+
+    The token below is perfectly well-formed and correctly signed by the trusted
+    provenance issuer -- it simply attests a different actor than the auth token
+    presenting it. Without actor binding, anyone holding such a token could
+    replay it under their own credentials and misattribute the causal chain.
+    """
+    request = _FakeRequest()
+    extension, _ = _make_extension(
+        settings,
+        request,
+        {
+            "Authorization": "Bearer any-token",
+            "rekuest-task": _provenance_token(
+                ed_key, act={"sub": "someone-else", "cid": "other-app"}
+            ),
+        },
+    )
+
+    with patch(
+        "authentikate.strawberry.extension.authenticate_header",
+        new=AsyncMock(return_value=token),
+    ):
+        with pytest.raises(errors.ProvenanceActorMismatchError):
+            await _run(extension)
+
+    assert request._provenance is None
+
+
+@pytest.mark.asyncio
+async def test_provenance_actor_issuer_must_match(
+    token: JWTToken, settings: AuthentikateSettings, ed_key: OKPKey
+) -> None:
+    """`sub` is unique only per issuer, so a matching sub from another issuer fails."""
+    request = _FakeRequest()
+    extension, _ = _make_extension(
+        settings,
+        request,
+        {
+            "Authorization": "Bearer any-token",
+            "rekuest-task": _provenance_token(
+                ed_key,
+                act={"sub": "1", "cid": "client-1", "iss": "other-issuer"},
+            ),
+        },
+    )
+
+    with patch(
+        "authentikate.strawberry.extension.authenticate_header",
+        new=AsyncMock(return_value=token),
+    ):
+        with pytest.raises(errors.ProvenanceActorMismatchError):
+            await _run(extension)
+
+    assert request._provenance is None

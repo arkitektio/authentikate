@@ -10,7 +10,13 @@ from joserfc.jwk import RSAKey
 from authentikate.base_models import JWTToken
 from authentikate.decode import adecode_token, decode_token
 from authentikate.errors import AuthentikateTokenExpired, MalformedJwtTokenError
-from authentikate.expand import aexpand_user_from_token, expand_user_from_token
+from django.contrib.auth.models import Group
+
+from authentikate.expand import (
+    aexpand_token_context,
+    aexpand_user_from_token,
+    expand_user_from_token,
+)
 from authentikate.models import Organization, User
 from authentikate.strawberry.directives import AuthExtension
 from authentikate.strawberry.types import User as UserType
@@ -150,13 +156,21 @@ def test_sync_expand_user_links_organization_by_slug(db, valid_jwt, valid_settin
 
 
 @pytest.mark.asyncio
-async def test_async_expand_new_user_assigns_groups(db, valid_jwt, valid_settings):
+async def test_token_roles_do_not_become_django_groups(db, valid_jwt, valid_settings):
+    """Token roles must never be mirrored into Django's permission system.
+
+    Mirroring them meant any IdP role name that happened to match a locally
+    managed, permission-bearing Group silently granted those permissions.
+    Roles now live on the token and on Membership, and are enforced in the
+    Strawberry layer instead.
+    """
     token = decode_token(valid_jwt, valid_settings)
 
     user = await aexpand_user_from_token(token)
 
     group_names = [name async for name in user.groups.values_list("name", flat=True)]
-    assert sorted(group_names) == sorted(token.roles)
+    assert group_names == []
+    assert await Group.objects.acount() == 0
 
 
 @pytest.fixture(scope="session")
@@ -195,15 +209,15 @@ def test_preferred_username_resolves_from_first_name():
 
 
 @pytest.mark.asyncio
-async def test_group_sync_removes_revoked_roles(db, valid_jwt, valid_settings):
+async def test_roles_are_tracked_on_the_membership(db, valid_jwt, valid_settings):
+    """Role changes are reflected on the org-scoped Membership, not on Groups."""
     token = decode_token(valid_jwt, valid_settings)
     first = token.model_copy(update={"roles": ["a", "b"]})
     second = token.model_copy(update={"roles": ["b", "c"]})
 
-    user = await aexpand_user_from_token(first)
-    group_names = [name async for name in user.groups.values_list("name", flat=True)]
-    assert sorted(group_names) == ["a", "b"]
+    context = await aexpand_token_context(first)
+    assert sorted(context.membership.roles) == ["a", "b"]
 
-    user = await aexpand_user_from_token(second)
-    group_names = [name async for name in user.groups.values_list("name", flat=True)]
-    assert sorted(group_names) == ["b", "c"]
+    context = await aexpand_token_context(second)
+    assert sorted(context.membership.roles) == ["b", "c"]
+    assert await Group.objects.acount() == 0

@@ -1,14 +1,23 @@
 from typing import Any, AsyncIterator, cast
 from strawberry.extensions import SchemaExtension
 from kante.context import WsContext, HttpContext
-from authentikate.vars import token_var, user_var, client_var, organization_var
+from authentikate.vars import (
+    token_var,
+    user_var,
+    client_var,
+    organization_var,
+    membership_var,
+)
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.models import Client, User
 from authentikate.utils import (
     authenticate_header,
     authenticate_token,
 )
-from authentikate.provenance import aauthenticate_provenance_header_or_raise
+from authentikate.provenance import (
+    aauthenticate_provenance_header_or_raise,
+    verify_actor,
+)
 from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
 
 
@@ -31,27 +40,29 @@ class AuthentikateExtension(SchemaExtension):
 
         expanded = await aexpand_token_context(token)
         return (
-            cast(User, expanded.user),
-            cast(Client, expanded.client),
+            expanded.user,
+            expanded.client,
             cast(OrganizationModel, expanded.organization),
             cast(MembershipModel, expanded.membership),
         )
 
     async def aexpand_user_from_token(self, token: JWTToken) -> User:
-        """Expand a user from the provided JWT token"""
-        from authentikate.expand import aexpand_user_from_token
+        """Expand a user from the provided JWT token.
 
-        # Call the async function to expand the user
-        user = await aexpand_user_from_token(token)
-        return cast(User, user)
+        Goes through the full token context rather than the bare user lookup, so
+        the membership and blocked checks are applied here too.
+        """
+        from authentikate.expand import aexpand_token_context
+
+        expanded = await aexpand_token_context(token)
+        return expanded.user
 
     async def aexpand_client_from_token(self, token: JWTToken) -> Client:
         """Expand a client from the provided JWT token"""
         from authentikate.expand import aexpand_client_from_token
 
         # Call the async function to expand the client
-        client = await aexpand_client_from_token(token)
-        return cast(Client, client)
+        return await aexpand_client_from_token(token)
 
     async def aexpand_organization_from_token(
         self, token: JWTToken
@@ -73,6 +84,37 @@ class AuthentikateExtension(SchemaExtension):
         membership = await aexpand_membership(user, organization, token)
         return cast(MembershipModel, membership)
 
+    async def _aattach_provenance(
+        self,
+        context: "WsContext | HttpContext",
+        carrier: dict[str, str],
+        token: JWTToken,
+        settings: AuthentikateSettings,
+    ) -> None:
+        """Verify a provenance token and attach it to the request.
+
+        ``carrier`` holds the provenance token under one of the configured
+        header names -- request headers over HTTP, connection params over
+        WebSocket.
+
+        Fails closed on both counts: a header that is present but
+        malformed/unverifiable raises ProvenanceValidationError, and a token
+        whose ``act`` does not match the auth token presenting it raises
+        ProvenanceActorMismatchError. Without the second check any holder of a
+        valid provenance token could replay it under their own auth token.
+        """
+        if settings.provenance is None:
+            return
+
+        provenance = await aauthenticate_provenance_header_or_raise(carrier, settings)
+        if provenance is None:
+            return
+
+        verify_actor(provenance, token)
+
+        context.request.set_provenance(provenance)
+        context.request.set_extension("provenance", provenance)
+
     async def on_operation(self) -> AsyncIterator[None]:
         """Set the token in the context variable"""
 
@@ -82,77 +124,57 @@ class AuthentikateExtension(SchemaExtension):
         reset_client = None
         reset_token = None
         reset_organization = None
+        reset_membership = None
 
         try:
-            if isinstance(context, WsContext):
-                # WebSocket context
-                # Do something with the WebSocket context
+            settings = self.get_settings()
 
+            # The token and the provenance carrier are the only things that
+            # differ between transports; everything after this point is shared,
+            # so the two paths cannot drift apart.
+            if isinstance(context, WsContext):
+                carrier = {
+                    str(k): v
+                    for k, v in context.connection_params.items()
+                    if isinstance(v, str)
+                }
                 token = await authenticate_token(
                     context.connection_params.get("token", ""),
-                    self.get_settings(),
-                )
-                reset_token = token_var.set(token)
-                if token:
-                    user, client, organization, membership = (
-                        await self.aexpand_token_context(token)
-                    )
-
-                    reset_client = client_var.set(client)
-                    reset_user = user_var.set(cast(UserModel, user))
-                    reset_organization = organization_var.set(organization)
-
-                    context.request.set_user(cast(Any, user))
-                    context.request.set_client(cast(Any, client))
-                    context.request.set_membership(membership)
-                    context.request.set_organization(organization)
-                    context.request.set_extension("token", token)
-
-            elif isinstance(context, HttpContext):
-                # HTTP context
-                # Do something with the HTTP context
-                settings = self.get_settings()
-                token = await authenticate_header(
-                    dict(context.headers),
                     settings,
                 )
-                reset_token = token_var.set(token)
-                if token:
-                    user, client, organization, membership = (
-                        await self.aexpand_token_context(token)
-                    )
-
-                    reset_client = client_var.set(client)
-                    reset_user = user_var.set(cast(UserModel, user))
-                    reset_organization = organization_var.set(organization)
-
-                    context.request.set_user(cast(Any, user))
-                    context.request.set_client(cast(Any, client))
-                    context.request.set_membership(membership)
-                    context.request.set_organization(organization)
-                    context.request.set_extension("token", token)
-
-                    # The provenance token (when configured) arrives under the
-                    # Rekuest task header; attach it so resolvers can read it
-                    # contextually via ``info.context.request.provenance``. This
-                    # path fails closed: if no provenance header is present the
-                    # request proceeds unprovenanced, but a header that is present
-                    # yet malformed/unverifiable raises ProvenanceValidationError
-                    # and fails the whole operation rather than being ignored.
-                    if settings.provenance is not None:
-                        provenance = await aauthenticate_provenance_header_or_raise(
-                            dict(context.headers), settings
-                        )
-                        if provenance is not None:
-                            # ProvenanceToken structurally satisfies kante's
-                            # Provenance protocol at runtime; the nested Actor
-                            # types differ only by protocol invariance.
-                            context.request.set_provenance(provenance)  # pyright: ignore[reportArgumentType]
-                            context.request.set_extension("provenance", provenance)
+            elif isinstance(context, HttpContext):
+                carrier = dict(context.headers)
+                token = await authenticate_header(carrier, settings)
             else:
                 raise ValueError(
                     "Unknown context type. Cannot determine if it's WebSocket or HTTP."
                 )
+
+            reset_token = token_var.set(token)
+            if token:
+                user, client, organization, membership = (
+                    await self.aexpand_token_context(token)
+                )
+
+                reset_client = client_var.set(client)
+                reset_user = user_var.set(cast(UserModel, user))
+                reset_organization = organization_var.set(organization)
+                reset_membership = membership_var.set(membership)
+
+                # The concrete models do satisfy kante's User/Client protocols,
+                # but basedpyright does not run mypy's django-stubs plugin, so it
+                # sees the raw descriptors (``CharField[str]`` rather than ``str``)
+                # and no declared ``id``. These casts are for the checker, not a
+                # real mismatch -- the genuine one, kante's invariant
+                # ``Provenance.act``, was fixed in kante 2.1.1, which is why
+                # ``set_provenance`` needs no ignore any more.
+                context.request.set_user(cast(Any, user))
+                context.request.set_client(cast(Any, client))
+                context.request.set_membership(membership)
+                context.request.set_organization(organization)
+                context.request.set_extension("token", token)
+
+                await self._aattach_provenance(context, carrier, token, settings)
 
             yield
         finally:
@@ -167,5 +189,8 @@ class AuthentikateExtension(SchemaExtension):
 
             if reset_organization:
                 organization_var.reset(reset_organization)
+
+            if reset_membership:
+                membership_var.reset(reset_membership)
 
         return

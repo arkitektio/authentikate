@@ -462,7 +462,10 @@ def test_default_algorithm_is_eddsa(ed_key):
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     settings = AuthentikateSettings(
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
-        provenance={"issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}]},
+        provenance={
+            "issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
+            "audience": "mikro",
+        },
     )
     assert settings.provenance is not None
     assert settings.provenance.algorithms == ["Ed25519"]
@@ -476,6 +479,7 @@ def test_rejects_unsafe_algorithm_config(ed_key, bad):
             issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
             provenance={
                 "issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
+                "audience": "mikro",
                 "algorithms": bad,
             },
         )
@@ -489,3 +493,27 @@ def test_raw_claim_cannot_override_actual_token(ed_key, settings):
     decoded = decode_provenance_token(token, settings)
     assert decoded.raw == token
     assert decoded.raw != "spoofed-raw-value"
+
+
+# --- issuer binding (the provenance twin of the auth-token fix) --------------
+
+
+def test_provenance_token_claiming_the_auth_issuer_is_rejected(ed_key, settings):
+    """A provenance token must not be verifiable against an *auth* issuer.
+
+    The fixture deliberately signs both trust domains with the same key, so the
+    signature alone cannot separate them -- only the issuer binding can. A token
+    claiming `iss: "lok"` (the auth issuer) must be rejected even though that
+    signature verifies, because "lok" is not a configured *provenance* issuer.
+    """
+    token = _sign(ed_key, _provenance_claims(iss="lok"))
+
+    with pytest.raises(errors.InvalidJwtTokenError, match="Untrusted issuer"):
+        decode_provenance_token(token, settings)
+
+
+def test_provenance_token_from_an_unconfigured_issuer_is_rejected(ed_key, settings):
+    token = _sign(ed_key, _provenance_claims(iss="not-rekuest"))
+
+    with pytest.raises(errors.InvalidJwtTokenError, match="Untrusted issuer"):
+        decode_provenance_token(token, settings)

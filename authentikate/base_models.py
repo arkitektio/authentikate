@@ -1,7 +1,9 @@
 import hashlib
+import json
 import logging
+import time
 import asyncio
-from typing import Literal, Union, Annotated, cast
+from typing import Callable, Coroutine, Literal, Union, Annotated, cast
 import httpx
 from pydantic import (
     BaseModel,
@@ -16,8 +18,7 @@ from pydantic import (
 import datetime
 from typing import Dict, Any
 from joserfc.jwk import KeySet, RSAKey
-from joserfc.jwk import GuestProtocol
-from authentikate.errors import JwksError, MalformedJwtTokenError
+from authentikate.errors import JwksError, InvalidJwtTokenError
 
 
 logger = logging.getLogger(__name__)
@@ -124,8 +125,12 @@ class JWTToken(BaseModel):
         """A hash that changes when the user changes"""
         # Must be stable across processes and restarts (the value is persisted
         # on the user model), so the salted builtin hash() cannot be used.
-        fingerprint = "|".join(
-            [self.sub, self.preferred_username, *self.roles, self.active_org or ""]
+        # JSON-encoded rather than "|".join: joining on a separator let a role
+        # named "a|b" produce the same fingerprint as the roles ["a", "b"],
+        # which could suppress the update that propagates a role change.
+        fingerprint = json.dumps(
+            [self.sub, self.preferred_username, sorted(self.roles), self.active_org],
+            separators=(",", ":"),
         )
         return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
 
@@ -203,18 +208,6 @@ class StaticToken(JWTToken):
     """The raw original token string"""
 
 
-class ImitationRequest(BaseModel):
-    """An imitation request
-
-    Identifies the user (by sub and iss) that should be imitated.
-    """
-
-    sub: str
-    """The sub claim of the user to imitate"""
-    iss: str
-    """The issuer of the user to imitate"""
-
-
 class Issuer(BaseModel):
     """A token issuer
 
@@ -277,7 +270,9 @@ class JWKIssuer(Issuer):
 
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
-        return self.jwks["keys"]
+        # validate_jwks_dict has already guaranteed "keys" exists and is a list;
+        # the cast records that invariant rather than hiding an unchecked one.
+        return cast(list[Dict[str, Any]], self.jwks["keys"])
 
 
 class RSAKeyIssuer(Issuer):
@@ -365,14 +360,45 @@ class JWKSUriIssuer(Issuer):
     """The issuer url (must match the iss claim of incoming tokens)"""
     jwks_uri: str = Field(validation_alias=AliasChoices("jwks_uri", "JWKS_URI"))
     """The url of the remote JWKS endpoint (e.g. .../.well-known/jwks.json)"""
+    min_refresh_interval: float = Field(
+        default=10.0,
+        validation_alias=AliasChoices(
+            "min_refresh_interval", "MIN_REFRESH_INTERVAL"
+        ),
+    )
+    """Minimum seconds between two JWKS *refreshes*.
+
+    An unknown ``kid`` triggers a refresh so a rotated key is picked up
+    promptly. Without a floor, a caller presenting a stream of made-up ``kid``s
+    would drive one live request to the issuer per inbound request. The initial
+    load is never throttled, and neither is the first refresh after it, so key
+    rotation is still picked up immediately.
+    """
     _cache: list[Dict[str, Any]] | None = PrivateAttr(default=None)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
+    _last_refresh: float | None = PrivateAttr(default=None)
+
+    def _run_blocking(self, factory: Callable[[], Coroutine[Any, Any, Any]]) -> None:
+        """Run one of this issuer's coroutines from synchronous code."""
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(factory())
+            return
+
+        raise JwksError(
+            "Cannot refresh JWKS synchronously while an event loop is running; use arefresh instead"
+        )
 
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
 
         if self._cache is None:
-            self.refresh()
+            # The initial load is not a refresh, and must not consume the
+            # refresh budget -- otherwise the first unknown kid after startup
+            # would be throttled and a rotated key missed.
+            self._run_blocking(self.aget_as_jwks)
 
         return cast(list[Dict[str, Any]], self._cache)
 
@@ -389,20 +415,30 @@ class JWKSUriIssuer(Issuer):
     def refresh(self) -> None:
         """Refresh the jwks from the uri"""
 
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            asyncio.run(self.arefresh())
-            return
-
-        raise JwksError(
-            "Cannot refresh JWKS synchronously while an event loop is running; use arefresh instead"
-        )
+        self._run_blocking(self.arefresh)
 
     async def arefresh(self) -> None:
-        """Refresh the jwks from the uri without blocking the event loop."""
+        """Refresh the jwks from the uri without blocking the event loop.
+
+        Rate-limited to one refresh per ``min_refresh_interval``; when a refresh
+        is skipped the existing cache is kept, so an unresolvable ``kid`` simply
+        fails verification instead of hitting the issuer again.
+        """
 
         async with self._cache_lock:
+            now = time.monotonic()
+            if (
+                self._last_refresh is not None
+                and now - self._last_refresh < self.min_refresh_interval
+            ):
+                logger.debug(
+                    "Skipping JWKS refresh for %s: refreshed %.1fs ago",
+                    self.jwks_uri,
+                    now - self._last_refresh,
+                )
+                return
+
+            self._last_refresh = now
             await self._fetch_jwks()
 
     async def _fetch_jwks(self) -> None:
@@ -424,84 +460,151 @@ IssuerUnion = Annotated[
 ]
 
 
-def _merge_jwks(
-    jwks_by_issuer: list[list[Dict[str, Any]]],
-) -> list[Dict[str, Any]]:
-    """Validate and merge the keys returned by a set of issuers.
+def _index_issuer_keys(iss: str, keys: list[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Validate and index a *single* issuer's keys by ``kid``.
 
-    Rejects duplicate or missing ``kid``s, since key resolution is by ``kid``.
+    ``kid``s only need to be unique within one issuer: a token is verified
+    against the keys of the one issuer its ``iss`` claim names, never against a
+    set merged across issuers. Two issuers may therefore safely publish the same
+    ``kid`` -- which they do by default, since ``RSAKeyIssuer.key_id`` and
+    ``RSAKeyFileIssuer.key_id`` both default to ``"1"``.
     """
 
-    merged_jwks: Dict[str, Dict[str, Any]] = {}
+    if not isinstance(keys, list):
+        raise JwksError(f"keys of issuer {iss!r} must be a list")
 
-    for keys in jwks_by_issuer:
-        if not isinstance(keys, list):
-            raise JwksError("keys must be a list")
+    indexed: Dict[str, Dict[str, Any]] = {}
 
-        for key in keys:
-            if key.get("kid") is None:
-                raise JwksError("key must contain a kid field")
+    for key in keys:
+        kid = key.get("kid")
+        if kid is None:
+            raise JwksError(f"key of issuer {iss!r} must contain a kid field")
 
-            if key["kid"] in merged_jwks:
-                raise JwksError(f"Duplicate kid found: {key['kid']}")
+        if kid in indexed:
+            raise JwksError(f"Duplicate kid {kid!r} in jwks of issuer {iss!r}")
 
-            merged_jwks[key["kid"]] = key
+        indexed[kid] = key
 
-    if not merged_jwks:
-        raise JwksError("No keys found in jwks")
+    if not indexed:
+        raise JwksError(f"No keys found in jwks of issuer {iss!r}")
 
-    return list(merged_jwks.values())
+    return indexed
+
+
+async def _aget_issuer_jwks(issuer: IssuerUnion) -> list[Dict[str, Any]]:
+    """Get one issuer's JWKS, without blocking the loop on a remote fetch."""
+
+    if isinstance(issuer, JWKSUriIssuer):
+        return await issuer.aget_as_jwks()
+    return issuer.get_as_jwks()
 
 
 def _collect_jwks(issuers: list[IssuerUnion]) -> list[Dict[str, Any]]:
-    """Collect and merge the JWKS of every issuer (blocking)."""
+    """Collect the validated keys of every issuer (blocking).
 
-    return _merge_jwks([issuer.get_as_jwks() for issuer in issuers])
+    For introspection only. Verification never uses a merged set -- it resolves
+    keys against a single issuer via :func:`_resolve_issuer_key_set`.
+    """
+
+    merged: list[Dict[str, Any]] = []
+    for issuer in issuers:
+        merged.extend(_index_issuer_keys(issuer.iss, issuer.get_as_jwks()).values())
+    return merged
 
 
 async def _acollect_jwks(issuers: list[IssuerUnion]) -> list[Dict[str, Any]]:
-    """Collect and merge the JWKS of every issuer without blocking the loop."""
+    """Collect the validated keys of every issuer without blocking the loop."""
 
-    jwks_by_issuer = []
+    merged: list[Dict[str, Any]] = []
     for issuer in issuers:
+        keys = await _aget_issuer_jwks(issuer)
+        merged.extend(_index_issuer_keys(issuer.iss, keys).values())
+    return merged
+
+
+def _find_issuer(issuers: list[IssuerUnion], iss: str) -> IssuerUnion:
+    """Select the configured issuer named by a token's ``iss`` claim.
+
+    Runs before any signature check and before any network I/O. Reading ``iss``
+    unverified is safe here because it only *selects* a trust anchor -- the
+    signature is what proves the token actually came from that issuer, and
+    :func:`authentikate.decode._validate_claims` re-checks ``iss`` against the
+    selected issuer afterwards. Rejecting up front also means an unknown issuer
+    can never trigger an outbound JWKS fetch.
+    """
+
+    for issuer in issuers:
+        if issuer.iss == iss:
+            return issuer
+
+    raise InvalidJwtTokenError(f"Untrusted issuer: {iss!r}")
+
+
+def _resolve_issuer_key_set(issuer: IssuerUnion, kid: str) -> KeySet:
+    """Resolve a KeySet of ``issuer``'s keys only, refreshing on a miss."""
+
+    keys = _index_issuer_keys(issuer.iss, issuer.get_as_jwks())
+
+    if kid not in keys:
+        issuer.refresh()
+        keys = _index_issuer_keys(issuer.iss, issuer.get_as_jwks())
+
+    return KeySet.import_key_set({"keys": list(keys.values())})
+
+
+async def _aresolve_issuer_key_set(issuer: IssuerUnion, kid: str) -> KeySet:
+    """Resolve a KeySet of ``issuer``'s keys only, without blocking the loop."""
+
+    keys = _index_issuer_keys(issuer.iss, await _aget_issuer_jwks(issuer))
+
+    if kid not in keys:
         if isinstance(issuer, JWKSUriIssuer):
-            jwks_by_issuer.append(await issuer.aget_as_jwks())
+            await issuer.arefresh()
         else:
-            jwks_by_issuer.append(issuer.get_as_jwks())
-
-    return _merge_jwks(jwks_by_issuer)
-
-
-def _resolve_key_set(issuers: list[IssuerUnion], kid: str | None) -> KeySet:
-    """Resolve a KeySet for ``kid``, refreshing issuers on a miss (blocking)."""
-
-    if not kid:
-        raise MalformedJwtTokenError("Missing kid in header")
-
-    jwks = _collect_jwks(issuers)
-
-    if not any(key.get("kid") == kid for key in jwks):
-        for issuer in issuers:
             issuer.refresh()
-        jwks = _collect_jwks(issuers)
+        keys = _index_issuer_keys(issuer.iss, await _aget_issuer_jwks(issuer))
 
-    return KeySet.import_key_set({"keys": jwks})
+    return KeySet.import_key_set({"keys": list(keys.values())})
 
 
-async def _aresolve_key_set(issuers: list[IssuerUnion], kid: str) -> KeySet:
-    """Resolve a KeySet for ``kid``, refreshing issuers on a miss (async)."""
+ASYMMETRIC_ALGORITHMS = [
+    "RS256",
+    "RS384",
+    "RS512",
+    "PS256",
+    "PS384",
+    "PS512",
+    "ES256",
+    "ES384",
+    "ES512",
+    "Ed25519",
+    "Ed448",
+    "EdDSA",
+]
+"""Every asymmetric signature algorithm joserfc supports.
 
-    jwks = await _acollect_jwks(issuers)
+The default auth-token allow-list. What pinning has to exclude is the *symmetric*
+family (``HS*``) and ``none``: with those permitted, an attacker can take the
+issuer's public key -- which is public by definition -- and use it as an HMAC
+secret, or drop the signature altogether. Narrowing further to the single
+algorithm your issuer actually uses is better still (RFC 8725 §3.1) and is what
+the ``ALGORITHMS`` setting is for; it is not the default only because it would
+break every deployment whose issuer does not sign with RS256.
+"""
 
-    if not any(key.get("kid") == kid for key in jwks):
-        for issuer in issuers:
-            if isinstance(issuer, JWKSUriIssuer):
-                await issuer.arefresh()
-            else:
-                issuer.refresh()
-        jwks = await _acollect_jwks(issuers)
 
-    return KeySet.import_key_set({"keys": jwks})
+def reject_unsafe_algorithms(algorithms: list[str]) -> list[str]:
+    """Pin the alg per RFC 8725: forbid an empty list and the ``none`` alg.
+
+    An empty allow-list or ``alg: none`` would let an attacker present an
+    unsigned (or arbitrarily-signed) token, defeating the whole point of
+    verification. Shared by the auth and provenance settings.
+    """
+    if not algorithms:
+        raise ValueError("algorithms must not be empty")
+    if any(alg.strip().lower() == "none" for alg in algorithms):
+        raise ValueError("The 'none' algorithm is not allowed")
+    return algorithms
 
 
 class ProvenanceSettings(BaseModel):
@@ -519,10 +622,14 @@ class ProvenanceSettings(BaseModel):
         validation_alias=AliasChoices("issuers", "ISSUERS")
     )
     """The trusted provenance issuers (typically one JWKSUriIssuer at Rekuest)."""
-    audience: str | None = Field(
-        default=None, validation_alias=AliasChoices("audience", "AUDIENCE")
-    )
-    """This service's identifier (e.g. "mikro"); checked against the token aud."""
+    audience: str = Field(validation_alias=AliasChoices("audience", "AUDIENCE"))
+    """This service's identifier (e.g. "mikro"); checked against the token aud.
+
+    Required: a provenance token exists to attest *which service* a unit of work
+    was scoped to, so accepting one with an unchecked audience would defeat its
+    purpose. Unlike the auth-token audience this has few enough deployments to
+    make mandatory outright.
+    """
     algorithms: list[str] = Field(
         default_factory=lambda: ["Ed25519"],
         validation_alias=AliasChoices("algorithms", "ALGORITHMS"),
@@ -531,18 +638,9 @@ class ProvenanceSettings(BaseModel):
 
     @field_validator("algorithms")
     @classmethod
-    def reject_unsafe_algorithms(cls, v: list[str]) -> list[str]:
-        """Pin the alg per RFC 8725: forbid an empty list and the ``none`` alg.
-
-        An empty allow-list or ``alg: none`` would let an attacker present an
-        unsigned (or arbitrarily-signed) provenance token, defeating the whole
-        point of verification.
-        """
-        if not v:
-            raise ValueError("Provenance algorithms must not be empty")
-        if any(alg.strip().lower() == "none" for alg in v):
-            raise ValueError("The 'none' algorithm is not allowed for provenance tokens")
-        return v
+    def check_algorithms(cls, v: list[str]) -> list[str]:
+        """Reject an empty allow-list or the ``none`` alg (RFC 8725)."""
+        return reject_unsafe_algorithms(v)
 
     def get_jwks(self) -> list[Dict[str, Any]]:
         """Get the merged jwks of all provenance issuers."""
@@ -552,13 +650,13 @@ class ProvenanceSettings(BaseModel):
         """Get the merged jwks of all provenance issuers without blocking."""
         return await _acollect_jwks(self.issuers)
 
-    def load_key(self, obj: GuestProtocol) -> KeySet:
-        """Resolve the key set from a JWS header (joserfc callable resolver)."""
-        return _resolve_key_set(self.issuers, obj.headers().get("kid"))
+    def resolve_key_set(self, iss: str, kid: str) -> KeySet:
+        """Resolve the verification keys of the provenance issuer named by ``iss``."""
+        return _resolve_issuer_key_set(_find_issuer(self.issuers, iss), kid)
 
-    async def aload_key(self, kid: str) -> KeySet:
-        """Resolve the key set for a given key id without blocking the loop."""
-        return await _aresolve_key_set(self.issuers, kid)
+    async def aresolve_key_set(self, iss: str, kid: str) -> KeySet:
+        """Resolve the keys of the issuer named by ``iss`` without blocking."""
+        return await _aresolve_issuer_key_set(_find_issuer(self.issuers, iss), kid)
 
 
 class AuthentikateSettings(BaseModel):
@@ -626,6 +724,52 @@ class AuthentikateSettings(BaseModel):
         validation_alias=AliasChoices("provenance", "PROVENANCE"),
     )
     """Configuration for verifying inbound provenance tokens (None disables it)."""
+    audience: str | None = Field(
+        default=None, validation_alias=AliasChoices("audience", "AUDIENCE")
+    )
+    """This service's identifier; checked against the token's ``aud`` claim.
+
+    Optional for now so existing deployments keep working, but strongly
+    recommended: without it, a token the IdP minted for *any* service is accepted
+    by this one. ``prepare_settings`` warns when it is unset, and it becomes
+    required in 4.0.
+    """
+    algorithms: list[str] = Field(
+        default_factory=lambda: list(ASYMMETRIC_ALGORITHMS),
+        validation_alias=AliasChoices("algorithms", "ALGORITHMS"),
+    )
+    """The signature algorithms allowed for auth tokens.
+
+    Defaults to every asymmetric algorithm, which blocks the ``HS*``/``none``
+    confusion attacks. Narrow it to the one your issuer uses -- see
+    :data:`ASYMMETRIC_ALGORITHMS`.
+    """
+    allowed_organizations: list[str] | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "allowed_organizations", "ALLOWED_ORGANIZATIONS"
+        ),
+    )
+    """Organizations this service accepts, or None to accept whatever the token names.
+
+    Without it, every distinct ``active_org`` claim auto-creates an Organization
+    and a Membership, making token claims an unbounded write primitive.
+    """
+    allow_static_tokens_in_production: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "allow_static_tokens_in_production", "ALLOW_STATIC_TOKENS_IN_PRODUCTION"
+        ),
+    )
+    """Escape hatch to permit ``static_tokens`` while ``DEBUG`` is False."""
+
+    @field_validator("algorithms")
+    @classmethod
+    def check_algorithms(
+        cls, v: list[str]
+    ) -> list[str]:
+        """Reject an empty allow-list or the ``none`` alg (RFC 8725)."""
+        return reject_unsafe_algorithms(v)
 
     def get_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
@@ -637,12 +781,16 @@ class AuthentikateSettings(BaseModel):
 
         return await _acollect_jwks(self.issuers)
 
-    def load_key(self, obj: GuestProtocol) -> KeySet:
-        """Resolve the key from the header"""
+    def resolve_key_set(self, iss: str, kid: str) -> KeySet:
+        """Resolve the verification keys of the issuer named by ``iss``.
 
-        return _resolve_key_set(self.issuers, obj.headers().get("kid"))
+        Scoped to that one issuer, so a token can only ever be verified against
+        the keys of the issuer it claims to come from.
+        """
 
-    async def aload_key(self, kid: str) -> KeySet:
-        """Resolve the key set for a given key id without blocking the event loop."""
+        return _resolve_issuer_key_set(_find_issuer(self.issuers, iss), kid)
 
-        return await _aresolve_key_set(self.issuers, kid)
+    async def aresolve_key_set(self, iss: str, kid: str) -> KeySet:
+        """Resolve the keys of the issuer named by ``iss`` without blocking."""
+
+        return await _aresolve_issuer_key_set(_find_issuer(self.issuers, iss), kid)

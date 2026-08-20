@@ -1,10 +1,46 @@
+import logging
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from authentikate.base_models import AuthentikateSettings
 from typing import Optional
 from pydantic import ValidationError
 
+logger = logging.getLogger(__name__)
+
 cached_settings: Optional[AuthentikateSettings] = None
+
+
+def _check_deployment_safety(parsed: AuthentikateSettings) -> None:
+    """Reject or warn about settings that are unsafe outside development.
+
+    Raises
+    ------
+    ImproperlyConfigured
+        When static tokens -- which bypass signature verification entirely --
+        are configured while ``DEBUG`` is False.
+    """
+
+    if parsed.static_tokens and not settings.DEBUG:
+        if not parsed.allow_static_tokens_in_production:
+            raise ImproperlyConfigured(
+                "AUTHENTIKATE.STATIC_TOKENS is set while DEBUG is False. Static "
+                "tokens bypass signature verification and are for tests only. "
+                "Remove them, or set ALLOW_STATIC_TOKENS_IN_PRODUCTION if this "
+                "is deliberate."
+            )
+        logger.warning(
+            "AUTHENTIKATE.STATIC_TOKENS is enabled with DEBUG=False via "
+            "ALLOW_STATIC_TOKENS_IN_PRODUCTION. These tokens bypass signature "
+            "verification."
+        )
+
+    if parsed.audience is None:
+        logger.warning(
+            "AUTHENTIKATE.AUDIENCE is not set, so the 'aud' claim is not "
+            "checked: a token this issuer minted for any other service is "
+            "accepted here. Set it to this service's identifier. This will "
+            "become required in authentikate 4.0."
+        )
 
 
 def prepare_settings() -> AuthentikateSettings:
@@ -31,15 +67,15 @@ def prepare_settings() -> AuthentikateSettings:
         raise ImproperlyConfigured("Missing setting AUTHENTIKATE")
 
     try:
-
-        return AuthentikateSettings(
-            **group
-        )
+        parsed = AuthentikateSettings(**group)
 
     except ValidationError as e:
         raise ImproperlyConfigured(
             "Invalid settings for AUTHENTIKATE. Please check your settings."
         ) from e
+
+    _check_deployment_safety(parsed)
+    return parsed
 
 
 def get_settings() -> AuthentikateSettings:

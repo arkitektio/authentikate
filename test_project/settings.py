@@ -48,11 +48,17 @@ AUTH_USER_MODEL = "authentikate.User"
 AUTHENTIKATE = {
     "ISSUERS": [
         {
-            "iss": "lok",
+            # Must match the `iss` claim of the tokens the suite mints
+            # (see the `valid_claims` fixture): a token is only ever verified
+            # against the keys of the issuer it names.
+            "iss": "XXXX",
             "kind": "rsa",
             "public_key": "public_key.pem",
         }
     ],
+    # The test suite runs with DEBUG=False, so it must opt in explicitly.
+    # Never set this in a real deployment: static tokens skip signature checks.
+    "ALLOW_STATIC_TOKENS_IN_PRODUCTION": True,
     "STATIC_TOKENS": {
         "hallo": {
             "sub": 1,

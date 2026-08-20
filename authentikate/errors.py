@@ -63,6 +63,12 @@ class MissingActiveOrganization(AuthentikatePermissionDenied):
     pass
 
 
+class OrganizationNotAllowed(AuthentikatePermissionDenied):
+    """Raised when a token names an organization this service does not accept."""
+
+    pass
+
+
 class BlockedMembership(AuthentikatePermissionDenied):
     """Raised when the resolved membership is blocked."""
 

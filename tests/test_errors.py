@@ -126,7 +126,9 @@ def test_key_not_found(key_pair_str):
     # Token signed with key "1"
     private_key_obj = RSAKey.import_key(key_pair_str.private_key)
     header = {"kid": "1", "alg": "RS256"}
-    claims = {"sub": "user"}
+    # iss must name a configured issuer, otherwise the token is rejected as
+    # untrusted before key lookup is ever reached.
+    claims = {"sub": "user", "iss": "http://test"}
     token = jwt.encode(header, claims, private_key_obj)
 
     # Settings with Key "2"

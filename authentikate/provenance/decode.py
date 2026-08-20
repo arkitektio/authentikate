@@ -6,12 +6,16 @@ and pins the signature algorithm (``Ed25519`` by default, never ``none``), as
 required by RFC 8725.
 """
 
+import logging
+
 from joserfc import jwt
 from pydantic import ValidationError
 
 from authentikate import base_models, errors
-from authentikate.decode import _decode_header, _validate_claims
+from authentikate.decode import _select_key_hints, _validate_claims
 from authentikate.provenance.models import ProvenanceToken
+
+logger = logging.getLogger(__name__)
 
 
 def _build_token(token: str, claims: dict[str, object]) -> ProvenanceToken:
@@ -64,10 +68,11 @@ def decode_provenance_token(
     if provenance is None:
         raise errors.ProvenanceNotConfiguredError("Provenance is not configured")
 
+    iss, kid = _select_key_hints(token)
+
     try:
-        decoded = jwt.decode(
-            token, provenance.load_key, algorithms=provenance.algorithms
-        )
+        key_set = provenance.resolve_key_set(iss, kid)
+        decoded = jwt.decode(token, key_set, algorithms=provenance.algorithms)
     except (errors.AuthentikateError, errors.AuthentikatePermissionDenied) as e:
         raise e
     except Exception as e:
@@ -75,7 +80,9 @@ def decode_provenance_token(
             "Error decoding provenance token"
         ) from e
 
-    _validate_claims(decoded)
+    # Audience is enforced by _check_audience below, which reports the
+    # specific ProvenanceAudienceError rather than a generic claim failure.
+    _validate_claims(decoded, issuer=iss)
 
     built = _build_token(token, decoded.claims)
     _check_audience(built, provenance)
@@ -91,17 +98,11 @@ async def adecode_provenance_token(
     if provenance is None:
         raise errors.ProvenanceNotConfiguredError("Provenance is not configured")
 
-    try:
-        header = _decode_header(token)
-        kid = header.get("kid")
-        if not kid:
-            raise errors.MalformedProvenanceTokenError("Missing kid in header")
+    iss, kid = _select_key_hints(token)
 
-        decoded = jwt.decode(
-            token,
-            await provenance.aload_key(kid),
-            algorithms=provenance.algorithms,
-        )
+    try:
+        key_set = await provenance.aresolve_key_set(iss, kid)
+        decoded = jwt.decode(token, key_set, algorithms=provenance.algorithms)
     except (errors.AuthentikateError, errors.AuthentikatePermissionDenied) as e:
         raise e
     except Exception as e:
@@ -109,9 +110,12 @@ async def adecode_provenance_token(
             "Error decoding provenance token"
         ) from e
 
-    _validate_claims(decoded)
+    # Audience is enforced by _check_audience below, which reports the
+    # specific ProvenanceAudienceError rather than a generic claim failure.
+    _validate_claims(decoded, issuer=iss)
 
     built = _build_token(token, decoded.claims)
     _check_audience(built, provenance)
-    print("Built provenance token:", built)
+    # Never log the token itself -- `raw` is a bearer credential.
+    logger.debug("Verified provenance token jti=%s tsk=%s", built.jti, built.tsk)
     return built
