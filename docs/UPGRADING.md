@@ -216,6 +216,31 @@ the installed package and treated it as `Any`. The marker is now included, so
 downstream code gets real types with no change on your side — though you may see
 new type errors in your own code that were previously masked.
 
+### Auth failures now carry a machine-readable code
+
+Every authentication and authorization failure reaches a GraphQL client with
+`extensions.code` (kante's coarse category — `UNAUTHENTICATED`,
+`PERMISSION_DENIED`, `INTERNAL_ERROR`) and `extensions.reason` (the specific
+failure, e.g. `TOKEN_EXPIRED`, `INSUFFICIENT_SCOPE`). Clients no longer have to
+parse English to tell "refresh the token" from "you will never be allowed".
+
+**Switch on `code`, treat `reason` as detail** — new reasons will be added and
+that must not break exhaustive handlers.
+
+Two behaviour changes come with it:
+
+- Authorization failures now also carry the requirement in `extensions`
+  (`requiredScopes`, `requiredRoles`, `requiredOrganizationRoles`, …). This
+  discloses nothing new: the `Auth` schema directive already publishes required
+  scopes and roles into the introspectable schema.
+- **Authentication failure messages changed.** They no longer echo the rejected
+  value (issuer, audience, key id) — that is attacker-supplied, and reflecting it
+  makes the error surface a probe for what the service trusts. The full detail is
+  logged at WARNING under `authentikate.strawberry.errors`. If you assert on
+  authentication error *text*, assert on `extensions.reason` instead.
+
+The full table is in [`docs/USAGE.md`](USAGE.md) §10.
+
 ### A real top-level API
 
 `authentikate/__init__.py` exported nothing; everything had to be imported from

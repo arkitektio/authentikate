@@ -139,3 +139,20 @@ def valid_auth_headers(valid_jwt):
     return {
         "Authorization": f"Bearer {valid_jwt}",
     }
+
+
+@pytest.fixture(autouse=True)
+def reset_authentikate_settings_cache():
+    """Give every test a fresh parse of ``settings.AUTHENTIKATE``.
+
+    ``get_settings()`` memoises into a module global, while several tests mutate
+    ``settings.AUTHENTIKATE`` in place (e.g. installing the fixture public key)
+    and expect the change to take. Whichever test ran first therefore decided the
+    cached value for the rest of the session, making outcomes depend on
+    collection order. Clearing it around each test removes that coupling.
+    """
+    import authentikate.settings as authentikate_settings
+
+    authentikate_settings.cached_settings = None
+    yield
+    authentikate_settings.cached_settings = None

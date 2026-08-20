@@ -19,6 +19,8 @@ from authentikate.provenance import (
     verify_actor,
 )
 from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
+from authentikate.errors import AuthentikateError, AuthentikatePermissionDenied
+from authentikate.strawberry.errors import to_graphql_error
 
 
 class AuthentikateExtension(SchemaExtension):
@@ -127,54 +129,61 @@ class AuthentikateExtension(SchemaExtension):
         reset_membership = None
 
         try:
-            settings = self.get_settings()
+            # Only the authentication/expansion step is translated. A failure
+            # inside a resolver (after the yield) is the resolver's own error
+            # and must not be relabelled as an auth failure.
+            try:
+                settings = self.get_settings()
 
-            # The token and the provenance carrier are the only things that
-            # differ between transports; everything after this point is shared,
-            # so the two paths cannot drift apart.
-            if isinstance(context, WsContext):
-                carrier = {
-                    str(k): v
-                    for k, v in context.connection_params.items()
-                    if isinstance(v, str)
-                }
-                token = await authenticate_token(
-                    context.connection_params.get("token", ""),
-                    settings,
-                )
-            elif isinstance(context, HttpContext):
-                carrier = dict(context.headers)
-                token = await authenticate_header(carrier, settings)
-            else:
-                raise ValueError(
-                    "Unknown context type. Cannot determine if it's WebSocket or HTTP."
-                )
+                # The token and the provenance carrier are the only things that
+                # differ between transports; everything after this point is shared,
+                # so the two paths cannot drift apart.
+                if isinstance(context, WsContext):
+                    carrier = {
+                        str(k): v
+                        for k, v in context.connection_params.items()
+                        if isinstance(v, str)
+                    }
+                    token = await authenticate_token(
+                        context.connection_params.get("token", ""),
+                        settings,
+                    )
+                elif isinstance(context, HttpContext):
+                    carrier = dict(context.headers)
+                    token = await authenticate_header(carrier, settings)
+                else:
+                    raise ValueError(
+                        "Unknown context type. Cannot determine if it's WebSocket or HTTP."
+                    )
 
-            reset_token = token_var.set(token)
-            if token:
-                user, client, organization, membership = (
-                    await self.aexpand_token_context(token)
-                )
+                reset_token = token_var.set(token)
+                if token:
+                    user, client, organization, membership = (
+                        await self.aexpand_token_context(token)
+                    )
 
-                reset_client = client_var.set(client)
-                reset_user = user_var.set(cast(UserModel, user))
-                reset_organization = organization_var.set(organization)
-                reset_membership = membership_var.set(membership)
+                    reset_client = client_var.set(client)
+                    reset_user = user_var.set(cast(UserModel, user))
+                    reset_organization = organization_var.set(organization)
+                    reset_membership = membership_var.set(membership)
 
-                # The concrete models do satisfy kante's User/Client protocols,
-                # but basedpyright does not run mypy's django-stubs plugin, so it
-                # sees the raw descriptors (``CharField[str]`` rather than ``str``)
-                # and no declared ``id``. These casts are for the checker, not a
-                # real mismatch -- the genuine one, kante's invariant
-                # ``Provenance.act``, was fixed in kante 2.1.1, which is why
-                # ``set_provenance`` needs no ignore any more.
-                context.request.set_user(cast(Any, user))
-                context.request.set_client(cast(Any, client))
-                context.request.set_membership(membership)
-                context.request.set_organization(organization)
-                context.request.set_extension("token", token)
+                    # The concrete models do satisfy kante's User/Client protocols,
+                    # but basedpyright does not run mypy's django-stubs plugin, so it
+                    # sees the raw descriptors (``CharField[str]`` rather than ``str``)
+                    # and no declared ``id``. These casts are for the checker, not a
+                    # real mismatch -- the genuine one, kante's invariant
+                    # ``Provenance.act``, was fixed in kante 2.1.1, which is why
+                    # ``set_provenance`` needs no ignore any more.
+                    context.request.set_user(cast(Any, user))
+                    context.request.set_client(cast(Any, client))
+                    context.request.set_membership(membership)
+                    context.request.set_organization(organization)
+                    context.request.set_extension("token", token)
 
-                await self._aattach_provenance(context, carrier, token, settings)
+                    await self._aattach_provenance(context, carrier, token, settings)
+
+            except (AuthentikateError, AuthentikatePermissionDenied) as exc:
+                raise to_graphql_error(exc) from exc
 
             yield
         finally:

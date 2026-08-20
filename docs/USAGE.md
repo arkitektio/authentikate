@@ -511,3 +511,64 @@ All errors derive from one of two bases (`authentikate.errors`):
 - **`AuthentikateError`** — non-permission/configuration errors:
   `JwksError`, `ProvenanceNotConfiguredError`,
   `UnsupportedCanonicalizationError`.
+
+### Codes on the wire
+
+Every auth failure reaches a GraphQL client with a machine-readable code, so it
+never has to parse the message:
+
+```json
+{ "errors": [ { "message": "The access token has expired.",
+                "extensions": { "code": "UNAUTHENTICATED",
+                                "reason": "TOKEN_EXPIRED" } } ] }
+```
+
+`code` is the coarse category, shared with `kante.errors` — it is the branch you
+act on. `reason` names the specific failure; new reasons can be added without
+breaking a client that switches on `code`, so **switch on `code` and treat
+`reason` as detail**.
+
+| `code` | What the client should do |
+|---|---|
+| `UNAUTHENTICATED` | Refresh the token, or send the user to log in again. |
+| `PERMISSION_DENIED` | Nothing will help; the credentials are valid but insufficient. |
+| `INTERNAL_ERROR` | A server-side fault (e.g. the issuer is unreachable). Retry later. |
+
+| `reason` | `code` | Raised when |
+|---|---|---|
+| `NO_AUTHORIZATION_HEADER` | `UNAUTHENTICATED` | No `Authorization` header was sent. |
+| `MALFORMED_AUTHORIZATION_HEADER` | `UNAUTHENTICATED` | The header is not a Bearer token. |
+| `TOKEN_EXPIRED` | `UNAUTHENTICATED` | The token's `exp` has passed — **the signal to refresh**. |
+| `TOKEN_MALFORMED` | `UNAUTHENTICATED` | The token is not a well-formed JWT. |
+| `TOKEN_INVALID` | `UNAUTHENTICATED` | Bad signature, untrusted issuer, or wrong audience. |
+| `SIGNING_KEY_NOT_FOUND` | `UNAUTHENTICATED` | The `kid` matches no key of that issuer. |
+| `NOT_AUTHENTICATED` | `UNAUTHENTICATED` | The field requires auth and the request carried none. |
+| `INSUFFICIENT_SCOPE` | `PERMISSION_DENIED` | Missing a required scope; see `requiredScopes` / `requiredAnyScopeOf`. |
+| `INSUFFICIENT_ROLE` | `PERMISSION_DENIED` | Missing a required role; see `requiredRoles` / `requiredAnyRoleOf`. |
+| `INSUFFICIENT_ORGANIZATION_ROLE` | `PERMISSION_DENIED` | Missing a role *within the active organization*; see `requiredOrganizationRoles`. |
+| `MISSING_ACTIVE_ORGANIZATION` | `PERMISSION_DENIED` | The token names no `active_org`. |
+| `ORGANIZATION_NOT_ALLOWED` | `PERMISSION_DENIED` | `ALLOWED_ORGANIZATIONS` excludes the token's org. |
+| `MEMBERSHIP_BLOCKED` | `PERMISSION_DENIED` | The membership is `blocked`. |
+| `PROVENANCE_*` | `PERMISSION_DENIED` | The provenance token is malformed, invalid, mis-scoped, or issued to another actor. |
+| `KEY_RETRIEVAL_FAILED` | `INTERNAL_ERROR` | The issuer's JWKS could not be fetched. |
+
+**Authorization** failures name the requirement, both in the message and in
+`extensions` (`requiredScopes`, `requiredRoles`, …). That discloses nothing new:
+the `Auth` schema directive already publishes the required scopes and roles into
+the introspectable schema.
+
+**Authentication** failures deliberately do *not* echo the rejected value — the
+issuer, audience or key id in a bad token is attacker-supplied, and reflecting it
+turns the error surface into a probe for what the service trusts. The full detail
+is logged at WARNING under `authentikate.strawberry.errors` instead.
+
+Each exception carries `code`, `reason` and `client_message` as class attributes,
+so non-GraphQL callers can read them too:
+
+```python
+from authentikate.errors import AuthentikateTokenExpired
+AuthentikateTokenExpired.reason        # "TOKEN_EXPIRED"
+
+from authentikate.strawberry import to_graphql_error
+raise to_graphql_error(exc)            # -> coded GraphQL error
+```

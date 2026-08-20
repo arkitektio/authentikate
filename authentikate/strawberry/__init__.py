@@ -1,6 +1,10 @@
 """ Strawberry extension for Authentikate """
 
 from .extension import AuthentikateExtension
+from .errors import (
+    AuthentikateGraphQLError,
+    to_graphql_error,
+)
 from .directives import (
     AuthExtension,
     Auth,
@@ -14,6 +18,8 @@ from .directives import (
 
 __all__ = [
     "AuthentikateExtension",
+    "AuthentikateGraphQLError",
+    "to_graphql_error",
     "AuthExtension",
     "Auth",
     "all_directives",

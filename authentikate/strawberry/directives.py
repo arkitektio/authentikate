@@ -1,6 +1,13 @@
 import strawberry
 from typing import Awaitable, Callable, Any, Optional, List, Sequence
-from graphql import GraphQLError
+from authentikate.strawberry.errors import (
+    INSUFFICIENT_ORGANIZATION_ROLE,
+    INSUFFICIENT_ROLE,
+    INSUFFICIENT_SCOPE,
+    NOT_AUTHENTICATED,
+    denied,
+    unauthenticated,
+)
 from strawberry.schema_directive import Location
 from kante.types import Info
 from strawberry.extensions import FieldExtension
@@ -93,12 +100,17 @@ class _AuthChecks:
         )
 
     def check(self, info: Info) -> None:
-        """Raise a GraphQLError unless the request satisfies every requirement.
+        """Raise a coded error unless the request satisfies every requirement.
+
+        The errors name the requirement and carry it in ``extensions``, which is
+        safe: the ``Auth`` schema directive already publishes the required scopes
+        and roles into the introspectable schema.
 
         Raises
         ------
-        GraphQLError
-            When the request is unauthenticated or lacks a required scope/role.
+        AuthentikateGraphQLError
+            ``UNAUTHENTICATED`` when the request carried no credentials,
+            ``PERMISSION_DENIED`` when it lacks a required scope or role.
         """
         try:
             # Accessing `user` raises when nothing has populated the request,
@@ -108,26 +120,35 @@ class _AuthChecks:
         except (KeyError, ValueError):
             # kante raises ValueError when nothing has populated the request;
             # either way the request is not authenticated.
-            raise GraphQLError("Authentication required")
+            raise unauthenticated("Authentication required", NOT_AUTHENTICATED)
 
         if self.scopes and not token.has_scopes(self.scopes):
-            raise GraphQLError(
-                f"User does not have the required scopes: {self.scopes}"
+            raise denied(
+                f"User does not have the required scopes: {self.scopes}",
+                INSUFFICIENT_SCOPE,
+                requiredScopes=self.scopes,
             )
 
         if self.any_scope_of and not token.has_any_scope(self.any_scope_of):
-            raise GraphQLError(
-                f"User does not have any of the required scopes: {self.any_scope_of}"
+            raise denied(
+                f"User does not have any of the required scopes: {self.any_scope_of}",
+                INSUFFICIENT_SCOPE,
+                requiredAnyScopeOf=self.any_scope_of,
             )
 
         if self.roles and not token.has_roles(self.roles):
-            raise GraphQLError(
-                f"User does not have the required roles: {', '.join(self.roles)}"
+            raise denied(
+                f"User does not have the required roles: {', '.join(self.roles)}",
+                INSUFFICIENT_ROLE,
+                requiredRoles=self.roles,
             )
 
         if self.any_role_of and not token.has_any_role(self.any_role_of):
-            raise GraphQLError(
-                f"User does not have any of the required roles: {', '.join(self.any_role_of)}"
+            raise denied(
+                "User does not have any of the required roles: "
+                f"{', '.join(self.any_role_of)}",
+                INSUFFICIENT_ROLE,
+                requiredAnyRoleOf=self.any_role_of,
             )
 
         if self.org_roles or self.any_org_role_of:
@@ -138,17 +159,21 @@ class _AuthChecks:
         org_roles: Sequence[str] = get_org_roles(info)
 
         if self.org_roles and not all(r in org_roles for r in self.org_roles):
-            raise GraphQLError(
+            raise denied(
                 "User does not have the required organization roles: "
-                f"{', '.join(self.org_roles)}"
+                f"{', '.join(self.org_roles)}",
+                INSUFFICIENT_ORGANIZATION_ROLE,
+                requiredOrganizationRoles=self.org_roles,
             )
 
         if self.any_org_role_of and not any(
             r in org_roles for r in self.any_org_role_of
         ):
-            raise GraphQLError(
+            raise denied(
                 "User does not have any of the required organization roles: "
-                f"{', '.join(self.any_org_role_of)}"
+                f"{', '.join(self.any_org_role_of)}",
+                INSUFFICIENT_ORGANIZATION_ROLE,
+                requiredAnyOrganizationRoleOf=self.any_org_role_of,
             )
 
 

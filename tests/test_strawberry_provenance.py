@@ -21,6 +21,7 @@ from joserfc.jwk import OKPKey
 from kante.context import HttpContext
 
 from authentikate import errors
+from authentikate.strawberry.errors import AuthentikateGraphQLError
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.provenance import CANONICALIZATION_VERSION
 from authentikate.strawberry.extension import AuthentikateExtension
@@ -211,8 +212,13 @@ async def test_present_but_invalid_provenance_token_raises(
         operation = extension.on_operation()
         # A provenance token IS present but cannot be validated, so the whole
         # operation fails closed instead of silently proceeding unprovenanced.
-        with pytest.raises(errors.ProvenanceValidationError):
+        # The extension reports this as a coded error rather than leaking the
+        # internal exception type.
+        with pytest.raises(AuthentikateGraphQLError) as exc_info:
             await operation.__anext__()
+
+        assert exc_info.value.extensions["code"] == "PERMISSION_DENIED"
+        assert exc_info.value.extensions["reason"] == "PROVENANCE_INVALID"
 
     # No provenance was attached, and the context vars were reset on the way out.
     assert request._provenance is None
@@ -319,9 +325,10 @@ async def test_provenance_token_for_another_actor_is_rejected(
         "authentikate.strawberry.extension.authenticate_header",
         new=AsyncMock(return_value=token),
     ):
-        with pytest.raises(errors.ProvenanceActorMismatchError):
+        with pytest.raises(AuthentikateGraphQLError) as exc_info:
             await _run(extension)
 
+    assert exc_info.value.extensions["reason"] == "PROVENANCE_ACTOR_MISMATCH"
     assert request._provenance is None
 
 
@@ -347,7 +354,8 @@ async def test_provenance_actor_issuer_must_match(
         "authentikate.strawberry.extension.authenticate_header",
         new=AsyncMock(return_value=token),
     ):
-        with pytest.raises(errors.ProvenanceActorMismatchError):
+        with pytest.raises(AuthentikateGraphQLError) as exc_info:
             await _run(extension)
 
+    assert exc_info.value.extensions["reason"] == "PROVENANCE_ACTOR_MISMATCH"
     assert request._provenance is None
