@@ -81,8 +81,16 @@ def _select_key_hints(token: str) -> tuple[str, str]:
     """Read the ``iss`` claim and ``kid`` header used to pick a verification key.
 
     Nothing read here is trusted -- it only selects *which* issuer's keys the
-    signature is then checked against. ``_validate_claims`` re-checks ``iss``
-    against that issuer once the signature has been verified.
+    signature is then checked against, and an ``iss`` naming no configured
+    issuer is rejected before any key is fetched.
+
+    What binds a token to its issuer is that pairing plus the signature: the
+    keys come from the one issuer whose configured ``iss`` equals this claim, so
+    a token verified with them provably came from that issuer. The ``iss``
+    assertion ``_validate_claims`` adds afterwards compares the verified payload
+    against the same claim read from the same payload, so it restates that
+    binding rather than establishing it; it is kept as a cheap invariant check,
+    not relied on as the check.
     """
 
     kid = _decode_header(token).get("kid")
