@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.0.0 (2026-08-21)
+
+### Features
+
+- Jwt changes to harden security
+  ([`c1484e8`](https://github.com/arkitektio/authentikate/commit/c1484e89745fd459b8aa98e6ac72f31011fde543))
+
+
 ## v3.2.0 (2026-08-20)
 
 ### Features
