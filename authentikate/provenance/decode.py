@@ -40,11 +40,18 @@ def _check_audience(
     ``ANY_AUDIENCE`` accepts a token scoped to any service. The token must still
     *carry* an ``aud`` -- it is a required claim on ``ProvenanceToken`` -- but
     this verifier stops caring which service it names.
+
+    The check is unconditional otherwise. It used to be guarded by
+    ``if provenance.audience``, which made a blank configured audience skip it
+    silently and accept a token minted for any other service;
+    :func:`~authentikate.base_models.reject_blank_audience` now rejects that
+    configuration at startup, and the guard is gone so a future blank value
+    cannot re-open the check.
     """
     if provenance.audience == base_models.ANY_AUDIENCE:
         return
 
-    if provenance.audience and not token.has_audience(provenance.audience):
+    if not token.has_audience(provenance.audience):
         raise errors.ProvenanceAudienceError(
             f"Provenance token audience {token.aud} does not include "
             f"{provenance.audience!r}"

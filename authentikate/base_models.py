@@ -396,17 +396,33 @@ class JWKSUriIssuer(Issuer):
             "min_refresh_interval", "MIN_REFRESH_INTERVAL"
         ),
     )
-    """Minimum seconds between two JWKS *refreshes*.
+    """Minimum seconds between two JWKS retrievals that would repeat work.
 
     An unknown ``kid`` triggers a refresh so a rotated key is picked up
     promptly. Without a floor, a caller presenting a stream of made-up ``kid``s
-    would drive one live request to the issuer per inbound request. The initial
-    load is never throttled, and neither is the first refresh after it, so key
-    rotation is still picked up immediately.
+    would drive one live request to the issuer per inbound request. The same
+    floor applies to retrying an initial load that *failed* (see
+    :meth:`_load_jwks`), which is the unauthenticated amplification path while
+    the issuer is unreachable.
+
+    A retrieval that succeeds is never throttled: the first load, and the first
+    refresh after it, both run immediately, so key rotation is still picked up
+    at once.
+    """
+    request_timeout: float = Field(
+        default=5.0,
+        validation_alias=AliasChoices("request_timeout", "REQUEST_TIMEOUT"),
+    )
+    """Seconds allowed for a single JWKS request, stated rather than inherited.
+
+    httpx does default to a 5s timeout, but relying on that leaves the bound on
+    an auth-path network call to a dependency's default: an unbounded JWKS fetch
+    holds a worker for as long as the issuer keeps the socket open.
     """
     _cache: list[Dict[str, Any]] | None = PrivateAttr(default=None)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
     _last_refresh: float | None = PrivateAttr(default=None)
+    _last_failed_load: float | None = PrivateAttr(default=None)
 
     def _run_blocking(self, factory: Callable[[], Coroutine[Any, Any, Any]]) -> None:
         """Run one of this issuer's coroutines from synchronous code."""
@@ -438,9 +454,44 @@ class JWKSUriIssuer(Issuer):
         if self._cache is None:
             async with self._cache_lock:
                 if self._cache is None:
-                    await self._fetch_jwks()
+                    await self._load_jwks()
 
         return cast(list[Dict[str, Any]], self._cache)
+
+    async def _load_jwks(self) -> None:
+        """Populate the cache, failing fast while a recent load attempt failed.
+
+        The initial load is what runs when there is nothing cached yet -- most
+        importantly, when the issuer has been unreachable since this process
+        started. Unthrottled, that turns every inbound request into its own
+        outbound request to the issuer, each one holding the cache lock for the
+        whole timeout, so the requests queue behind one another: an
+        *unauthenticated* caller could stall authentication for everyone and
+        hammer the issuer while it is already struggling.
+
+        A failed load is therefore remembered and reused as a failure for
+        ``min_refresh_interval``, the same budget a refresh gets. Recovery is
+        delayed by at most that interval; a successful load clears it, and the
+        happy path never reaches here because the cache short-circuits it.
+        """
+
+        now = time.monotonic()
+        if (
+            self._last_failed_load is not None
+            and now - self._last_failed_load < self.min_refresh_interval
+        ):
+            raise JwksError(
+                f"Not retrying the JWKS load from {self.jwks_uri}: the previous "
+                f"attempt failed {now - self._last_failed_load:.1f}s ago"
+            )
+
+        try:
+            await self._fetch_jwks()
+        except Exception:
+            self._last_failed_load = now
+            raise
+
+        self._last_failed_load = None
 
     def refresh(self) -> None:
         """Refresh the jwks from the uri"""
@@ -475,7 +526,9 @@ class JWKSUriIssuer(Issuer):
         """Fetch and cache the JWKS document from the issuer."""
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(self.request_timeout)
+            ) as client:
                 response = await client.get(self.jwks_uri)
                 response.raise_for_status()
                 data = response.json()
@@ -623,6 +676,27 @@ break every deployment whose issuer does not sign with RS256.
 """
 
 
+def reject_blank_audience(audience: str) -> str:
+    """Reject a blank ``AUDIENCE``: it reads as configured but checks nothing.
+
+    A blank value is never what an operator means -- it is an unset environment
+    variable or a stray empty string -- and the two verifiers used to disagree
+    about what it meant. The auth path treated ``""`` as a literal audience no
+    token can match, so every request failed with an opaque claim error; the
+    provenance path guarded its check with ``if provenance.audience``, so a blank
+    value skipped the audience check entirely and a token minted for any other
+    service was accepted. Rejecting it at startup removes both readings.
+
+    Use :data:`ANY_AUDIENCE` (``"*"``) to say "any audience" deliberately.
+    """
+    if not audience.strip():
+        raise ValueError(
+            "audience must not be blank: set it to this service's identifier, "
+            f"or to {ANY_AUDIENCE!r} to accept a token minted for any service"
+        )
+    return audience
+
+
 def reject_unsafe_algorithms(algorithms: list[str]) -> list[str]:
     """Pin the alg per RFC 8725: forbid an empty list and the ``none`` alg.
 
@@ -672,6 +746,12 @@ class ProvenanceSettings(BaseModel):
     def check_algorithms(cls, v: list[str]) -> list[str]:
         """Reject an empty allow-list or the ``none`` alg (RFC 8725)."""
         return reject_unsafe_algorithms(v)
+
+    @field_validator("audience")
+    @classmethod
+    def check_audience(cls, v: str) -> str:
+        """Reject a blank audience, which would skip the check entirely."""
+        return reject_blank_audience(v)
 
     def get_jwks(self) -> list[Dict[str, Any]]:
         """Get the merged jwks of all provenance issuers."""
@@ -804,6 +884,12 @@ class AuthentikateSettings(BaseModel):
     ) -> list[str]:
         """Reject an empty allow-list or the ``none`` alg (RFC 8725)."""
         return reject_unsafe_algorithms(v)
+
+    @field_validator("audience")
+    @classmethod
+    def check_audience(cls, v: str) -> str:
+        """Reject a blank audience, which no token could ever match."""
+        return reject_blank_audience(v)
 
     def get_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""

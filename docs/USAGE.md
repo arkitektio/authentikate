@@ -73,7 +73,7 @@ so a typo raises `ImproperlyConfigured` at startup rather than failing silently.
 | `PROVENANCE_HEADER` | list of strings | no | Rekuest task + provenance-token header variants | Header names searched (in order) for a provenance token. |
 | `STATIC_TOKENS` | map of `str → token dict` | no | `{}` | Hard-coded tokens that bypass signature verification. **Tests only** — refused when `DEBUG` is `False`. |
 | `PROVENANCE` | provenance dict | no | `None` | Configuration for verifying inbound provenance tokens. `None` disables provenance verification. |
-| `AUDIENCE` | string | **yes** | — | This service's identifier, checked against the token's `aud`; `"*"` accepts any audience. See below. |
+| `AUDIENCE` | string | **yes** | — | This service's identifier, checked against the token's `aud`; `"*"` accepts any audience. May not be blank. See below. |
 | `ALGORITHMS` | list of strings | no | every asymmetric algorithm | Allowed signature algorithms. The default blocks the `HS*`/`none` confusion attacks; narrow it to the one your issuer uses (RFC 8725 §3.1). An empty list and `none` are rejected. |
 | `ALLOWED_ORGANIZATIONS` | list of strings | no | `None` | Organization ids this service accepts, matched against the token's `org` claim. `None` accepts whatever the token names. |
 | `ALLOW_STATIC_TOKENS_IN_PRODUCTION` | bool | no | `False` | Escape hatch permitting `STATIC_TOKENS` while `DEBUG` is `False`. |
@@ -123,11 +123,40 @@ That still warns at startup, because a token minted for another service is
 accepted. `"*"` widens the check rather than dropping it: the `aud` claim stays
 required, this service just stops caring which service it names.
 
+A **blank** `AUDIENCE` (`""`, or whitespace — typically an unset environment
+variable) raises `ImproperlyConfigured` at startup. It is never what an operator
+means, and it used to be read two different ways: the auth path treated it as a
+literal audience no token could match, so every request failed with an opaque
+claim error, while the provenance path skipped its audience check entirely and
+accepted a token minted for any other service. `"*"` is how you say "any
+audience" — deliberately, and in writing.
+
 > **`"*"` is config-side only.** It says what *this service* accepts. A token
 > whose own `aud` claim contains `"*"` gains nothing — a service configured with
 > a literal audience still rejects it. A token-side wildcard would let the issuer
 > mint one credential valid at every service, which is precisely the
 > cross-service replay that audience checking exists to prevent.
+
+### Header aliases (`AUTHORIZATION_HEADERS`, `PROVENANCE_HEADER`)
+
+Both default to a *list* of accepted names, searched in order, and the first
+non-empty one wins. That is convenient across transports, but each alias is
+another name a client can put a credential under. If anything in front of this
+service inspects, strips, or rewrites `Authorization` — an API gateway that
+injects its own, a proxy that scrubs credentials from logs — it will not know
+about `X-Authorization`, and a caller can route around it by using the alias.
+
+Narrow the list to the names your deployment actually uses:
+
+```python
+AUTHENTIKATE = {
+    "ISSUERS": [...],
+    "AUDIENCE": "mikro",
+    "AUTHORIZATION_HEADERS": ["Authorization", "authorization"],
+}
+```
+
+The same applies to `PROVENANCE_HEADER`, which ships twelve variants.
 
 ### Organization allow-list (`ALLOWED_ORGANIZATIONS`)
 
@@ -150,6 +179,16 @@ This is enforced on the `authenticate_*` entry points in `authentikate.utils`
 hand. If you drive `adecode_token` and `aexpand_token_context` yourself (§7),
 the allow-list is not consulted — check it yourself, or go through
 `authenticate_token`.
+
+> **The organization claim is not the only claim that creates rows.** Expansion
+> also `get_or_create`s an `App`, `Release` and `Device` from the token's
+> `client_app`, `client_release` and `client_device` claims, and there is no
+> allow-list for those. They come from a signed token, so this is only reachable
+> by a holder of a valid token — but if your IdP lets a client choose its own
+> `client_app`/`client_device` metadata, a single credential can create
+> unbounded rows. Constrain those claims at the issuer. A value longer than the
+> column (`max_length` 2000) is also a database error rather than a clean
+> rejection on engines that enforce it.
 
 ---
 
@@ -177,8 +216,21 @@ event loop.
     "kind": "jwks_uri",
     "iss": "https://lok.my-org.com",
     "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
+    "min_refresh_interval": 10.0,   # optional, seconds
+    "request_timeout": 5.0,         # optional, seconds
 }
 ```
+
+Retrieval is throttled in both directions, so an unreachable issuer cannot turn
+inbound requests into outbound ones. A refresh (triggered by an unknown `kid`)
+runs at most once per `min_refresh_interval`; a *failed* load is remembered for
+the same interval and reused as a failure, so while the issuer is down each
+request fails fast instead of opening its own connection and holding the cache
+lock for the full `request_timeout`. Recovery is therefore delayed by at most
+`min_refresh_interval` after the issuer comes back.
+
+A retrieval failure raises `JwksError` — `INTERNAL_ERROR`/`KEY_RETRIEVAL_FAILED`,
+not a permission decision — because no credential the client holds can fix it.
 
 ### `jwks_dict` — inline JWKS document
 
@@ -281,7 +333,7 @@ disable provenance entirely.
 | Key | Type | Required | Default | Purpose |
 |-----|------|----------|---------|---------|
 | `ISSUERS` | list of issuer dicts | **yes** | — | Trusted provenance issuers (same issuer shapes as §3; typically one `jwks_uri` at Rekuest). |
-| `AUDIENCE` | string | **yes** | — | This service's identifier (e.g. `"mikro"`), checked against the token's `aud`; `"*"` accepts a token scoped to any service. Required so the choice is always deliberate — a provenance token exists to attest which service a unit of work was scoped to. |
+| `AUDIENCE` | string | **yes** | — | This service's identifier (e.g. `"mikro"`), checked against the token's `aud`; `"*"` accepts a token scoped to any service. Required and may not be blank, so the choice is always deliberate — a provenance token exists to attest which service a unit of work was scoped to. |
 | `ALGORITHMS` | list of strings | no | `["Ed25519"]` | Allowed signature algorithms. The algorithm is pinned per RFC 8725: an empty list and the `none` algorithm are rejected. |
 
 ```python
@@ -499,8 +551,9 @@ verify_args(provenance, cleartext_args)  # SHA-256 of canonical args must equal 
 ```
 
 `decode_provenance_token` verifies the EdDSA signature against the provenance
-issuers, validates expiry, and (when `AUDIENCE` is set) checks that this service
-is in the token's `aud`. Single-use `jti` enforcement needs a database and
+issuers, validates expiry, and checks that this service is in the token's `aud`.
+`AUDIENCE` is required and may not be blank, so that check always runs; `"*"` is
+the only way to accept a token scoped to another service. Single-use `jti` enforcement needs a database and
 remains the host application's responsibility — the `jti` claim is exposed on
 `ProvenanceToken` for that purpose.
 
