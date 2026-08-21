@@ -1,6 +1,52 @@
 # CHANGELOG
 
 
+## v4.0.1 (2026-08-21)
+
+### Bug Fixes
+
+- Reject a blank AUDIENCE and throttle failed JWKS loads
+  ([`1b1315c`](https://github.com/arkitektio/authentikate/commit/1b1315c4b724c43ca2423f144e96f41377119880))
+
+Findings from a security audit of the token verification path.
+
+**A blank AUDIENCE silently disabled the provenance audience check.** `_check_audience` guarded
+  itself with `if provenance.audience`, so an empty string -- an unset environment variable,
+  typically -- skipped the check entirely and accepted a provenance token minted for any other
+  service. The auth path read the same value as a literal audience no token could match, so it
+  failed every request with an opaque claim error instead. Neither reading is what an operator
+  means, so a blank audience is now rejected as configuration, at startup, on both the
+  `AUTHENTIKATE` and `PROVENANCE` blocks; `"*"` remains the way to accept any audience deliberately.
+  The truthiness guard is gone as well, so a future blank value cannot re-open the check.
+
+Released as a patch rather than a break: a deployment configured with `AUDIENCE: ""` now fails at
+  startup instead of booting, but it was already either failing closed on every request or silently
+  accepting another service's provenance tokens, so nothing that worked before stops working.
+
+**An unreachable issuer turned inbound requests into outbound ones.** Refreshes were throttled but
+  the initial load was not, and the initial load is what runs while the issuer has been unreachable
+  since startup. Each attempt held the cache lock for the full request timeout, so concurrent
+  requests queued behind one another: 20 concurrent requests produced 20 outbound fetches, fully
+  serialized. An unauthenticated caller could stall authentication for everyone while hammering an
+  issuer that was already struggling. A failed load is now remembered for `min_refresh_interval` and
+  reused as a failure, so requests fail fast; recovery is delayed by at most that interval. The same
+  20 requests now produce one fetch. The JWKS request timeout is also stated explicitly
+  (`request_timeout`, default 5s) rather than inherited from httpx.
+
+Also documents two residual risks that are configuration decisions rather than defects: the default
+  header alias lists let a client route a credential around a proxy that only knows about
+  `Authorization`, and `App`/`Release`/`Device` rows are created from token claims with no
+  equivalent of `ALLOWED_ORGANIZATIONS` to bound them.
+
+Corrects an overstatement in `_select_key_hints`: the post-verification `iss` assertion compares the
+  payload against a claim read from that same payload, so it restates the issuer binding that key
+  selection plus the signature already establish, rather than adding to it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01HWdmAQbwdmj8AfJ9vVend9
+
+
 ## v4.0.0 (2026-08-21)
 
 ### Features
