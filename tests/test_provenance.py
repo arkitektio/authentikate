@@ -75,6 +75,7 @@ def _sign(key: OKPKey, claims: dict, *, kid: str = PROV_KID) -> str:
 def settings(ed_key: OKPKey) -> AuthentikateSettings:
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     return AuthentikateSettings(
+        audience="*",
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
         provenance={
             "issuers": [
@@ -165,6 +166,7 @@ def test_expired_token(ed_key, settings):
 
 def test_not_configured(ed_key):
     bare = AuthentikateSettings(
+        audience="*",
         issuers=[
             {
                 "iss": "lok",
@@ -208,6 +210,7 @@ def _auth_token(sub: str, client_id: str) -> JWTToken:
         preferred_username="agent",
         roles=[],
         scope="openid",
+        aud=["mikro"],
         raw="raw",
     )
 
@@ -296,6 +299,7 @@ def bare_settings(ed_key: OKPKey) -> AuthentikateSettings:
     """Settings with no provenance block configured."""
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     return AuthentikateSettings(
+        audience="*",
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
     )
 
@@ -461,6 +465,7 @@ async def test_or_raise_not_configured_raises(ed_key, bare_settings):
 def test_default_algorithm_is_eddsa(ed_key):
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     settings = AuthentikateSettings(
+        audience="*",
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
         provenance={
             "issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
@@ -476,6 +481,7 @@ def test_rejects_unsafe_algorithm_config(ed_key, bad):
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     with pytest.raises(ValidationError):
         AuthentikateSettings(
+            audience="*",
             issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
             provenance={
                 "issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
@@ -527,6 +533,7 @@ def any_audience_settings(ed_key: OKPKey) -> AuthentikateSettings:
     """Provenance configured to accept a token scoped to any service."""
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     return AuthentikateSettings(
+        audience="*",
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
         provenance={
             "issuers": [

@@ -73,9 +73,9 @@ so a typo raises `ImproperlyConfigured` at startup rather than failing silently.
 | `PROVENANCE_HEADER` | list of strings | no | Rekuest task + provenance-token header variants | Header names searched (in order) for a provenance token. |
 | `STATIC_TOKENS` | map of `str → token dict` | no | `{}` | Hard-coded tokens that bypass signature verification. **Tests only** — refused when `DEBUG` is `False`. |
 | `PROVENANCE` | provenance dict | no | `None` | Configuration for verifying inbound provenance tokens. `None` disables provenance verification. |
-| `AUDIENCE` | string | no | `None` | This service's identifier, checked against the token's `aud`; `"*"` accepts any audience. **Strongly recommended**; see below. Becomes required in 4.0. |
+| `AUDIENCE` | string | **yes** | — | This service's identifier, checked against the token's `aud`; `"*"` accepts any audience. See below. |
 | `ALGORITHMS` | list of strings | no | every asymmetric algorithm | Allowed signature algorithms. The default blocks the `HS*`/`none` confusion attacks; narrow it to the one your issuer uses (RFC 8725 §3.1). An empty list and `none` are rejected. |
-| `ALLOWED_ORGANIZATIONS` | list of strings | no | `None` | Organizations this service accepts. `None` accepts whatever the token names. |
+| `ALLOWED_ORGANIZATIONS` | list of strings | no | `None` | Organization ids this service accepts, matched against the token's `org` claim. `None` accepts whatever the token names. |
 | `ALLOW_STATIC_TOKENS_IN_PRODUCTION` | bool | no | `False` | Escape hatch permitting `STATIC_TOKENS` while `DEBUG` is `False`. |
 
 ### Minimal example
@@ -89,10 +89,11 @@ AUTHENTIKATE = {
             "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
         }
     ],
+    "AUDIENCE": "my-service",
 }
 ```
 
-### Audience (`AUDIENCE`) — strongly recommended
+### Audience (`AUDIENCE`) — required
 
 A token is only ever verified against the keys of the issuer named by its `iss`
 claim, so one issuer can never mint a token for another. What signature checking
@@ -106,23 +107,21 @@ AUTHENTIKATE = {
 }
 ```
 
-When set, `aud` becomes an essential claim and must contain this value (a
+`aud` is an essential claim: it must be present and must contain this value (a
 list-valued `aud` matches on membership, so a token scoped to several services is
-valid at each of them). When unset, a warning is logged at startup and `aud` is
-not checked — this is for backwards compatibility only and becomes an error in
-4.0.
+valid at each of them). A token carrying no `aud` at all is rejected — it is
+scoped to no service, so there is nothing to check it against.
 
-To accept any audience *deliberately*, set it to `"*"`:
+The setting itself is required, so a service can never end up accepting every
+audience by omission. To accept any audience *deliberately*, set it to `"*"`:
 
 ```python
 AUTHENTIKATE = {"ISSUERS": [...], "AUDIENCE": "*"}
 ```
 
-That is the same security posture as leaving it unset — and it still warns at
-startup for that reason — but it reads as a decision rather than an oversight,
-and it will satisfy the 4.0 requirement. With `"*"` a token carrying no `aud` at
-all is accepted too, so the wildcard is never *stricter* than omitting the
-setting.
+That still warns at startup, because a token minted for another service is
+accepted. `"*"` widens the check rather than dropping it: the `aud` claim stays
+required, this service just stops caring which service it names.
 
 > **`"*"` is config-side only.** It says what *this service* accepts. A token
 > whose own `aud` claim contains `"*"` gains nothing — a service configured with
@@ -133,13 +132,13 @@ setting.
 ### Organization allow-list (`ALLOWED_ORGANIZATIONS`)
 
 `Organization` and `Membership` rows are created on demand from the token's
-`active_org` claim. Unless you constrain it, every distinct value the issuer
-emits creates rows:
+`org` claim (the issuer's organization id, as a string). Unless you constrain it,
+every distinct value the issuer emits creates rows:
 
 ```python
 AUTHENTIKATE = {
     "ISSUERS": [...],
-    "ALLOWED_ORGANIZATIONS": ["acme", "beta-corp"],
+    "ALLOWED_ORGANIZATIONS": ["42", "137"],   # organization ids, as strings
 }
 ```
 
@@ -245,7 +244,8 @@ AUTHENTIKATE = {
             # "preferred_username": "static_user",
             # "scope": "openid profile email",
             # "roles": ["admin"],   # <- note the default is admin
-            # "active_org": "static_org",
+            # "org": "static_org",
+            # "aud": ["static_audience"],   # never checked for static tokens
             # "client_app": "static_app",
             # "client_release": "v1.0.0",
             # "client_device": "static_device",
@@ -323,7 +323,8 @@ async def my_view(request):
         token.client_id           # OAuth2 client that requested the token
         token.scopes              # list[str], split from the space-separated `scope`
         token.roles               # list[str]
-        token.active_org          # active organization slug (or None)
+        token.aud                 # list[str], the services the token is minted for
+        token.org                 # active organization id, as a string (or None)
 ```
 
 `authenticate_header` walks `AUTHORIZATION_HEADERS` in order, extracts the
@@ -356,14 +357,14 @@ from authentikate.expand import aexpand_token_context
 ctx = await aexpand_token_context(token)
 ctx.user          # authentikate.User    (get-or-created from sub + iss)
 ctx.client        # authentikate.Client  (OAuth2 client, with release/device)
-ctx.organization  # authentikate.Organization (from active_org)
+ctx.organization  # authentikate.Organization (from the `org` claim)
 ctx.membership    # authentikate.Membership   (user ⇄ org, mirrors roles)
 ```
 
 Individual expanders are also available:
 `aexpand_user_from_token`, `aexpand_client_from_token`,
 `aexpand_organization_from_token`, `aexpand_membership`. A blocked membership
-raises `BlockedMembership`, and a token without `active_org` raises
+raises `BlockedMembership`, and a token without an `org` claim raises
 `MissingActiveOrganization`.
 
 > **Changed in 3.0 — token roles are no longer mirrored onto Django `Group`s.**
@@ -558,13 +559,13 @@ breaking a client that switches on `code`, so **switch on `code` and treat
 | `MALFORMED_AUTHORIZATION_HEADER` | `UNAUTHENTICATED` | The header is not a Bearer token. |
 | `TOKEN_EXPIRED` | `UNAUTHENTICATED` | The token's `exp` has passed — **the signal to refresh**. |
 | `TOKEN_MALFORMED` | `UNAUTHENTICATED` | The token is not a well-formed JWT. |
-| `TOKEN_INVALID` | `UNAUTHENTICATED` | Bad signature, untrusted issuer, or wrong audience. |
+| `TOKEN_INVALID` | `UNAUTHENTICATED` | Bad signature, untrusted issuer, or a missing/wrong `aud`. |
 | `SIGNING_KEY_NOT_FOUND` | `UNAUTHENTICATED` | The `kid` matches no key of that issuer. |
 | `NOT_AUTHENTICATED` | `UNAUTHENTICATED` | The field requires auth and the request carried none. |
 | `INSUFFICIENT_SCOPE` | `PERMISSION_DENIED` | Missing a required scope; see `requiredScopes` / `requiredAnyScopeOf`. |
 | `INSUFFICIENT_ROLE` | `PERMISSION_DENIED` | Missing a required role; see `requiredRoles` / `requiredAnyRoleOf`. |
 | `INSUFFICIENT_ORGANIZATION_ROLE` | `PERMISSION_DENIED` | Missing a role *within the active organization*; see `requiredOrganizationRoles`. |
-| `MISSING_ACTIVE_ORGANIZATION` | `PERMISSION_DENIED` | The token names no `active_org`. |
+| `MISSING_ACTIVE_ORGANIZATION` | `PERMISSION_DENIED` | The token carries no `org` claim. |
 | `ORGANIZATION_NOT_ALLOWED` | `PERMISSION_DENIED` | `ALLOWED_ORGANIZATIONS` excludes the token's org. |
 | `MEMBERSHIP_BLOCKED` | `PERMISSION_DENIED` | The membership is `blocked`. |
 | `PROVENANCE_*` | `PERMISSION_DENIED` | The provenance token is malformed, invalid, mis-scoped, or issued to another actor. |

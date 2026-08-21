@@ -18,17 +18,18 @@ def build_token(**overrides: object) -> JWTToken:
         "roles": ["reader"],
         "scope": "read",
         "iat": 1000000000,
+        "aud": ["test-service"],
         "raw": "raw-token",
-        "active_org": "org-1",
+        "org": "org-1",
     }
     payload.update(overrides)
     return JWTToken.model_validate(payload)
 
 
 @pytest.mark.asyncio
-async def test_aexpand_organization_requires_active_org() -> None:
+async def test_aexpand_organization_requires_the_org_claim() -> None:
     with pytest.raises(MissingActiveOrganization, match="active organization"):
-        await aexpand_organization_from_token(build_token(active_org=None))
+        await aexpand_organization_from_token(build_token(org=None))
 
 
 @pytest.mark.asyncio

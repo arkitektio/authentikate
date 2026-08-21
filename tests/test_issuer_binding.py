@@ -50,7 +50,8 @@ def _claims(iss: str, **overrides: object) -> dict[str, object]:
         "preferred_username": "victim",
         "roles": ["admin"],
         "scope": "openid",
-        "active_org": "acme",
+        "aud": ["test-service"],
+        "org": "acme",
     }
     claims.update(overrides)
     return claims
@@ -63,6 +64,7 @@ def two_issuers() -> tuple[AuthentikateSettings, RSAKey, RSAKey]:
     key_b, pub_b = _keypair()
 
     settings = AuthentikateSettings(
+        audience="*",
         issuers=[
             {"kind": "rsa", "iss": ISS_A, "public_key": pub_a},
             {"kind": "rsa", "iss": ISS_B, "public_key": pub_b},
@@ -155,6 +157,7 @@ async def test_unconfigured_issuer_triggers_no_jwks_fetch() -> None:
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
         settings = AuthentikateSettings(
+            audience="*",
             issuers=[
                 {
                     "kind": "jwks_uri",

@@ -56,6 +56,9 @@ AUTHENTIKATE = {
             "public_key": "public_key.pem",
         }
     ],
+    # Must match the `aud` claim of the tokens the suite mints (see the
+    # `valid_claims` fixture); `aud` is a required claim since 4.0.
+    "AUDIENCE": "test-service",
     # The test suite runs with DEBUG=False, so it must opt in explicitly.
     # Never set this in a real deployment: static tokens skip signature checks.
     "ALLOW_STATIC_TOKENS_IN_PRODUCTION": True,

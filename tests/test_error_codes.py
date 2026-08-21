@@ -150,6 +150,7 @@ def _token(scope: str = "read", roles: list[str] | None = None) -> JWTToken:
             "preferred_username": "u",
             "roles": roles if roles is not None else ["reader"],
             "scope": scope,
+            "aud": ["test-service"],
             "raw": "raw",
         }
     )
@@ -227,6 +228,7 @@ async def test_expired_token_reports_token_expired_end_to_end() -> None:
 
     past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
     settings = AuthentikateSettings(
+        audience="*",
         issuers=[], static_tokens={"tok": StaticToken(sub="u", exp=past)}
     )
 
@@ -241,7 +243,7 @@ async def test_expired_token_reports_token_expired_end_to_end() -> None:
 async def test_missing_authorization_header_reports_its_own_reason() -> None:
     from authentikate.utils import authenticate_header
 
-    settings = AuthentikateSettings(issuers=[])
+    settings = AuthentikateSettings(audience="*", issuers=[])
 
     with pytest.raises(errors.NoAuthorizationHeader) as exc_info:
         await authenticate_header({"Content-Type": "application/json"}, settings)

@@ -58,6 +58,7 @@ def test_jwks_uri_integration(key_pair_str):
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
 
         settings = AuthentikateSettings(
+            audience="*",
             issuers=[
                 {
                     "kind": "jwks_uri",
@@ -94,6 +95,7 @@ def test_jwks_uri_decoding(key_pair_str):
         "preferred_username": "testuser",
         "roles": ["user"],
         "scope": "openid profile",
+        "aud": ["test-service"],
     }
 
     token = jwt.encode(header, claims, private_key_obj)
@@ -106,6 +108,7 @@ def test_jwks_uri_decoding(key_pair_str):
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
 
         settings = AuthentikateSettings(
+            audience="*",
             issuers=[
                 {
                     "kind": "jwks_uri",

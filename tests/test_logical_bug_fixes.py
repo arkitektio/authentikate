@@ -59,8 +59,9 @@ def make_token(**overrides) -> JWTToken:
         client_id="client",
         scope="read",
         roles=["special"],
+        aud=["test-service"],
         raw="raw",
-        active_org="org",
+        org="org",
     )
     defaults.update(overrides)
     return JWTToken(**defaults)
@@ -73,7 +74,7 @@ def test_changed_hash_is_stable_and_sensitive():
     assert len(token.changed_hash) == 64  # sha256 hexdigest
 
     assert token.changed_hash != make_token(roles=["other"]).changed_hash
-    assert token.changed_hash != make_token(active_org="other").changed_hash
+    assert token.changed_hash != make_token(org="other").changed_hash
 
 
 def test_jwt_timestamps_are_utc_aware():
@@ -86,6 +87,7 @@ def test_jwt_timestamps_are_utc_aware():
         client_id="client",
         scope="read",
         roles=[],
+        aud=["test-service"],
         raw="raw",
     )
     assert token.exp.tzinfo == datetime.timezone.utc
@@ -145,14 +147,14 @@ async def test_resolve_async_enforces_any_scope_and_any_role():
     )
 
 
-def test_sync_expand_user_links_organization_by_slug(db, valid_jwt, valid_settings):
+def test_sync_expand_user_links_organization_from_the_org_claim(db, valid_jwt, valid_settings):
     token = decode_token(valid_jwt, valid_settings)
 
     user = expand_user_from_token(token)
 
     assert user.active_organization is not None
-    assert user.active_organization.slug == token.active_org
-    assert Organization.objects.filter(slug=token.active_org).count() == 1
+    assert user.active_organization.slug == token.org
+    assert Organization.objects.filter(slug=token.org).count() == 1
 
 
 @pytest.mark.asyncio

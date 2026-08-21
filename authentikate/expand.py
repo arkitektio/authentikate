@@ -123,10 +123,10 @@ async def aexpand_organization_from_token(
     """
     Expand an organization from the provided JWT token.
     """
-    if not token.active_org:
+    if not token.org:
         raise MissingActiveOrganization("Token does not contain an active organization")
 
-    org, _ = await models.Organization.objects.aget_or_create(slug=token.active_org)
+    org, _ = await models.Organization.objects.aget_or_create(slug=token.org)
     return org
 
 
@@ -156,10 +156,10 @@ def expand_organization_from_token(
     """
     Expand an organization from the provided JWT token.
     """
-    if not token.active_org:
+    if not token.org:
         raise MissingActiveOrganization("Token does not contain an active organization")
 
-    org, _ = models.Organization.objects.get_or_create(slug=token.active_org)
+    org, _ = models.Organization.objects.get_or_create(slug=token.org)
     return org
 
 
@@ -209,9 +209,9 @@ async def _aexpand_user(
 
         if organization is not None:
             user.active_organization = organization
-        elif token.active_org:
+        elif token.org:
             current_org, _ = await models.Organization.objects.aget_or_create(
-                slug=token.active_org,
+                slug=token.org,
             )
             user.active_organization = current_org
 
@@ -232,9 +232,9 @@ async def _aexpand_user(
 
         if organization is not None:
             user.active_organization = organization
-        elif token.active_org:
+        elif token.org:
             current_org, _ = await models.Organization.objects.aget_or_create(
-                slug=token.active_org,
+                slug=token.org,
             )
             user.active_organization = current_org
 
@@ -303,9 +303,9 @@ def _expand_user(
 
         if organization is not None:
             user.active_organization = organization
-        elif token.active_org:
+        elif token.org:
             current_org, _ = models.Organization.objects.get_or_create(
-                slug=token.active_org
+                slug=token.org
             )
             user.active_organization = current_org
 
@@ -326,9 +326,9 @@ def _expand_user(
 
         if organization is not None:
             user.active_organization = organization
-        elif token.active_org:
+        elif token.org:
             current_org, _ = models.Organization.objects.get_or_create(
-                slug=token.active_org
+                slug=token.org
             )
             user.active_organization = current_org
 

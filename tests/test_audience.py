@@ -2,7 +2,8 @@
 
 Before the fix `_validate_claims` only required `exp`, and `AuthentikateSettings`
 had no `audience` field at all -- so a token an issuer minted for service X was
-accepted verbatim by service Y.
+accepted verbatim by service Y. Since 4.0 `AUDIENCE` is required and `aud` is an
+essential claim, with `"*"` widening the check rather than dropping it.
 """
 
 import datetime
@@ -19,7 +20,7 @@ from authentikate.errors import InvalidJwtTokenError
 ISS = "https://idp.example"
 
 
-def _settings(public_key: str, audience: str | None) -> AuthentikateSettings:
+def _settings(public_key: str, audience: str) -> AuthentikateSettings:
     return AuthentikateSettings(
         issuers=[{"kind": "rsa", "iss": ISS, "public_key": public_key}],
         audience=audience,
@@ -85,12 +86,16 @@ def test_missing_aud_is_rejected_when_audience_configured(key_pair_str) -> None:
         decode_token(token, settings)
 
 
-def test_aud_is_not_checked_when_audience_unset(key_pair_str) -> None:
-    """Backwards compatibility: existing deployments keep working (with a warning)."""
-    settings = _settings(key_pair_str.public_key, audience=None)
-    token = _token(key_pair_str.private_key, ["someone-else"])
+def test_audience_is_required_configuration() -> None:
+    """Leaving AUDIENCE unset used to mean "accept a token for any service".
 
-    assert decode_token(token, settings).aud == ["someone-else"]
+    That was indistinguishable from an oversight, so the field is required: a
+    service that really wants any audience says so with `"*"`.
+    """
+    with pytest.raises(ValidationError):
+        AuthentikateSettings(
+            issuers=[{"kind": "rsa", "iss": ISS, "public_key": "unused"}],
+        )
 
 
 # --- algorithm pinning (RFC 8725) --------------------------------------------
@@ -103,6 +108,7 @@ def test_default_algorithms_exclude_symmetric_and_none() -> None:
     anyone use it as an HMAC secret and mint valid tokens.
     """
     settings = AuthentikateSettings(
+        audience="mikro",
         issuers=[{"kind": "rsa", "iss": ISS, "public_key": "unused"}],
     )
 
@@ -114,10 +120,11 @@ def test_default_algorithms_exclude_symmetric_and_none() -> None:
 def test_algorithm_outside_the_allowlist_is_rejected(key_pair_str) -> None:
     """A token signed with an algorithm this service does not accept fails."""
     settings = AuthentikateSettings(
+        audience="mikro",
         issuers=[{"kind": "rsa", "iss": ISS, "public_key": key_pair_str.public_key}],
         algorithms=["ES256"],
     )
-    token = _token(key_pair_str.private_key, None)  # RS256
+    token = _token(key_pair_str.private_key, ["mikro"])  # RS256
 
     with pytest.raises(InvalidJwtTokenError):
         decode_token(token, settings)
@@ -127,6 +134,7 @@ def test_algorithm_outside_the_allowlist_is_rejected(key_pair_str) -> None:
 def test_unsafe_algorithm_config_is_rejected(bad: list[str]) -> None:
     with pytest.raises(ValidationError):
         AuthentikateSettings(
+            audience="mikro",
             issuers=[{"kind": "rsa", "iss": ISS, "public_key": "unused"}],
             algorithms=bad,
         )
@@ -143,16 +151,17 @@ def test_wildcard_accepts_a_token_for_another_service(key_pair_str) -> None:
     assert decode_token(token, settings).aud == ["some-other-service"]
 
 
-def test_wildcard_accepts_a_token_with_no_aud_claim(key_pair_str) -> None:
-    """`"*"` must not end up *stricter* than leaving AUDIENCE unset.
+def test_wildcard_still_requires_the_aud_claim(key_pair_str) -> None:
+    """`"*"` widens the check, it does not drop it.
 
-    A literal audience makes `aud` an essential claim; the wildcard drops the
-    constraint entirely, so a token without the claim is accepted too.
+    A token that names no audience is scoped to no service, so there is nothing
+    for even a wildcard verifier to accept it *as*.
     """
     settings = _settings(key_pair_str.public_key, audience="*")
     token = _token(key_pair_str.private_key, None)
 
-    assert decode_token(token, settings).aud is None
+    with pytest.raises(InvalidJwtTokenError):
+        decode_token(token, settings)
 
 
 def test_wildcard_is_config_side_not_token_side(key_pair_str) -> None:

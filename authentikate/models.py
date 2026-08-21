@@ -6,7 +6,12 @@ class Organization(models.Model):
     """An Organization model to represent an organization in the system"""
 
     slug = models.CharField(max_length=1000, unique=True)
-    """The unique slug of the organization (mirrors the token's active_org claim)"""
+    """The unique identifier of the organization (mirrors the token's ``org`` claim).
+
+    Named ``slug`` for historical reasons and kept that way because it is part of
+    the GraphQL schema; since 4.0 the ``org`` claim carries the issuer's
+    organization *id* as a string, so that is what lands here.
+    """
 
     def __str__(self) -> str:
         """String representation of Organization"""

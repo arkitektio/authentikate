@@ -36,6 +36,7 @@ def test_expired_static_token_is_rejected() -> None:
     """A static token's `exp` must be honoured, not merely decorative."""
     past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
     settings = AuthentikateSettings(
+        audience="*",
         issuers=[],
         static_tokens={"tok": StaticToken(sub="u", exp=past)},
     )
@@ -46,6 +47,7 @@ def test_expired_static_token_is_rejected() -> None:
 
 def test_unexpired_static_token_is_accepted() -> None:
     settings = AuthentikateSettings(
+        audience="*",
         issuers=[],
         static_tokens={"tok": StaticToken(sub="u")},
     )
@@ -62,6 +64,7 @@ def test_static_tokens_are_refused_when_debug_is_off(settings: Any) -> None:
     settings.DEBUG = False
     settings.AUTHENTIKATE = {
         "ISSUERS": [],
+        "AUDIENCE": "*",
         "STATIC_TOKENS": {"tok": {"sub": "u"}},
     }
     _reset_settings_cache()
@@ -77,6 +80,7 @@ def test_static_tokens_allowed_with_explicit_escape_hatch(settings: Any) -> None
     settings.DEBUG = False
     settings.AUTHENTIKATE = {
         "ISSUERS": [],
+        "AUDIENCE": "*",
         "STATIC_TOKENS": {"tok": {"sub": "u"}},
         "ALLOW_STATIC_TOKENS_IN_PRODUCTION": True,
     }
@@ -93,8 +97,9 @@ def test_static_tokens_allowed_with_explicit_escape_hatch(settings: Any) -> None
 
 def _static_settings(**kwargs: Any) -> AuthentikateSettings:
     return AuthentikateSettings(
+        audience="*",
         issuers=[],
-        static_tokens={"tok": StaticToken(sub="u", active_org="acme")},
+        static_tokens={"tok": StaticToken(sub="u", org="acme")},
         **kwargs,
     )
 
@@ -109,12 +114,12 @@ def test_organization_outside_the_allowlist_is_rejected() -> None:
 def test_organization_inside_the_allowlist_is_accepted() -> None:
     settings = _static_settings(allowed_organizations=["acme", "other"])
 
-    assert asyncio.run(authenticate_token("tok", settings)).active_org == "acme"
+    assert asyncio.run(authenticate_token("tok", settings)).org == "acme"
 
 
 def test_any_organization_is_accepted_when_allowlist_unset() -> None:
     """Default behaviour is unchanged, so existing deployments keep working."""
-    assert asyncio.run(authenticate_token("tok", _static_settings())).active_org == "acme"
+    assert asyncio.run(authenticate_token("tok", _static_settings())).org == "acme"
 
 
 # --- JWKS refresh throttling -------------------------------------------------
@@ -142,6 +147,7 @@ def test_unknown_kids_do_not_drive_unbounded_jwks_fetches(key_pair_str) -> None:
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
         settings = AuthentikateSettings(
+            audience="*",
             issuers=[
                 {
                     "kind": "jwks_uri",
@@ -180,8 +186,9 @@ def _token(sub: str = "1", org: str = "org-1") -> JWTToken:
             "preferred_username": "user-1",
             "roles": ["reader"],
             "scope": "read",
+            "aud": ["test-service"],
             "raw": "raw-token",
-            "active_org": org,
+            "org": org,
         }
     )
 
@@ -326,8 +333,9 @@ def _username_token(iss: str, sub: str) -> JWTToken:
             "preferred_username": "user-1",
             "roles": [],
             "scope": "read",
+            "aud": ["test-service"],
             "raw": "raw-token",
-            "active_org": "org-1",
+            "org": "org-1",
         }
     )
 
@@ -399,10 +407,9 @@ def test_provisioned_user_passes_full_clean(db) -> None:
 
 
 def test_wildcard_audience_still_warns(settings: Any, caplog: Any) -> None:
-    """`"*"` is deliberate, but the posture matches leaving AUDIENCE unset.
+    """`"*"` is deliberate, but it still accepts another service's token.
 
-    An operator reading the logs should be able to see that this service accepts
-    a token minted for any other service.
+    An operator reading the logs should be able to see that.
     """
     settings.DEBUG = True
     settings.AUTHENTIKATE = {"ISSUERS": [], "AUDIENCE": "*"}
@@ -412,7 +419,20 @@ def test_wildcard_audience_still_warns(settings: Any, caplog: Any) -> None:
         parsed = prepare_settings()
 
     assert parsed.audience == "*"
-    assert "'*'" in caplog.text and "not checked" in caplog.text
+    assert "'*'" in caplog.text and "not matched" in caplog.text
+
+
+def test_missing_audience_is_refused_at_startup(settings: Any) -> None:
+    """The most likely 4.0 upgrade failure must name what is missing."""
+    settings.DEBUG = True
+    settings.AUTHENTIKATE = {"ISSUERS": []}
+    _reset_settings_cache()
+
+    try:
+        with pytest.raises(ImproperlyConfigured, match="audience"):
+            prepare_settings()
+    finally:
+        _reset_settings_cache()
 
 
 def test_configured_audience_does_not_warn(settings: Any, caplog: Any) -> None:

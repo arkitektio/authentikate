@@ -21,8 +21,8 @@ def _check_organization_allowed(
 ) -> None:
     """Reject a token naming an organization this service does not accept.
 
-    Organizations are auto-created from the ``active_org`` claim further down
-    the expansion path, so without an allow-list every distinct value the issuer
+    Organizations are auto-created from the ``org`` claim further down the
+    expansion path, so without an allow-list every distinct value the issuer
     emits creates rows. Checked here, at the single authentication funnel, so it
     applies to static and signed tokens alike and runs before any database
     write. Unset (the default) keeps the previous accept-anything behaviour.
@@ -31,9 +31,9 @@ def _check_organization_allowed(
     if allowed is None:
         return
 
-    if decoded.active_org not in allowed:
+    if decoded.org not in allowed:
         raise OrganizationNotAllowed(
-            f"Organization {decoded.active_org!r} is not accepted by this service"
+            f"Organization {decoded.org!r} is not accepted by this service"
         )
 
 

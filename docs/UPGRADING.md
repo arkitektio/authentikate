@@ -1,3 +1,87 @@
+# Upgrading to authentikate 4.0
+
+Two breaking changes, both in the shape of the token this service accepts. Your
+**issuer must be updated first** — every one of these tokens is minted by the
+IdP, so authentikate 4.0 rejects tokens an unchanged issuer still emits.
+
+---
+
+## 1. The `active_org` claim is now `org`, and carries an id
+
+The claim naming the organization a token acts in is renamed, and its value
+changes meaning:
+
+| | 3.x | 4.0 |
+|---|---|---|
+| claim | `active_org` | `org` |
+| value | the organization *slug* (`"acme"`) | the organization *id* as a string (`str(organization_id)`, e.g. `"42"`) |
+
+An id is stable across renames; a slug is not. `JWTToken.active_org` is likewise
+`JWTToken.org`. The old claim is **not** accepted as a fallback — with
+`extra="ignore"` on the model, a token still sending `active_org` decodes to
+`org = None` and is rejected with `MissingActiveOrganization` on any path that
+expands the organization.
+
+**Re-key `ALLOWED_ORGANIZATIONS`.** Its values are matched against the new claim,
+so a list of slugs now matches nothing and rejects every request:
+
+```python
+AUTHENTIKATE = {
+    "ISSUERS": [...],
+    "ALLOWED_ORGANIZATIONS": ["42", "137"],   # ids, not ["acme", "beta-corp"]
+}
+```
+
+**Existing `Organization` rows do not migrate themselves.** The claim is still
+stored in `Organization.slug` (the column keeps its name because it is part of
+the GraphQL schema), so on first request after the upgrade a *new* row keyed
+`"42"` is created alongside the old `"acme"` row, with a new `Membership`, and
+`User.active_organization` is re-pointed at it. That re-pointing happens for
+every user because the `org` claim feeds `changed_hash`, which is what triggers
+the sync.
+
+If you have data hanging off `Organization`, write a data migration that rewrites
+`slug` from the old value to the new id before deploying — authentikate cannot do
+it for you, since only your issuer knows which id belongs to which slug.
+
+## 2. `AUDIENCE` is required, and so is the token's `aud` claim
+
+`AUDIENCE` was optional in 3.x with a startup warning. It is now required:
+
+```python
+AUTHENTIKATE = {
+    "ISSUERS": [...],
+    "AUDIENCE": "my-service",   # this service's identifier
+}
+```
+
+Omitting it raises `ImproperlyConfigured` at startup rather than silently
+accepting a token your IdP minted for any other service.
+
+`aud` is correspondingly an essential claim on every auth token, and required on
+`JWTToken`. A token without one is rejected with `InvalidJwtTokenError`
+(`TOKEN_INVALID`) — it is scoped to no service, so there is nothing to check it
+against.
+
+**`"*"` still works, but it no longer waives the claim.** In 3.x the wildcard
+dropped the audience check entirely, which meant a token with no `aud` was
+accepted; that behaviour existed only so `"*"` could never be *stricter* than
+leaving the setting unset. With the setting required, there is no "unset" to be
+lenient against: `"*"` now says *any* audience, not *no* audience. A token still
+has to carry an `aud` — this service just stops caring which service it names,
+and still warns at startup that it does.
+
+`"*"` remains config-side only: a token whose own `aud` contains `"*"` is still
+rejected by a service configured with a literal audience.
+
+Static tokens are unaffected. They bypass signature verification by design, and
+their audience is not checked either — an operator pasting a token into their own
+settings is not the cross-service replay that audience checking prevents.
+`StaticToken.aud` defaults to `["static_audience"]` purely to satisfy the
+required claim.
+
+---
+
 # Upgrading to authentikate 3.0
 
 This release fixes two authentication bypasses and a configuration that broke all
@@ -92,7 +176,12 @@ required* below.
 
 ## Action required
 
-### 1. Set `AUDIENCE` (recommended now, required in 4.0)
+### 1. Set `AUDIENCE` (recommended in 3.0, **required** since 4.0)
+
+> Going straight to 4.0? Read this section for context, then follow the 4.0
+> section above — `AUDIENCE` is required there and `"*"` no longer waives the
+> `aud` claim.
+
 
 ```python
 AUTHENTIKATE = {
@@ -172,6 +261,9 @@ point of a token whose job is to attest which service work was scoped to.
 
 ### 6. `expand_user_from_token` / `aexpand_user_from_token` now require `active_org`
 
+> Renamed to `org` in 4.0 — see the 4.0 section above.
+
+
 Both expansion paths are now identical, and both resolve the organization and
 membership the way `aexpand_token_context` always did. A token **without** an `active_org` claim now raises
 `MissingActiveOrganization` where it previously returned a user with
@@ -210,6 +302,9 @@ AUTHENTIKATE = {
     "ALLOWED_ORGANIZATIONS": ["acme", "beta-corp"],
 }
 ```
+
+> In 4.0 the claim is `org` and carries organization ids, so these values become
+> ids too — see the 4.0 section above.
 
 ---
 

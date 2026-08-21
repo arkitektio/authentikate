@@ -1,6 +1,9 @@
 from authentikate.base_models import JWTToken
 import datetime
 
+import pytest
+from pydantic import ValidationError
+
 
 def test_jwt_token():
 
@@ -39,6 +42,7 @@ def test_jwt_aud_list():
 def test_jwt_token_optional():
 
     JWTToken(
+        aud="string",
         sub=1,
         iss="lok",
         exp=datetime.datetime.now(),
@@ -52,3 +56,21 @@ def test_jwt_token_optional():
         client_app="karlos",
         client_release="v1",
     )
+
+
+def test_jwt_aud_is_required():
+    """A token that names no audience is scoped to no service."""
+
+    with pytest.raises(ValidationError):
+        JWTToken(
+            sub=1,
+            iss="lok",
+            exp=datetime.datetime.now(),
+            roles=["admin"],
+            scope="read",
+            iat=1,
+            jti="string",
+            raw="string",
+            preferred_username="string",
+            client_id="string",
+        )

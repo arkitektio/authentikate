@@ -41,7 +41,7 @@ def _build_mock_session(*responses_or_exceptions):
 
 @pytest.mark.asyncio
 async def test_no_authorization_header():
-    settings = AuthentikateSettings(issuers=[])
+    settings = AuthentikateSettings(audience="*", issuers=[])
     headers = {"Content-Type": "application/json"}
 
     with pytest.raises(NoAuthorizationHeader):
@@ -50,7 +50,7 @@ async def test_no_authorization_header():
 
 @pytest.mark.asyncio
 async def test_malformed_authorization_header():
-    settings = AuthentikateSettings(issuers=[])
+    settings = AuthentikateSettings(audience="*", issuers=[])
     headers = {"Authorization": "Basic 123456"}
 
     with pytest.raises(MalformedAuthorizationHeader):
@@ -59,7 +59,7 @@ async def test_malformed_authorization_header():
 
 @pytest.mark.asyncio
 async def test_authenticate_header_or_none_returns_none_for_auth_failure():
-    settings = AuthentikateSettings(issuers=[])
+    settings = AuthentikateSettings(audience="*", issuers=[])
     headers = {"Content-Type": "application/json"}
 
     assert await authenticate_header_or_none(headers, settings) is None
@@ -106,7 +106,7 @@ def test_missing_kid_in_header(key_pair_str):
     claims = {"sub": "user"}
     token = jwt.encode(header, claims, rsa_key)
 
-    settings = AuthentikateSettings(issuers=[])
+    settings = AuthentikateSettings(audience="*", issuers=[])
 
     # decode_token catches exceptions and re-raises them specific authentikate errors
     # But here the error happens inside load_key which is called by jwt.decode
@@ -138,6 +138,7 @@ def test_key_not_found(key_pair_str):
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
         settings = AuthentikateSettings(
+            audience="*",
             issuers=[
                 JWKSUriIssuer(
                     kind="jwks_uri",

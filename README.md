@@ -79,23 +79,24 @@ AUTHENTIKATE = {
             "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
         }
     ],
-    # This service's identifier, checked against the token's `aud`. Optional
-    # today (a warning is logged when unset) and required from 4.0 — without it
-    # a token your issuer minted for any other service is accepted here.
+    # This service's identifier, checked against the token's `aud`. Required —
+    # without it a token your issuer minted for any other service would be
+    # accepted here. Use "*" to accept any audience deliberately.
     "AUDIENCE": "my-service",
 }
 
 ```
 
-`ISSUERS` is the only required key. Each entry is selected by its `kind`
+`ISSUERS` and `AUDIENCE` are the required keys. Each entry is selected by its `kind`
 (`jwks_uri`, `jwks_dict`, `rsa`, or `rsa_file`). For the full settings shape —
 issuers, static tokens, provenance, headers, the public API and error model —
 see [`docs/USAGE.md`](docs/USAGE.md).
 
-> **Upgrading from 2.x?** 3.0 fixes two authentication bypasses and contains
-> breaking changes (most notably: token roles are no longer mirrored onto Django
-> `Group`s). See
-> [`docs/UPGRADING.md`](docs/UPGRADING.md).
+> **Upgrading?** 4.0 renames the `active_org` claim to `org` (which now carries
+> the organization *id*, not a slug) and makes `AUDIENCE` and the token's `aud`
+> claim required. 3.0 fixed two authentication bypasses and contains breaking
+> changes of its own (most notably: token roles are no longer mirrored onto
+> Django `Group`s). See [`docs/UPGRADING.md`](docs/UPGRADING.md).
 
 
 ### Standard Usage

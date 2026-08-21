@@ -34,20 +34,14 @@ def _check_deployment_safety(parsed: AuthentikateSettings) -> None:
             "verification."
         )
 
-    if parsed.audience is None:
+    if parsed.audience == ANY_AUDIENCE:
+        # Deliberate -- AUDIENCE is required, so nobody lands here by omission --
+        # but a token minted for another service is still accepted, so an
+        # operator reading the logs should be able to see it.
         logger.warning(
-            "AUTHENTIKATE.AUDIENCE is not set, so the 'aud' claim is not "
-            "checked: a token this issuer minted for any other service is "
-            "accepted here. Set it to this service's identifier, or to '*' to "
-            "accept any audience deliberately. This will become required in "
-            "authentikate 4.0."
-        )
-    elif parsed.audience == ANY_AUDIENCE:
-        # Deliberate, but the posture is the same as leaving it unset, so an
-        # operator reading the logs should still be able to see it.
-        logger.warning(
-            "AUTHENTIKATE.AUDIENCE is '*', so the 'aud' claim is not checked: "
-            "a token this issuer minted for any other service is accepted here."
+            "AUTHENTIKATE.AUDIENCE is '*', so the 'aud' claim is required but "
+            "not matched: a token this issuer minted for any other service is "
+            "accepted here."
         )
 
 
@@ -78,8 +72,18 @@ def prepare_settings() -> AuthentikateSettings:
         parsed = AuthentikateSettings(**group)
 
     except ValidationError as e:
+        # Name the offending keys: this is raised at startup, to the operator
+        # who wrote the settings, so "check your settings" alone left the most
+        # common upgrade failure (a missing AUDIENCE) as a mystery crash. The
+        # values are operator-supplied configuration, not attacker-supplied
+        # request data, so there is nothing here to withhold.
+        problems = "; ".join(
+            f"{'.'.join(str(part) for part in error['loc']) or 'AUTHENTIKATE'}: "
+            f"{error['msg']}"
+            for error in e.errors()
+        )
         raise ImproperlyConfigured(
-            "Invalid settings for AUTHENTIKATE. Please check your settings."
+            f"Invalid settings for AUTHENTIKATE -- {problems}"
         ) from e
 
     _check_deployment_safety(parsed)

@@ -71,6 +71,7 @@ def test_jwks_uri_refresh_on_missing_kid(key_pair_str):
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
 
         settings = AuthentikateSettings(
+            audience="*",
             issuers=[
                 {
                     "kind": "jwks_uri",
@@ -94,6 +95,7 @@ def test_jwks_uri_refresh_on_missing_kid(key_pair_str):
             "preferred_username": "user",
             "roles": ["user"],
             "scope": "scope",
+            "aud": ["test-service"],
         }
 
         header1 = {"kid": "1", "alg": "RS256"}

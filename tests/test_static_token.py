@@ -23,6 +23,7 @@ def test_static_token(db, key_pair_str):
     headers = {"Authorization": f"Bearer {fake_token}"}
 
     settings = AuthentikateSettings(
+        audience="*",
         issuers=[],
         static_tokens={fake_token: StaticToken(sub=static_sub, iss=static_iss)},
     )
@@ -30,4 +31,4 @@ def test_static_token(db, key_pair_str):
     x = asyncio.run(authenticate_header(headers, settings))
     assert x.sub == static_sub, "User ID should match the static token"
     assert x.iss == static_iss, "Issuer should match the static token"
-    assert x.active_org == "static_org", "Active organization should be 'static_org'"
+    assert x.org == "static_org", "Active organization should be 'static_org'"

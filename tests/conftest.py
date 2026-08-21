@@ -77,7 +77,8 @@ def valid_claims():
         "client_id": "XXXX",
         "scope": "openid profile email read",
         "roles": ["XXXX"],
-        "active_org": "kkk",
+        "aud": ["test-service"],
+        "org": "kkk",
         "client_app": "my_app",
         "client_release": "v1.0.0",
         "client_device": "device_12345",
@@ -103,6 +104,7 @@ def valid_settings(key_pair_str: KeyPairStr):
     key = RSAKey.import_key(key_pair_str.public_key)
 
     return AuthentikateSettings(
+        audience="test-service",
         issuers=[
             JWKIssuer(
                 iss="XXXX",
@@ -112,7 +114,7 @@ def valid_settings(key_pair_str: KeyPairStr):
                     ]
                 },
             )
-        ]
+        ],
     )
 
 
@@ -120,12 +122,13 @@ def valid_settings(key_pair_str: KeyPairStr):
 def valid_rsa_key(key_pair_str: KeyPairStr):
 
     return AuthentikateSettings(
+        audience="test-service",
         issuers=[
             RSAKeyIssuer(
                 iss="XXXX",
                 key=key_pair_str.public_key,
             )
-        ]
+        ],
     )
 
 

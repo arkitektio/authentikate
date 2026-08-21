@@ -77,6 +77,7 @@ def token() -> JWTToken:
             "roles": ["reader"],
             "scope": "read",
             "iat": 1000000000,
+            "aud": ["test-service"],
             "raw": "raw-token",
         }
     )
@@ -91,6 +92,7 @@ def ed_key() -> OKPKey:
 def settings(ed_key: OKPKey) -> AuthentikateSettings:
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     return AuthentikateSettings(
+        audience="*",
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
         provenance={
             "issuers": [
@@ -105,6 +107,7 @@ def settings(ed_key: OKPKey) -> AuthentikateSettings:
 def bare_settings(ed_key: OKPKey) -> AuthentikateSettings:
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     return AuthentikateSettings(
+        audience="*",
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
     )
 

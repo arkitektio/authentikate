@@ -17,6 +17,11 @@ def _validate_claims(
     ``exp`` is always essential. ``issuer`` confirms the verified token really
     carries the ``iss`` its key was selected by, and ``audience`` confirms the
     token was minted for this service; both are skipped when not supplied.
+
+    Supplying ``audience`` also makes ``aud`` an essential claim, including for
+    :data:`~authentikate.base_models.ANY_AUDIENCE`. Callers that enforce audience
+    themselves -- the provenance path, which reports its own error -- pass None
+    and are unaffected.
     """
     # The registry pins "now" at construction time, so it must be created
     # per validation rather than once at module level.
@@ -25,15 +30,20 @@ def _validate_claims(
     if issuer is not None:
         claims_options["iss"] = {"essential": True, "value": issuer}
 
-    if audience is not None and audience != base_models.ANY_AUDIENCE:
-        # joserfc treats a scalar "value" for aud as membership in a
-        # list-valued claim, so this handles both aud shapes.
-        #
-        # ANY_AUDIENCE drops the constraint entirely rather than widening it,
-        # which also means a token with no `aud` at all is accepted: "*" must
-        # never end up *stricter* than leaving the setting unset, and keeping
-        # `aud` essential here would do exactly that.
-        claims_options["aud"] = {"essential": True, "value": audience}
+    if audience is not None:
+        # `aud` is essential whenever this verifier checks audience at all: a
+        # token naming no audience is scoped to no service, so there is nothing
+        # to check it against. ANY_AUDIENCE widens the check rather than
+        # dropping it -- the claim stays required, this service just stops
+        # caring which service it names.
+        aud_option: dict[str, Any] = {"essential": True}
+
+        if audience != base_models.ANY_AUDIENCE:
+            # joserfc treats a scalar "value" for aud as membership in a
+            # list-valued claim, so this handles both aud shapes.
+            aud_option["value"] = audience
+
+        claims_options["aud"] = aud_option
 
     registry = jwt.JWTClaimsRegistry(**claims_options)
     try:

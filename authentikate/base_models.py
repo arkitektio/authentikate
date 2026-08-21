@@ -28,11 +28,13 @@ ANY_AUDIENCE = "*"
 """Configured ``audience`` value meaning "accept a token for any audience".
 
 A property of *this service*, not of a token: it says this verifier does not care
-which service a token was minted for. A token whose own ``aud`` claim contains
-``"*"`` gains nothing by it -- a service configured with a literal audience still
-rejects that token. Making the wildcard token-side instead would let an issuer
-mint one credential valid at every service, which is exactly the cross-service
-replay that audience checking exists to prevent.
+which service a token was minted for. The token must still *carry* an ``aud`` --
+it is a required claim -- so ``"*"`` widens the check rather than removing it. A
+token whose own ``aud`` claim contains ``"*"`` gains nothing by it: a service
+configured with a literal audience still rejects that token. Making the wildcard
+token-side instead would let an issuer mint one credential valid at every
+service, which is exactly the cross-service replay that audience checking exists
+to prevent.
 """
 
 
@@ -73,8 +75,12 @@ class JWTToken(BaseModel):
     exp: datetime.datetime
     """The expiration time of the token"""
 
-    active_org: str | None = None
-    """The active organization of the user, if any"""
+    org: str | None = None
+    """The id of the organization the user is acting in, as a string.
+
+    An opaque identifier minted by the issuer (``str(organization_id)``), not a
+    human-readable slug: it is stable across renames, which a slug is not.
+    """
 
     client_id: str
     """The client_id of the app that requested the token"""
@@ -88,8 +94,13 @@ class JWTToken(BaseModel):
     iat: datetime.datetime
     """The issued at time of the token"""
 
-    aud: list[str] | None = None
-    """The audience of the token"""
+    aud: list[str]
+    """The audience of the token: the services it was minted for.
+
+    Required. A token that names no audience is scoped to no service, so it is
+    rejected before it reaches this model -- see
+    :func:`authentikate.decode._validate_claims`.
+    """
 
     jti: str | None = None
     """The unique identifier for the token"""
@@ -141,7 +152,7 @@ class JWTToken(BaseModel):
         # named "a|b" produce the same fingerprint as the roles ["a", "b"],
         # which could suppress the update that propagates a role change.
         fingerprint = json.dumps(
-            [self.sub, self.preferred_username, sorted(self.roles), self.active_org],
+            [self.sub, self.preferred_username, sorted(self.roles), self.org],
             separators=(",", ":"),
         )
         return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
@@ -208,8 +219,15 @@ class StaticToken(JWTToken):
     """The client release version"""
     client_device: str = "static_device"
     """The client device identifier"""
-    active_org: str = "static_org"
-    """The active organization of the user"""
+    org: str = "static_org"
+    """The id of the organization the user is acting in"""
+    aud: list[str] = Field(default_factory=lambda: ["static_audience"])
+    """The audience of the token.
+
+    Never checked: a static token is pasted into this service's own settings by
+    the operator, so there is no cross-service replay for an audience check to
+    prevent. The default only satisfies the required claim.
+    """
     preferred_username: str = "static_user"
     """The username of the user"""
     scope: str = "openid profile email"
@@ -737,20 +755,16 @@ class AuthentikateSettings(BaseModel):
         validation_alias=AliasChoices("provenance", "PROVENANCE"),
     )
     """Configuration for verifying inbound provenance tokens (None disables it)."""
-    audience: str | None = Field(
-        default=None, validation_alias=AliasChoices("audience", "AUDIENCE")
-    )
+    audience: str = Field(validation_alias=AliasChoices("audience", "AUDIENCE"))
     """This service's identifier; checked against the token's ``aud`` claim.
 
-    Optional for now so existing deployments keep working, but strongly
-    recommended: without it, a token the IdP minted for *any* service is accepted
-    by this one. ``prepare_settings`` warns when it is unset, and it becomes
-    required in 4.0.
+    Required, so the choice is always deliberate: left optional, an unset value
+    meant a token the IdP minted for *any* service was accepted by this one, and
+    that is indistinguishable from an oversight.
 
-    Set it to :data:`ANY_AUDIENCE` (``"*"``) to accept any audience deliberately.
-    That is the same security posture as leaving it unset, but it reads as a
-    decision rather than an oversight, and it will still satisfy the 4.0
-    requirement.
+    Set it to :data:`ANY_AUDIENCE` (``"*"``) to accept a token minted for any
+    service. The claim is still required -- ``"*"`` only stops this verifier
+    caring *which* service the token names.
     """
     algorithms: list[str] = Field(
         default_factory=lambda: list(ASYMMETRIC_ALGORITHMS),
@@ -770,8 +784,10 @@ class AuthentikateSettings(BaseModel):
     )
     """Organizations this service accepts, or None to accept whatever the token names.
 
-    Without it, every distinct ``active_org`` claim auto-creates an Organization
-    and a Membership, making token claims an unbounded write primitive.
+    Values are matched against the token's ``org`` claim, which carries the
+    issuer's organization *id* as a string -- not a slug. Without the list, every
+    distinct ``org`` claim auto-creates an Organization and a Membership, making
+    token claims an unbounded write primitive.
     """
     allow_static_tokens_in_production: bool = Field(
         default=False,
