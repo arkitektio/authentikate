@@ -30,15 +30,33 @@ jobs:
       - name: Run tests
         run: uv run pytest tests
 
+      # semantic-release runs `build_command` only when the commits since the
+      # last tag actually warrant a version. On a non-releasing commit (ci:,
+      # chore:, docs:) it prints "No release will be made" and builds nothing,
+      # so a non-empty dist/ is exactly the signal that a release was cut.
       - name: Run semantic-release
+        id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run semantic-release version 
+        run: |
+          uv run semantic-release version
+          if [ -n "$(ls -A dist 2>/dev/null)" ]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "No new version was cut; skipping the publish steps."
+          fi
 
+      # Both publish steps are guarded: without this they run unconditionally,
+      # so a non-releasing commit failed the workflow -- `semantic-release
+      # publish` re-attaching assets to an already-published tag, and
+      # `uv publish` with nothing in dist/ to upload.
       - name: Publish to Releases
+        if: steps.release.outputs.released == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run semantic-release publish 
+        run: uv run semantic-release publish
 
       - name: Publish to Pypi
+        if: steps.release.outputs.released == 'true'
         run: uv publish

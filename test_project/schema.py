@@ -6,7 +6,6 @@ from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension
 from authentikate.strawberry.types import App, Device, User, Client, Organization
 from authentikate.strawberry.directives import (
-    Auth,
     AuthExtension,
     all_directives,
     AuthSubscribeExtension,
@@ -64,14 +63,17 @@ class Mutation:
 
     @kante.django_mutation(extensions=[AuthExtension(scopes="write")])
     def require_write(self, info: Info) -> str:
+        """A mutation gated on the write scope."""
         return "User"
 
     @kante.django_mutation(extensions=[AuthExtension(scopes="write")])
     async def async_require_write(self, info: Info) -> str:
+        """A mutation gated on the write scope, resolved asynchronously."""
         return "User"
 
     @kante.django_mutation(extensions=[AuthExtension(scopes="read")])
     def require_read(self, info: Info) -> str:
+        """A mutation gated on the read scope."""
         return "User"
 
 

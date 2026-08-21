@@ -23,8 +23,11 @@ jobs:
       - name: Install the project
         run: uv sync --all-extras --dev
 
+      # `uv run`, not `uvx`: uvx resolves the latest ruff at run time, so a new
+      # ruff release could turn this red without a commit. The dev-dependency
+      # pin in pyproject.toml is the single version, shared with contributors.
       - name: Check Ruff
-        run: uvx ruff check .
+        run: uv run ruff check .
 
       - name: Check basedpyright
         run: uv run basedpyright
