@@ -272,6 +272,52 @@ requested. The path must exist at startup (validated as a `FilePath`).
 }
 ```
 
+### Revocation checking (any kind)
+
+A JWT is verified offline, so once issued it is good until `exp` whatever the
+issuer decides in the meantime. lok publishes the `jti`s of the access tokens it
+has revoked but which have not yet expired; point `revocation_uri` at that list
+and a verified token is refused while its `jti` is on it. The setting lives on
+the issuer -- any kind, since it is independent of how the keys are obtained --
+and is off unless set.
+
+```python
+{
+    "kind": "jwks_uri",
+    "iss": "https://lok.my-org.com",
+    "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
+    "revocation_uri": "https://lok.my-org.com/o/revoked/",
+    "revocation_refresh_interval": 60.0,   # optional, seconds
+    "revocation_request_timeout": 5.0,     # optional, seconds
+}
+```
+
+The cost model is one number. The list is fetched at most once per
+`revocation_refresh_interval` per issuer, and every check in between is answered
+from the cached copy, so the outbound request rate is set by configuration, not
+by traffic: a thousand tokens presented within one interval cost one fetch. The
+same interval is the longest a revocation can go unnoticed, so pick it against
+that trade-off; the default is a minute.
+
+The endpoint returns the revoked `jti`s as JSON, either
+`{"revoked": ["<jti>", ...]}` or a bare list. It only needs to list tokens that
+are both revoked and unexpired, so the document stays small.
+
+Two consequences of enabling it:
+
+- **Every token must carry a `jti`.** A token without one cannot be matched
+  against the list, so it is refused as `TOKEN_MALFORMED` rather than silently
+  exempted from revocation. lok's access tokens always carry one (RFC 9068).
+- **It fails open, with a stale copy preferred over none.** When a refresh
+  fails the previous list keeps answering, and until a first load succeeds no
+  token is treated as revoked; both are logged as warnings and the fetch is not
+  retried before the next interval. Revocation is defence in depth on top of the
+  signature and expiry checks, and failing closed here would let an unreachable
+  issuer log every user out of every service at once.
+
+A revoked token is rejected with `TokenRevokedError` —
+`UNAUTHENTICATED`/`TOKEN_REVOKED`. Static tokens are never checked.
+
 ---
 
 ## 4. Static tokens (`STATIC_TOKENS`)
@@ -570,7 +616,7 @@ All errors derive from one of two bases (`authentikate.errors`):
 - **`AuthentikatePermissionDenied`** (subclass of Django's `PermissionDenied`) —
   authentication/authorization failures. The `*_or_none` helpers catch these.
   Includes `AuthentikateTokenExpired`, `MalformedJwtTokenError`,
-  `InvalidJwtTokenError`, `NoAuthorizationHeader`,
+  `InvalidJwtTokenError`, `TokenRevokedError`, `NoAuthorizationHeader`,
   `MalformedAuthorizationHeader`, `MissingActiveOrganization`,
   `BlockedMembership`, and the provenance errors (`InvalidProvenanceTokenError`,
   `MalformedProvenanceTokenError`, `ProvenanceAudienceError`,
@@ -613,6 +659,7 @@ breaking a client that switches on `code`, so **switch on `code` and treat
 | `TOKEN_EXPIRED` | `UNAUTHENTICATED` | The token's `exp` has passed — **the signal to refresh**. |
 | `TOKEN_MALFORMED` | `UNAUTHENTICATED` | The token is not a well-formed JWT. |
 | `TOKEN_INVALID` | `UNAUTHENTICATED` | Bad signature, untrusted issuer, or a missing/wrong `aud`. |
+| `TOKEN_REVOKED` | `UNAUTHENTICATED` | The issuer's revocation list names the token's `jti`; see `revocation_uri`. |
 | `SIGNING_KEY_NOT_FOUND` | `UNAUTHENTICATED` | The `kid` matches no key of that issuer. |
 | `NOT_AUTHENTICATED` | `UNAUTHENTICATED` | The field requires auth and the request carried none. |
 | `INSUFFICIENT_SCOPE` | `PERMISSION_DENIED` | Missing a required scope; see `requiredScopes` / `requiredAnyScopeOf`. |

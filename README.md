@@ -77,6 +77,9 @@ AUTHENTIKATE = {
             "kind": "jwks_uri",
             "iss": "https://lok.my-org.com",
             "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
+            # Optional: refuse tokens lok has revoked before they expire. The
+            # list is fetched at most once a minute (configurable), not per request.
+            "revocation_uri": "https://lok.my-org.com/o/revoked/",
         }
     ],
     # This service's identifier, checked against the token's `aud`. Required —

@@ -61,6 +61,7 @@ if TYPE_CHECKING:
         MissingActiveOrganization,
         NoAuthorizationHeader,
         OrganizationNotAllowed,
+        TokenRevokedError,
     )
     from authentikate.expand import (
         ExpandedTokenContext,
@@ -121,6 +122,7 @@ _EXPORTS: dict[str, str] = {
     "OrganizationNotAllowed": "authentikate.errors",
     "BlockedMembership": "authentikate.errors",
     "JwksError": "authentikate.errors",
+    "TokenRevokedError": "authentikate.errors",
 }
 
 __all__ = [
@@ -140,6 +142,7 @@ __all__ = [
     "NoAuthorizationHeader",
     "OrganizationNotAllowed",
     "StaticToken",
+    "TokenRevokedError",
     "adecode_token",
     "aexpand_token_context",
     "authenticate_header",

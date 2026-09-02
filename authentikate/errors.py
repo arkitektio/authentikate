@@ -84,6 +84,13 @@ class InvalidJwtTokenError(JwtTokenError):
     client_message = "The access token could not be verified."
 
 
+class TokenRevokedError(JwtTokenError):
+    """Raised when a verified token appears on its issuer's revocation list."""
+
+    reason = "TOKEN_REVOKED"
+    client_message = "The access token has been revoked."
+
+
 class AuthentikateUserNotFound(AuthentikatePermissionDenied):
     """Raised when a user is not found"""
 

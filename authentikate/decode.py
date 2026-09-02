@@ -54,6 +54,28 @@ def _validate_claims(
         raise errors.InvalidJwtTokenError("Token claims are invalid") from e
 
 
+def _revocation_subject(
+    decoded: jwt.Token, issuer: base_models.IssuerUnion
+) -> str | None:
+    """The ``jti`` to check against ``issuer``'s revocation list, or None to skip.
+
+    Runs on a *verified* token only, so nothing here can be steered by a forged
+    payload. When the issuer publishes a revocation list, a token without a
+    ``jti`` cannot be matched against it and is refused: revocation checking
+    was configured deliberately, and a token that can never be revoked is not
+    what the operator asked for. Static tokens never reach this path.
+    """
+
+    if issuer.revocation_uri is None:
+        return None
+
+    jti = decoded.claims.get("jti")
+    if not jti or not isinstance(jti, str):
+        raise errors.MalformedJwtTokenError("Missing jti claim in token")
+
+    return jti
+
+
 def _decode_segment(token: str, index: int, what: str) -> dict[str, Any]:
     """Base64url-decode one JWT segment into a dict, without verifying anything."""
 
@@ -134,6 +156,8 @@ def decode_token(
         When the token is expired
     MalformedJwtTokenError
         When the token payload does not form a valid JWTToken
+    TokenRevokedError
+        When the issuer publishes a revocation list and the token is on it
     """
     iss, kid = _select_key_hints(token)
 
@@ -146,6 +170,11 @@ def decode_token(
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
     _validate_claims(decoded, issuer=iss, audience=settings.audience)
+
+    issuer = settings.find_issuer(iss)
+    jti = _revocation_subject(decoded, issuer)
+    if jti is not None and issuer.is_revoked(jti):
+        raise errors.TokenRevokedError("Token has been revoked")
 
     try:
         return base_models.JWTToken(**{**decoded.claims, "raw": token})
@@ -169,6 +198,11 @@ async def adecode_token(
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
     _validate_claims(decoded, issuer=iss, audience=settings.audience)
+
+    issuer = settings.find_issuer(iss)
+    jti = _revocation_subject(decoded, issuer)
+    if jti is not None and await issuer.ais_revoked(jti):
+        raise errors.TokenRevokedError("Token has been revoked")
 
     try:
         return base_models.JWTToken(**{**decoded.claims, "raw": token})

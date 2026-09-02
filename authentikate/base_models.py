@@ -19,6 +19,7 @@ import datetime
 from typing import Dict, Any
 from joserfc.jwk import KeySet, RSAKey
 from authentikate.errors import JwksError, InvalidJwtTokenError
+from authentikate.revocation import RevocationList
 
 
 logger = logging.getLogger(__name__)
@@ -252,6 +253,39 @@ class Issuer(BaseModel):
         validation_alias=AliasChoices("iss", "issuer", "issuer_url", "ISSUER")
     )
     """The issuer url (must match the iss claim of incoming tokens)"""
+    revocation_uri: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("revocation_uri", "REVOCATION_URI"),
+    )
+    """Where this issuer publishes the ``jti``s of its revoked, unexpired tokens.
+
+    Unset (the default) disables revocation checking for this issuer, and a
+    verified token is then good until ``exp``. When set, every verified auth
+    token must carry a ``jti`` and is refused while that ``jti`` is on the list.
+    Independent of how the keys are obtained, so it is available on every
+    issuer kind. See :mod:`authentikate.revocation` for the document shape.
+    """
+    revocation_refresh_interval: float = Field(
+        default=60.0,
+        validation_alias=AliasChoices(
+            "revocation_refresh_interval", "REVOCATION_REFRESH_INTERVAL"
+        ),
+    )
+    """Seconds between two fetches of the revocation list.
+
+    This is the whole cost model: the list is fetched at most once per interval
+    however many tokens are presented, so this number alone sets the outbound
+    request rate. It is also the longest a revocation can go unnoticed here.
+    """
+    revocation_request_timeout: float = Field(
+        default=5.0,
+        validation_alias=AliasChoices(
+            "revocation_request_timeout", "REVOCATION_REQUEST_TIMEOUT"
+        ),
+    )
+    """Seconds allowed for a single revocation-list request."""
+
+    _revocation: RevocationList | None = PrivateAttr(default=None)
 
     def get_as_jwks(self) -> list[Dict[str, Any]]:
         """Get the jwks of the issuer"""
@@ -262,6 +296,37 @@ class Issuer(BaseModel):
     def refresh(self) -> None:
         """Refresh the issuer jwks if applicable"""
         pass
+
+    def _revocation_list(self) -> RevocationList | None:
+        """The lazily created revocation list, or None when checking is disabled."""
+
+        if self.revocation_uri is None:
+            return None
+
+        if self._revocation is None:
+            self._revocation = RevocationList(
+                self.revocation_uri,
+                self.revocation_refresh_interval,
+                self.revocation_request_timeout,
+            )
+
+        return self._revocation
+
+    async def ais_revoked(self, jti: str) -> bool:
+        """Whether this issuer has revoked the token with ``jti`` (False when unconfigured)."""
+
+        revocation = self._revocation_list()
+        if revocation is None:
+            return False
+        return await revocation.ais_revoked(jti)
+
+    def is_revoked(self, jti: str) -> bool:
+        """Blocking :meth:`ais_revoked`, for the synchronous decode path."""
+
+        revocation = self._revocation_list()
+        if revocation is None:
+            return False
+        return revocation.is_revoked(jti)
 
 
 class JWKIssuer(Issuer):
@@ -900,6 +965,11 @@ class AuthentikateSettings(BaseModel):
         """Get the jwks of the issuer without blocking the event loop."""
 
         return await _acollect_jwks(self.issuers)
+
+    def find_issuer(self, iss: str) -> IssuerUnion:
+        """Select the configured issuer named by ``iss``, or raise for an untrusted one."""
+
+        return _find_issuer(self.issuers, iss)
 
     def resolve_key_set(self, iss: str, kid: str) -> KeySet:
         """Resolve the verification keys of the issuer named by ``iss``.
