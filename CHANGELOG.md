@@ -1,6 +1,98 @@
 # CHANGELOG
 
 
+## v4.1.0 (2026-09-02)
+
+### Chores
+
+- Sync uv.lock with the 4.0.1 version bump
+  ([`291c03c`](https://github.com/arkitektio/authentikate/commit/291c03c812192dc8b63452b9a71be5fc6db7eae1))
+
+semantic-release updates `project.version` in pyproject.toml but does not refresh uv.lock, so the
+  lock's record of this project's own version trails the release that just happened -- it said 4.0.0
+  against a pyproject on 4.0.1. The same drift was already there before 4.0.1 (lock on 3.2.0 against
+  a pyproject on 4.0.0), so it has been accumulating for several releases and reappears on the next
+  `uv sync` for whoever runs one first.
+
+Only the `[[package]] name = "authentikate"` version entry changes; no dependency is added, removed,
+  or re-resolved.
+
+This will recur on every release until the lock is refreshed as part of the release commit -- worth
+  pointing `[tool.semantic_release]` at it rather than fixing by hand each time.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01HWdmAQbwdmj8AfJ9vVend9
+
+### Continuous Integration
+
+- Fix the chronically-red quality workflow
+  ([`6158c61`](https://github.com/arkitektio/authentikate/commit/6158c610abd503b1e30d9356930b90269d2a95d5))
+
+The quality workflow has failed on every run on main since July 2025 -- 30 consecutive red runs --
+  so the ruff and basedpyright gates have been reporting nothing for a year.
+
+The cause was two ruff versions. CI ran `uvx ruff check .`, which resolves the *latest* ruff at run
+  time, while pyproject pinned `ruff>=0.0.282,<0.0.283` from 2023 for contributors. The config was
+  written for the old one, so the new one rejected it: `extend-select` and `extend-ignore` moved
+  under `[tool.ruff.lint]`, and ANN101/ANN102 were removed outright, making them warn as no-ops. CI
+  also lints `.` while the exclude list covers `tests` but not `test_project`, which is how four
+  real findings there went unseen.
+
+So: the config moves to `[tool.ruff.lint]`, the two removed rules are dropped, and the
+  dev-dependency adopts the ruff generation CI actually runs. CI switches from `uvx ruff` to `uv run
+  ruff` so the lockfile is the single version and a contributor's local run matches CI -- a floating
+  linter can turn the build red with no commit, which is how this started. The four findings in
+  test_project/schema.py are fixed rather than excluded: one unused import, three missing
+  docstrings.
+
+Also removes `tests/test_expand copy.py`, a stray duplicate whose only test was byte-identical to
+  `test_expand.py::test_authenticate_token`.
+
+Finally, guards the two publish steps in the release workflow. They ran unconditionally, but
+  semantic-release only builds when the commits since the last tag warrant a version -- so on a
+  non-releasing commit like this one, `semantic-release publish` would re-attach assets to an
+  already published tag and `uv publish` would find nothing in dist/ to upload, failing the
+  workflow. A non-empty dist/ is exactly the signal that a release was cut, so both steps now key
+  off it.
+
+Verified locally with the workflows' own commands: ruff, basedpyright, and 218 tests all pass.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01HWdmAQbwdmj8AfJ9vVend9
+
+### Features
+
+- Check verified tokens against the issuer's revocation list
+  ([`15d3695`](https://github.com/arkitektio/authentikate/commit/15d3695702a7752340df10dacb70fa67c2ac96e0))
+
+A JWT is verified offline, so once issued it stayed valid until `exp` whatever lok decided in the
+  meantime. lok now publishes the `jti`s of the access tokens it has revoked but which have not yet
+  expired; an issuer configured with `revocation_uri` has every verified auth token checked against
+  that list and refused with the new `TokenRevokedError` (`UNAUTHENTICATED`/`TOKEN_REVOKED`) while
+  its `jti` is on it.
+
+The cost model is one number. The list is fetched at most once per `revocation_refresh_interval`
+  (default 60s) per issuer and every check in between is answered from the cached copy, so the
+  outbound request rate is set by configuration, not by inbound traffic: a thousand tokens presented
+  within one interval cost one fetch, and concurrent first-callers share it. A failed fetch keeps
+  the stale copy and is not retried before the next interval; until a first load succeeds no token
+  is treated as revoked. Both are logged.
+
+The check runs after signature and claims validation, so a forged token can never trigger a fetch or
+  a revocation error. A token without a `jti` is refused when its issuer checks revocation, since it
+  could never be revoked. Static tokens are never checked.
+
+Non-breaking: the setting is off unless `revocation_uri` is set, on any issuer
+
+kind. Expected document shape: `{"revoked": ["<jti>", ...]}` (a bare list is accepted too).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_015Eocy8dkcPk1EALbZMLK2X
+
+
 ## v4.0.1 (2026-08-21)
 
 ### Bug Fixes
