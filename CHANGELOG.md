@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v4.1.1 (2026-09-16)
+
+### Bug Fixes
+
+- Drop the never-populated name from the Client GraphQL type
+  ([`5fc13af`](https://github.com/arkitektio/authentikate/commit/5fc13af4a623d5842d46e6d613015c62cc36be40))
+
+Clients are created from tokens in expand.py, which carry no display name, so Client.name was null
+  on every row while the type declared it String!. Any selection of client { name } therefore failed
+  with "Cannot return null for non-nullable field Client.name". Remove the field instead of making
+  it nullable: nothing ever writes it.
+
+Also sync uv.lock with the 4.1.0 version bump.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+
+
 ## v4.1.0 (2026-09-02)
 
 ### Chores
