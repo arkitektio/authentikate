@@ -55,4 +55,3 @@ class Client:
     id: strawberry.ID
     release: Release | None = None
     client_id: str
-    name: str
