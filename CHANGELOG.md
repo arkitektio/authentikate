@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v4.2.0 (2026-09-26)
+
+### Features
+
+- Mirror the OIDC profile claims onto User; preferred_username gets its own column
+  ([`35df79a`](https://github.com/arkitektio/authentikate/commit/35df79a15ae6257233064a79de941c413cc63502))
+
+The token's preferred_username was stored on Django's first_name, so User had no preferred_username
+  attribute. authentikate's own GraphQL type papered over that with a field_name mapping, but every
+  service declaring its own narrow User type (mikro, bank) wrote `preferred_username: str` and
+  failed at query time with "'User' object has no attribute 'preferred_username'".
+
+- User.preferred_username is a real column; migration 0007 moves existing values off first_name and
+  resets changed_hash so each profile re-syncs from the next token. - The optional OIDC standard
+  profile claims (name, given_name, family_name, nickname, email, email_verified, picture, locale,
+  zoneinfo) are parsed from the token and mirrored onto User on every metadata change:
+  first_name/last_name/email now carry given_name/family_name/email, the rest have their own
+  nullable columns. A claim the issuer stops sending is cleared. Profile changes alone now trigger a
+  re-sync. - The User GraphQL type exposes the display fields (email is kept off the schema).
+
+Note: first_name no longer holds the username. Code that read user.first_name as the username must
+  read user.preferred_username.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+
 ## v4.1.1 (2026-09-16)
 
 ### Bug Fixes
