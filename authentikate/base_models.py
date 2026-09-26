@@ -57,6 +57,20 @@ def coerce_unix_to_datetime(v: int | datetime.datetime | None) -> datetime.datet
     return v
 
 
+PROFILE_CLAIMS = (
+    "name",
+    "given_name",
+    "family_name",
+    "nickname",
+    "email",
+    "email_verified",
+    "picture",
+    "locale",
+    "zoneinfo",
+)
+"""The optional OIDC standard claims mirrored onto :class:`authentikate.models.User`."""
+
+
 class JWTToken(BaseModel):
     """A JWT token
 
@@ -87,6 +101,28 @@ class JWTToken(BaseModel):
     """The client_id of the app that requested the token"""
     preferred_username: str
     """The username of the user"""
+
+    # Optional OIDC standard profile claims (OpenID Connect Core §5.1). An issuer
+    # sends whichever its scopes allow; each one lands on the matching User field.
+    name: str | None = None
+    """The user's full name"""
+    given_name: str | None = None
+    """The user's given (first) name"""
+    family_name: str | None = None
+    """The user's family (last) name"""
+    nickname: str | None = None
+    """A casual name of the user"""
+    email: str | None = None
+    """The user's email address"""
+    email_verified: bool | None = None
+    """Whether the issuer verified the email address"""
+    picture: str | None = None
+    """URL of the user's profile picture"""
+    locale: str | None = None
+    """The user's locale (BCP47, e.g. ``de-AT``)"""
+    zoneinfo: str | None = None
+    """The user's time zone (IANA, e.g. ``Europe/Vienna``)"""
+
     roles: list[str]
     """The roles of the user"""
     scope: str
@@ -153,10 +189,15 @@ class JWTToken(BaseModel):
         # named "a|b" produce the same fingerprint as the roles ["a", "b"],
         # which could suppress the update that propagates a role change.
         fingerprint = json.dumps(
-            [self.sub, self.preferred_username, sorted(self.roles), self.org],
+            [self.sub, self.preferred_username, sorted(self.roles), self.org, self.profile],
             separators=(",", ":"),
         )
         return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+
+    @property
+    def profile(self) -> dict[str, str | bool | None]:
+        """The optional OIDC profile claims, keyed by claim name."""
+        return {claim: getattr(self, claim) for claim in PROFILE_CLAIMS}
 
     @property
     def scopes(self) -> list[str]:

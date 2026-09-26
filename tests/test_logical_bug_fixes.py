@@ -196,12 +196,12 @@ async def test_adecode_token_rejects_malformed_claims(
 
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
-def test_preferred_username_resolves_from_first_name():
+def test_preferred_username_resolves_from_its_own_field():
     @strawberry.type
     class Query:
         @strawberry.field
         def me(self) -> UserType:
-            return User(username="x", first_name="hello", sub="1")
+            return User(username="x", preferred_username="hello", sub="1")
 
     schema = strawberry.Schema(query=Query)
     result = schema.execute_sync("{ me { sub preferredUsername } }")

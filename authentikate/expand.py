@@ -184,6 +184,24 @@ def expand_membership(
     return membership
 
 
+def apply_profile(user: models.User, token: base_models.JWTToken) -> None:
+    """Mirror the token's profile claims onto the user.
+
+    Every claim is written, present or not: a claim the issuer stopped sending clears the
+    field instead of leaving a stale value behind.
+    """
+    user.preferred_username = token.preferred_username
+    user.name = token.name
+    user.nickname = token.nickname
+    user.first_name = token.given_name or ""
+    user.last_name = token.family_name or ""
+    user.email = token.email or ""
+    user.email_verified = token.email_verified
+    user.picture = token.picture
+    user.locale = token.locale
+    user.zoneinfo = token.zoneinfo
+
+
 async def _aexpand_user(
     token: base_models.JWTToken,
     organization: models.Organization | None = None,
@@ -204,7 +222,7 @@ async def _aexpand_user(
             iss=token.iss,
         )
         user.set_unusable_password()
-        user.first_name = token.preferred_username
+        apply_profile(user, token)
         user.changed_hash = token.changed_hash
 
         if organization is not None:
@@ -227,7 +245,7 @@ async def _aexpand_user(
 
     if user.changed_hash != token.changed_hash:
         # The token's user metadata changed since we last saw it: sync it across.
-        user.first_name = token.preferred_username
+        apply_profile(user, token)
         user.changed_hash = token.changed_hash
 
         if organization is not None:
@@ -298,7 +316,7 @@ def _expand_user(
             iss=token.iss,
         )
         user.set_unusable_password()
-        user.first_name = token.preferred_username
+        apply_profile(user, token)
         user.changed_hash = token.changed_hash
 
         if organization is not None:
@@ -321,7 +339,7 @@ def _expand_user(
 
     if user.changed_hash != token.changed_hash:
         # The token's user metadata changed since we last saw it: sync it across.
-        user.first_name = token.preferred_username
+        apply_profile(user, token)
         user.changed_hash = token.changed_hash
 
         if organization is not None:

@@ -36,6 +36,23 @@ class User(AbstractUser):
     changed_hash = models.CharField(max_length=1000, null=True, blank=True)
     """A stable hash of the token's user metadata, used to skip needless updates"""
 
+    # The token's profile, mirrored on every metadata change (see expand.py). Django's
+    # own ``first_name``/``last_name``/``email`` carry ``given_name``/``family_name``/``email``.
+    preferred_username = models.CharField(max_length=1000, blank=True, default="")
+    """The token's ``preferred_username`` claim"""
+    name = models.CharField(max_length=1000, null=True, blank=True)
+    """The token's ``name`` claim (full name)"""
+    nickname = models.CharField(max_length=1000, null=True, blank=True)
+    """The token's ``nickname`` claim"""
+    picture = models.URLField(max_length=2000, null=True, blank=True)
+    """The token's ``picture`` claim (profile picture URL)"""
+    locale = models.CharField(max_length=35, null=True, blank=True)
+    """The token's ``locale`` claim (BCP47)"""
+    zoneinfo = models.CharField(max_length=64, null=True, blank=True)
+    """The token's ``zoneinfo`` claim (IANA time zone)"""
+    email_verified = models.BooleanField(null=True, blank=True)
+    """The token's ``email_verified`` claim"""
+
     class Meta:
         """Meta class for User"""
 

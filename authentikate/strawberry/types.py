@@ -43,8 +43,14 @@ class User:
 
     id: strawberry.ID
     sub: str
-    # The token's preferred_username is persisted on first_name (see expand.py)
-    preferred_username: str = strawberry_django.field(field_name="first_name")
+    preferred_username: str
+    name: str | None = strawberry_django.field(description="The full name, if the issuer sends one.")
+    given_name: str | None = strawberry_django.field(field_name="first_name", description="The given name, if the issuer sends one.")
+    family_name: str | None = strawberry_django.field(field_name="last_name", description="The family name, if the issuer sends one.")
+    nickname: str | None = strawberry_django.field(description="A casual name, if the issuer sends one.")
+    picture: str | None = strawberry_django.field(description="URL of the profile picture, if the issuer sends one.")
+    locale: str | None = strawberry_django.field(description="The user's locale (BCP47), if the issuer sends one.")
+    zoneinfo: str | None = strawberry_django.field(description="The user's IANA time zone, if the issuer sends one.")
     active_organization: Organization | None = None
 
 
