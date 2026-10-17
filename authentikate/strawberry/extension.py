@@ -1,3 +1,4 @@
+from contextvars import ContextVar, Token
 from typing import Any, AsyncIterator, cast
 from strawberry.extensions import SchemaExtension
 from kante.context import WsContext, HttpContext
@@ -21,6 +22,23 @@ from authentikate.provenance import (
 from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
 from authentikate.errors import AuthentikateError, AuthentikatePermissionDenied
 from authentikate.strawberry.errors import to_graphql_error
+
+
+def _reset(var: ContextVar[Any], token: Token[Any] | None) -> None:
+    """Undo ``var.set`` for this operation, where that is still possible.
+
+    A WebSocket operation's stream can be closed from another task -- the
+    client disconnected mid-subscription, or after an error -- and then this
+    runs in a context that never set ``var``. The context that did ends with the
+    operation, so there is nothing left to undo; resetting the variable here
+    would clobber the other context's value instead.
+    """
+    if token is None:
+        return
+    try:
+        var.reset(token)
+    except ValueError:
+        pass
 
 
 class AuthentikateExtension(SchemaExtension):
@@ -187,19 +205,10 @@ class AuthentikateExtension(SchemaExtension):
 
             yield
         finally:
-            if reset_user:
-                user_var.reset(reset_user)
-
-            if reset_client:
-                client_var.reset(reset_client)
-
-            if reset_token:
-                token_var.reset(reset_token)
-
-            if reset_organization:
-                organization_var.reset(reset_organization)
-
-            if reset_membership:
-                membership_var.reset(reset_membership)
+            _reset(user_var, reset_user)
+            _reset(client_var, reset_client)
+            _reset(token_var, reset_token)
+            _reset(organization_var, reset_organization)
+            _reset(membership_var, reset_membership)
 
         return
