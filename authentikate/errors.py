@@ -234,3 +234,28 @@ class UnsupportedCanonicalizationError(AuthentikateError):
         "The provenance token uses an args canonicalization this service cannot "
         "reproduce."
     )
+
+
+class ScopedTokenUnsupported(AuthentikatePermissionDenied):
+    """Raised for a scoped member's token at a service that does not narrow to shared objects.
+
+    Rejecting it is the safe answer: without the narrowing, a member shared one
+    object would be served the whole organization.
+    """
+
+    reason = "SCOPED_TOKEN_UNSUPPORTED"
+    client_message = "This service does not accept tokens that are limited to shared objects."
+
+
+class ScopedReadOnly(AuthentikatePermissionDenied):
+    """Raised when a scoped member's token is used for a write or a subscription."""
+
+    reason = "SCOPED_READ_ONLY"
+    client_message = "Access limited to shared objects is read-only."
+
+
+class FullMembershipRequired(AuthentikatePermissionDenied):
+    """Raised when something only a full member of the organization may do is asked by a scoped one."""
+
+    reason = "FULL_MEMBERSHIP_REQUIRED"
+    client_message = "This requires full membership of the organization."

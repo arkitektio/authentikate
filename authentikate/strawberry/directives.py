@@ -1,6 +1,7 @@
 import strawberry
 from typing import Awaitable, Callable, Any, Optional, List, Sequence
 from authentikate.strawberry.errors import (
+    FULL_MEMBERSHIP_REQUIRED,
     INSUFFICIENT_ORGANIZATION_ROLE,
     INSUFFICIENT_ROLE,
     INSUFFICIENT_SCOPE,
@@ -28,6 +29,14 @@ class Auth:
     required_org_roles: Optional[List[str]] = strawberry.directive_field(
         name="required_org_roles", default=None
     )
+    allow_scoped: Optional[bool] = strawberry.directive_field(
+        name="allow_scoped", default=None
+    )
+    """Whether a scoped member (shared objects only) may call this mutation.
+
+    Published only where it is true: on a read-like mutation (a download link)
+    whose resolver checks the object it hands out is shared.
+    """
 
 
 def _as_list(value: Optional[List[str]] | str) -> Optional[List[str]]:
@@ -82,14 +91,21 @@ class _AuthChecks:
         any_scope_of: Optional[List[str]] = None,
         org_roles: Optional[List[str]] | str = None,
         any_org_role_of: Optional[List[str]] = None,
+        allow_scoped: bool = False,
     ) -> None:
-        """Record the requirements this field places on the caller."""
+        """Record the requirements this field places on the caller.
+
+        ``allow_scoped`` opens a mutation to scoped members, who are otherwise
+        refused every mutation and subscription (``SCOPED_READ_ONLY``). The
+        resolver then answers for checking that what it touches is shared.
+        """
         self.scopes: Optional[List[str]] = _as_list(scopes)
         self.roles: Optional[List[str]] = _as_list(roles)
         self.any_role_of: Optional[List[str]] = any_role_of
         self.any_scope_of: Optional[List[str]] = any_scope_of
         self.org_roles: Optional[List[str]] = _as_list(org_roles)
         self.any_org_role_of: Optional[List[str]] = any_org_role_of
+        self.allow_scoped: bool = allow_scoped
 
     def _directive(self) -> Auth:
         """The schema directive describing these requirements."""
@@ -97,6 +113,7 @@ class _AuthChecks:
             required_scopes=self.scopes,
             required_roles=self.roles,
             required_org_roles=self.org_roles,
+            allow_scoped=True if self.allow_scoped else None,
         )
 
     def check(self, info: Info) -> None:
@@ -121,6 +138,16 @@ class _AuthChecks:
             # kante raises ValueError when nothing has populated the request;
             # either way the request is not authenticated.
             raise unauthenticated("Authentication required", NOT_AUTHENTICATED)
+
+        if token.is_scoped and (
+            self.roles or self.any_role_of or self.org_roles or self.any_org_role_of
+        ):
+            # A scoped member holds no role, so these would fail below anyway;
+            # said here so that it stays true whatever roles a token carries.
+            raise denied(
+                "This field requires full membership of the organization",
+                FULL_MEMBERSHIP_REQUIRED,
+            )
 
         if self.scopes and not token.has_scopes(self.scopes):
             raise denied(
@@ -227,6 +254,9 @@ class AuthSubscribeExtension(_AuthChecks, FieldExtension):
         assert (
             field.is_subscription
         ), "AuthSubscribeExtension can only be applied to subscription fields."
+        assert (
+            not self.allow_scoped
+        ), "A subscription streams the organization's events: it cannot be opened to scoped members."
         field.directives.append(self._directive())
 
     def resolve(

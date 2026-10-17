@@ -61,7 +61,16 @@ if TYPE_CHECKING:
         MissingActiveOrganization,
         NoAuthorizationHeader,
         OrganizationNotAllowed,
+        FullMembershipRequired,
+        ScopedReadOnly,
+        ScopedTokenUnsupported,
         TokenRevokedError,
+    )
+    from authentikate.grants import ObjectGrant, parse_grant
+    from authentikate.scoped import (
+        enforce_scoped,
+        full_members_only,
+        require_full_member,
     )
     from authentikate.expand import (
         ExpandedTokenContext,
@@ -91,6 +100,12 @@ _EXPORTS: dict[str, str] = {
     # tokens
     "JWTToken": "authentikate.base_models",
     "StaticToken": "authentikate.base_models",
+    "ObjectGrant": "authentikate.grants",
+    "parse_grant": "authentikate.grants",
+    # scoped members (shared objects only)
+    "enforce_scoped": "authentikate.scoped",
+    "require_full_member": "authentikate.scoped",
+    "full_members_only": "authentikate.scoped",
     # authenticating a request
     "authenticate_header": "authentikate.utils",
     "authenticate_header_or_none": "authentikate.utils",
@@ -123,6 +138,9 @@ _EXPORTS: dict[str, str] = {
     "BlockedMembership": "authentikate.errors",
     "JwksError": "authentikate.errors",
     "TokenRevokedError": "authentikate.errors",
+    "ScopedTokenUnsupported": "authentikate.errors",
+    "ScopedReadOnly": "authentikate.errors",
+    "FullMembershipRequired": "authentikate.errors",
 }
 
 __all__ = [
@@ -132,6 +150,7 @@ __all__ = [
     "AuthentikateTokenExpired",
     "BlockedMembership",
     "ExpandedTokenContext",
+    "FullMembershipRequired",
     "InvalidJwtTokenError",
     "JWTToken",
     "JwksError",
@@ -140,7 +159,10 @@ __all__ = [
     "MalformedJwtTokenError",
     "MissingActiveOrganization",
     "NoAuthorizationHeader",
+    "ObjectGrant",
     "OrganizationNotAllowed",
+    "ScopedReadOnly",
+    "ScopedTokenUnsupported",
     "StaticToken",
     "TokenRevokedError",
     "adecode_token",
@@ -150,13 +172,17 @@ __all__ = [
     "authenticate_token",
     "authenticate_token_or_none",
     "decode_token",
+    "enforce_scoped",
     "expand_token_context",
+    "full_members_only",
     "get_client",
     "get_membership",
     "get_organization",
     "get_settings",
     "get_token",
     "get_user",
+    "parse_grant",
+    "require_full_member",
 ]
 
 

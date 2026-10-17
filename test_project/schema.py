@@ -76,6 +76,16 @@ class Mutation:
         """A mutation gated on the read scope."""
         return "User"
 
+    @kante.django_mutation(extensions=[AuthExtension(allow_scoped=True)])
+    def presign(self, info: Info) -> str:
+        """A read-like mutation a scoped member may call."""
+        return "signed"
+
+    @kante.django_mutation(extensions=[AuthExtension(roles="admin")])
+    def administrate(self, info: Info) -> str:
+        """A mutation gated on a role."""
+        return "done"
+
 
 @kante.type
 class Subscription:
@@ -86,6 +96,11 @@ class Subscription:
         """Subscribe to user creation events"""
         # This is just a placeholder. In a real application, you would use channels or another method to send updates.
         yield cast(User, info.context.request.user)
+
+    @kante.subscription(extensions=[AuthSubscribeExtension()])
+    async def yield_open(self, info: Info) -> AsyncGenerator[str, None]:
+        """A subscription with no requirement beyond authentication."""
+        yield "event"
 
 
 schema = kante.Schema(

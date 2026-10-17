@@ -48,6 +48,13 @@ INSUFFICIENT_ORGANIZATION_ROLE = "INSUFFICIENT_ORGANIZATION_ROLE"
 """The user lacks a role the field requires *within the active organization*."""
 
 
+FULL_MEMBERSHIP_REQUIRED = "FULL_MEMBERSHIP_REQUIRED"
+"""A scoped member (shared objects only) asked for a field that requires a role."""
+
+SCOPED_READ_ONLY = "SCOPED_READ_ONLY"
+"""A scoped member sent a mutation or subscription that did not opt in to them."""
+
+
 class AuthentikateGraphQLError(KanteError):
     """A GraphQL error carrying both a ``code`` and a ``reason``."""
 
@@ -108,10 +115,12 @@ def to_graphql_error(
 
 __all__ = [
     "AuthentikateGraphQLError",
+    "FULL_MEMBERSHIP_REQUIRED",
     "INSUFFICIENT_ORGANIZATION_ROLE",
     "INSUFFICIENT_ROLE",
     "INSUFFICIENT_SCOPE",
     "NOT_AUTHENTICATED",
+    "SCOPED_READ_ONLY",
     "denied",
     "to_graphql_error",
     "unauthenticated",

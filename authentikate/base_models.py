@@ -19,6 +19,7 @@ import datetime
 from typing import Dict, Any
 from joserfc.jwk import KeySet, RSAKey
 from authentikate.errors import JwksError, InvalidJwtTokenError
+from authentikate.grants import ObjectGrant, parse_grant
 from authentikate.revocation import RevocationList
 
 
@@ -154,6 +155,15 @@ class JWTToken(BaseModel):
     client_device: str | None = None
     """ The client device identifier """
 
+    objects: dict[str, list[str]] | None = None
+    """The objects a scoped member was shared, by hub: ``{"3": ["@mikro/arraydataset:42"]}``.
+
+    Absent (None) for a full member, who acts for the whole organization. Present
+    -- even empty -- for a scoped member, who may see only these. ``{}`` or no
+    entry for a hub shares nothing there; it never means "everything". See
+    :mod:`authentikate.grants`.
+    """
+
     @field_validator("aud", mode="before")
     @classmethod
     def aud_to_list(cls, v: str | list[str] | None) -> list[str] | None:
@@ -193,6 +203,25 @@ class JWTToken(BaseModel):
             separators=(",", ":"),
         )
         return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+
+    @property
+    def is_scoped(self) -> bool:
+        """Whether the token is a scoped member's: shared some objects, not the organization."""
+        return self.objects is not None
+
+    def grants_for(self, hub: str) -> tuple[ObjectGrant, ...]:
+        """The objects shared with this member on ``hub`` (the issuer's hub pk).
+
+        Empty for a full member too: ask :attr:`is_scoped` first. An entry that
+        does not parse is dropped and logged -- it shares nothing.
+        """
+        grants: list[ObjectGrant] = []
+        for raw in (self.objects or {}).get(str(hub), ()):
+            try:
+                grants.append(parse_grant(raw))
+            except ValueError as error:
+                logger.warning("Dropping an unreadable object grant of %s: %s", self.sub, error)
+        return tuple(grants)
 
     @property
     def profile(self) -> dict[str, str | bool | None]:
@@ -982,6 +1011,35 @@ class AuthentikateSettings(BaseModel):
         ),
     )
     """Escape hatch to permit ``static_tokens`` while ``DEBUG`` is False."""
+    hub: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("hub", "HUB"),
+    )
+    """The issuer's id of the hub this service runs in (lok's hub pk, as a string).
+
+    A scoped token lists its objects by hub; this is the entry this service reads.
+    Unset, whatever enforces scoping here may name it (:mod:`authentikate.scoped`).
+    """
+    scoped_tokens: Literal["auto", "reject", "self"] = Field(
+        default="auto",
+        validation_alias=AliasChoices("scoped_tokens", "SCOPED_TOKENS"),
+    )
+    """What this service does with a scoped member's token (one with ``objects``).
+
+    ``auto`` (the default) accepts it read-only where something narrows reads to
+    the shared objects (:func:`authentikate.scoped.enforce_scoped`), and rejects
+    it everywhere else. ``reject`` always rejects it. ``self`` accepts it and
+    leaves every rule to the service itself -- for a service that already knows
+    what a scoped member may do (lok).
+    """
+
+    @field_validator("hub", mode="before")
+    @classmethod
+    def hub_to_string(cls, v: str | int | None) -> str | None:
+        """A hub pk written as a number in YAML is the same hub."""
+        if isinstance(v, int):
+            return str(v)
+        return v
 
     @field_validator("algorithms")
     @classmethod

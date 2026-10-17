@@ -151,6 +151,44 @@ class Query:
 `AuthExtension` accepts `scopes`, `roles`, `any_scope_of` and `any_role_of`. Use
 `AuthSubscribeExtension` on subscription fields.
 
+### Scoped Members
+
+A member who was shared a few objects of an organization, and nothing else, gets a
+token with an `objects` claim, keyed by the hub that hosts them:
+
+```json
+{"org": "12", "roles": [], "objects": {"3": ["@mikro/arraydataset:42#derived"]}}
+```
+
+`token.is_scoped` tells the two kinds of member apart, and `token.grants_for(hub)`
+lists the shared objects as `ObjectGrant(structure, object_id, reach)`. Which rows an
+object and its reach cover is the hosting service's business: authentikate only
+decides whether such a token is served at all.
+
+```python
+AUTHENTIKATE = {
+    ...,
+    "HUB": "3",               # this service's hub: the entry of `objects` it reads
+    "SCOPED_TOKENS": "auto",  # auto | reject | self
+}
+```
+
+- `auto` (the default) rejects a scoped token (`SCOPED_TOKEN_UNSUPPORTED`) unless
+  something in the process narrows reads to the shared objects and has said so with
+  `authentikate.scoped.enforce_scoped()`. Where it is accepted, it is read-only:
+  mutations and subscriptions are refused (`SCOPED_READ_ONLY`) unless every root field
+  opted in with `AuthExtension(allow_scoped=True)`.
+- `reject` always rejects it.
+- `self` accepts it and leaves every rule to the service itself.
+
+Outside GraphQL, `require_full_member(token)` and the `@full_members_only` view
+decorator refuse a scoped member (`FULL_MEMBERSHIP_REQUIRED`).
+
+The refusal is recorded as the operation's validation errors (`on_validate`). An
+extension that assigns `execution_context.pre_execution_errors` itself, such as
+strawberry's `ValidationCache`, must come *before* `AuthentikateExtension` in the
+schema's extensions, or it overwrites the refusal.
+
 ### Static Tokens
 
 Static Tokens are tokens that are hard coded into the settings. They are useful for testing and development, but should

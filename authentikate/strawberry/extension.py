@@ -1,6 +1,19 @@
 from contextvars import ContextVar, Token
 from typing import Any, AsyncIterator, cast
+from graphql import (
+    DocumentNode,
+    FieldNode,
+    FragmentDefinitionNode,
+    FragmentSpreadNode,
+    GraphQLSchema,
+    InlineFragmentNode,
+    OperationDefinitionNode,
+    SelectionSetNode,
+)
 from strawberry.extensions import SchemaExtension
+from strawberry.schema.schema_converter import GraphQLCoreConverter
+from strawberry.types import ExecutionContext
+from strawberry.types.graphql import OperationType
 from kante.context import WsContext, HttpContext
 from authentikate.vars import (
     token_var,
@@ -20,7 +33,12 @@ from authentikate.provenance import (
     verify_actor,
 )
 from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
-from authentikate.errors import AuthentikateError, AuthentikatePermissionDenied
+from authentikate.errors import (
+    AuthentikateError,
+    AuthentikatePermissionDenied,
+    ScopedReadOnly,
+)
+from authentikate.scoped import scoped_mode
 from authentikate.strawberry.errors import to_graphql_error
 
 
@@ -39,6 +57,65 @@ def _reset(var: ContextVar[Any], token: Token[Any] | None) -> None:
         var.reset(token)
     except ValueError:
         pass
+
+
+def _operation(document: DocumentNode, name: str | None) -> OperationDefinitionNode | None:
+    """The operation of ``document`` that runs: the one called ``name``, else the only one."""
+    for definition in document.definitions:
+        if isinstance(definition, OperationDefinitionNode) and (
+            name is None or (definition.name is not None and definition.name.value == name)
+        ):
+            return definition
+    return None
+
+
+def _root_field_names(
+    selection_set: SelectionSetNode,
+    fragments: dict[str, FragmentDefinitionNode],
+    seen: frozenset[str] = frozenset(),
+) -> list[str]:
+    """The root fields an operation selects, through its fragments."""
+    names: list[str] = []
+    for selection in selection_set.selections:
+        if isinstance(selection, FieldNode):
+            names.append(selection.name.value)
+        elif isinstance(selection, InlineFragmentNode):
+            names.extend(_root_field_names(selection.selection_set, fragments, seen))
+        elif isinstance(selection, FragmentSpreadNode):
+            name = selection.name.value
+            fragment = fragments.get(name)
+            if fragment is not None and name not in seen:
+                names.extend(_root_field_names(fragment.selection_set, fragments, seen | {name}))
+    return names
+
+
+def allows_scoped(execution_context: ExecutionContext) -> bool:
+    """Whether every root field of the operation opted in to scoped members.
+
+    A field opts in with ``AuthExtension(allow_scoped=True)``. One that did not,
+    one that cannot be found, or an operation that cannot be read, does not.
+    """
+    document = execution_context.graphql_document
+    if document is None:
+        return False
+    operation = _operation(document, execution_context.operation_name)
+    if operation is None:
+        return False
+    core: GraphQLSchema = execution_context.schema._schema
+    root = core.get_root_type(operation.operation)
+    if root is None:
+        return False
+    fragments = {
+        d.name.value: d for d in document.definitions if isinstance(d, FragmentDefinitionNode)
+    }
+    for name in _root_field_names(operation.selection_set, fragments):
+        if name == "__typename":
+            continue
+        field = root.fields.get(name)
+        definition = (field.extensions or {}).get(GraphQLCoreConverter.DEFINITION_BACKREF) if field else None
+        if not any(getattr(e, "allow_scoped", False) for e in getattr(definition, "extensions", None) or ()):
+            return False
+    return True
 
 
 class AuthentikateExtension(SchemaExtension):
@@ -212,3 +289,34 @@ class AuthentikateExtension(SchemaExtension):
             _reset(membership_var, reset_membership)
 
         return
+
+    async def on_validate(self) -> AsyncIterator[None]:
+        """Keep a scoped member's operation read-only.
+
+        Here rather than in ``on_operation``: the operation's type is known only
+        once the document is parsed. The refusal is recorded as the operation's
+        validation errors, which strawberry answers with -- over HTTP and
+        WebSocket alike -- instead of running it. (Raising here would bring a
+        WebSocket down; raising in ``on_execute`` leaves the hooks entered before
+        it, the optimizer's among them, unwound.)
+
+        Subscriptions are refused with mutations, whatever their fields say --
+        they stream the organization's events, which no queryset narrows. A
+        mutation passes only when every root field opted in (``allow_scoped``). Under
+        ``SCOPED_TOKENS: self`` the service applies its own rules instead.
+        """
+        token = token_var.get()
+        operation_type = self.execution_context.operation_type
+        if (
+            token is not None
+            and token.is_scoped
+            and operation_type != OperationType.QUERY
+            and scoped_mode(self.get_settings()) == "enforce"
+            and (operation_type == OperationType.SUBSCRIPTION or not allows_scoped(self.execution_context))
+        ):
+            operation = self.execution_context.operation_type.value
+            self.execution_context.pre_execution_errors = [
+                to_graphql_error(ScopedReadOnly(f"{token.sub} sent a {operation} as a scoped member"))
+            ]
+
+        yield

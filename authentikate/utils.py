@@ -1,4 +1,5 @@
 from authentikate.decode import adecode_token
+from authentikate.scoped import check_scoped_token
 from authentikate.settings import get_settings
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.errors import (
@@ -56,6 +57,10 @@ async def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTT
         decoded = await adecode_token(token, settings)
 
     _check_organization_allowed(decoded, settings)
+    # A scoped member's token is only served where reads are narrowed to its
+    # objects (authentikate.scoped); everywhere else it is rejected here, before
+    # any expansion writes a row for it.
+    check_scoped_token(decoded, settings)
 
     return decoded
 
