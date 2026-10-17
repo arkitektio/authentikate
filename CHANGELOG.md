@@ -1,6 +1,45 @@
 # CHANGELOG
 
 
+## v4.3.0 (2026-10-17)
+
+### Bug Fixes
+
+- A WebSocket operation closed from another task tears down without an error
+  ([`cc57275`](https://github.com/arkitektio/authentikate/commit/cc572752e3d3bada87ee5b68919c7b2da65a5d33))
+
+When a subscription errors and the client disconnects, strawberry closes the operation's stream from
+  another task, so on_operation's finally ran in a context that never set the auth context
+  variables, and resetting them raised "created in a different Context". The context that set them
+  ends with the operation: there is nothing left to undo, and nothing else is reset.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Features
+
+- Scoped members, who were shared a few objects, are served read-only where reads are narrowed
+  ([`cd784a1`](https://github.com/arkitektio/authentikate/commit/cd784a10698ae154cea9103daa92ad93433e392d))
+
+lok marks a member shared only some objects of an organization with an `objects` claim, keyed by
+  hub. A token now reads it: `is_scoped`, `grants_for(hub)` and `ObjectGrant`/`parse_grant`, with
+  lok's own patterns. An unreadable grant is dropped, never widened.
+
+Which rows a shared object covers is the hosting service's business, so authentikate only decides
+  whether such a token is served:
+
+- `authenticate_token` rejects it (SCOPED_TOKEN_UNSUPPORTED) unless something in the process narrows
+  reads and said so (`authentikate.scoped.enforce_scoped`), and knows its hub (`HUB`, or the
+  enforcer's resolver). - Where served it is read-only: its mutations and subscriptions are refused
+  at validation (SCOPED_READ_ONLY), unless every root field of a mutation opted in with
+  `AuthExtension(allow_scoped=True)`. Fields requiring roles, `require_full_member` and
+  `@full_members_only` refuse it (FULL_MEMBERSHIP_REQUIRED). - `SCOPED_TOKENS: auto | reject | self`
+  (default auto): `self` leaves every rule to a service that applies its own (lok).
+
+Full members are unaffected.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v4.2.0 (2026-09-26)
 
 ### Features
