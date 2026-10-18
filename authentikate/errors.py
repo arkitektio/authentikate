@@ -237,21 +237,21 @@ class UnsupportedCanonicalizationError(AuthentikateError):
 
 
 class ScopedTokenUnsupported(AuthentikatePermissionDenied):
-    """Raised for a scoped member's token at a service that does not narrow to shared objects.
+    """Raised for a guest's token at a service that does not hold reads to their collaborations.
 
-    Rejecting it is the safe answer: without the narrowing, a member shared one
-    object would be served the whole organization.
+    Rejecting it is the safe answer: without that, a guest granted one collaboration would
+    be served the whole organization.
     """
 
     reason = "SCOPED_TOKEN_UNSUPPORTED"
-    client_message = "This service does not accept tokens that are limited to shared objects."
+    client_message = "This service does not accept tokens that are limited to collaborations."
 
 
 class ScopedReadOnly(AuthentikatePermissionDenied):
-    """Raised when a scoped member's token is used for a write or a subscription."""
+    """Raised when a guest's token is used for a write or a subscription no collaboration permits."""
 
     reason = "SCOPED_READ_ONLY"
-    client_message = "Access limited to shared objects is read-only."
+    client_message = "Access limited to collaborations is read-only here."
 
 
 class FullMembershipRequired(AuthentikatePermissionDenied):
@@ -262,10 +262,10 @@ class FullMembershipRequired(AuthentikatePermissionDenied):
 
 
 class ShareInsufficient(AuthentikatePermissionDenied):
-    """Raised when what was shared with a scoped member does not permit what they asked.
+    """Raised when the collaborations granted to a guest do not permit what they asked.
 
-    The object is not shared with them at the reach it needs, or the grant's
-    sharer may not do it themselves.
+    The object is in none of their collaborations, or in none where they hold the roles
+    it needs.
     """
 
     reason = "SHARE_INSUFFICIENT"

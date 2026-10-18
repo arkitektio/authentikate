@@ -151,70 +151,57 @@ class Query:
 `AuthExtension` accepts `scopes`, `roles`, `any_scope_of` and `any_role_of`. Use
 `AuthSubscribeExtension` on subscription fields.
 
-### Scoped Members
+### Guests (collaborations)
 
-A member who was shared a few objects of an organization, and nothing else, gets a
-token with an `objects` claim, keyed by the hub that hosts them:
+A guest of an organization was granted a few *collaborations* of its services, and nothing
+else. Their token says which, by service instance, with the roles they hold in each:
 
 ```json
-{"org": "12", "roles": [], "objects": {"3": ["@mikro/arraydataset:42#derived~8"]}}
+{"org": "12", "roles": [], "collabs": {"12": {"5": ["editor"], "9": []}}}
 ```
 
-Each grant is `<structure>:<id>[#<reach>][~<sharer>]`: the object, how far the share
-reaches beyond it (`self` when left out), and who shared it (`~8`: user 8's `sub`).
+A guest holds a collaboration's roles only inside that collaboration: `editor` in collaboration 5 lets
+them edit what is in collaboration 5, and `[]` lets them view collaboration 9. What a collaboration holds
+is the hosting service's business (`arkitekt_service.collaborations`): authentikate only
+decides whether such a token is served at all, and checks a field's roles against
+the guest's collaborations. The issuer caps a guest's roles to those of whoever granted
+the collaboration, so a guest never holds more than that person.
 
-`token.is_scoped` tells the two kinds of member apart, and `token.grants_for(hub)`
-lists the shared objects as `ObjectGrant(structure, object_id, reach, sharer)`. Which
-rows an object and its reach cover is the hosting service's business: authentikate
-only decides whether such a token is served at all.
-
-A grant reaches no further than its sharer. The issuer leaves out the grants of a
-sharer who is no longer a full member; and where a sharer's membership in *this*
-service is blocked, the GraphQL extension drops their grants from the request's token
-(`authentikate.expand.anarrow_scoped_token`) before anything reads it.
+`token.is_scoped` tells guests from full members, and `token.collabs_here(instance)`
+lists the collaborations granted on one service instance with their roles.
 
 ```python
 AUTHENTIKATE = {
     ...,
-    "HUB": "3",               # this service's hub: the entry of `objects` it reads
+    "AUDIENCE": "12",         # this service instance: tokens must name it, and its entry of `collabs` is read
     "SCOPED_TOKENS": "auto",  # auto | reject | self
 }
 ```
 
-- `auto` (the default) rejects a scoped token (`SCOPED_TOKEN_UNSUPPORTED`) unless
-  something in the process narrows reads to the shared objects and has said so with
-  `authentikate.scoped.enforce_scoped()`. Where it is accepted, it is read-only:
-  mutations and subscriptions are refused (`SCOPED_READ_ONLY`) unless every root field
-  opted in with `AuthExtension(allow_scoped=True)`.
+A service whose audience is `*` names no instance, so it serves no guests.
+
+- `auto` (the default) rejects a guest's token (`SCOPED_TOKEN_UNSUPPORTED`) unless
+  something in the process holds reads to the guest's collaborations and has said so with
+  `authentikate.scoped.enforce_scoped()`. Where it is accepted, mutations and
+  subscriptions are refused (`SCOPED_READ_ONLY`) unless every root field opted in
+  with `AuthExtension(allow_scoped=True)`; subscriptions always are.
 - `reject` always rejects it.
 - `self` accepts it and leaves every rule to the service itself.
 
-A share can also permit a write. `AuthExtension(any_role_of=["editor"],
-shared_by=["@mikro/scene#annotate"])` opens the mutation to scoped members holding a
-grant of a listed structure (anyone else gets `SCOPED_READ_ONLY`). For them, the
-field's roles are not theirs to hold but their **sharer's**: the resolver must check
-that the object it writes to is shared at that reach, and that the grant's sharer
-holds those roles (`arkitekt_service.sharing.require_shared`, which raises
-`SHARE_INSUFFICIENT`). Full members are checked against the roles as before.
+On an opted-in field, a guest passes the role requirements when *one* of their
+collaborations holds them all. The resolver must then check that what it writes to is in
+such a collaboration (`arkitekt_service.collaborations.require_in_collaboration`, which raises
+`SHARE_INSUFFICIENT`). Full members are checked against their roles as before.
 
-The schema says all of it. `@auth` publishes every requirement (`required_*`,
-`any_*`, `allow_scoped`), and `@shared(by: [...])`, in grant notation, says which
-shares permit a mutation. arkitekt-service adds it to types and their fields
-(which share reveals a type, which reach of the parent's share reveals a field):
-
-```graphql
-type Scene @shared(by: ["@mikro/scene"]) {
-  annotations: [Annotation!]! @shared(by: ["#annotate"])
-}
-type Mutation {
-  createAnnotation(input: CreateAnnotationInput!): Annotation!
-    @auth(any_role_of: ["admin", "editor", "bot"], allow_scoped: true)
-    @shared(by: ["@mikro/scene#annotate", "@mikro/annotationcollection#annotate"])
-}
+```python
+@kante.django_mutation(extensions=[AuthExtension(any_role_of=["admin", "editor"], allow_scoped=True)])
+def create_annotation(self, info: Info, input: CreateAnnotationInput) -> Annotation: ...
 ```
 
+`@auth` publishes every requirement (`required_*`, `any_*`, `allow_scoped`).
+
 Outside GraphQL, `require_full_member(token)` and the `@full_members_only` view
-decorator refuse a scoped member (`FULL_MEMBERSHIP_REQUIRED`).
+decorator refuse a guest (`FULL_MEMBERSHIP_REQUIRED`).
 
 The refusal is recorded as the operation's validation errors (`on_validate`). An
 extension that assigns `execution_context.pre_execution_errors` itself, such as

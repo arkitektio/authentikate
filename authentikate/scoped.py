@@ -1,19 +1,23 @@
-"""Whether, and how, this service serves a scoped member.
+"""Whether, and how, this service serves a guest.
 
-A scoped member's token (:attr:`JWTToken.is_scoped`) names the organization like
-any other, but its holder was shared a few objects and nothing else. Every read
-of such a request has to be narrowed to those objects -- and authentikate does
-not know a service's objects. So a scoped token is only accepted where something
-that does has said it narrows them::
+A guest's token (:attr:`JWTToken.is_scoped`) names the organization like any
+other, but its holder was granted a few *collaborations* and nothing else, with roles that
+hold only inside each (``collabs``). Every read of such a request has to be held to
+what is in those collaborations -- and authentikate does not know a service's collaborations. So
+a guest's token is only accepted where something that does has said it holds them
+there::
 
     from authentikate.scoped import enforce_scoped
 
-    enforce_scoped(hub_resolver=lambda: "3")  # e.g. arkitekt-service, once a structure has reaches
+    enforce_scoped()  # e.g. arkitekt-service, for a schema behind its collaboration gate
 
-Until then (``SCOPED_TOKENS: auto``, the default) a scoped token is rejected with
+A guest's collaborations are read for this service instance: its ``audience``, which names it
+(a service whose audience is ``*`` serves no guests).
+
+Until then (``SCOPED_TOKENS: auto``, the default) a guest's token is rejected with
 ``SCOPED_TOKEN_UNSUPPORTED`` at :func:`authentikate.utils.authenticate_token`,
-which every transport goes through: a service that never wired sharing shuts
-scoped members out rather than handing them the organization.
+which every transport goes through: a service that never wired collaborations shuts
+guests out rather than handing them the organization.
 
 Where it is accepted, it is read-only: the GraphQL extension rejects its
 mutations and subscriptions (``SCOPED_READ_ONLY``) unless every root field opted
@@ -28,43 +32,37 @@ import asyncio
 import functools
 from typing import Any, Callable, Literal
 
-from authentikate.base_models import AuthentikateSettings, JWTToken
+from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings, JWTToken
 from authentikate.errors import FullMembershipRequired, ScopedTokenUnsupported
 
 ScopedMode = Literal["enforce", "reject", "self"]
 """What a scoped token meets here, once ``auto`` is resolved."""
 
-HubResolver = Callable[[], "str | None"]
-
-_enforcer: "list[HubResolver | None]" = []
+_enforced: list[bool] = []
 
 
-def enforce_scoped(hub_resolver: HubResolver | None = None) -> None:
-    """Declare that this process narrows every read to a scoped member's objects.
+def enforce_scoped() -> None:
+    """Declare that this process holds every read of a guest to their collaborations.
 
-    Called by whatever does the narrowing, when it is set up. ``hub_resolver``
-    names this service's hub when the ``HUB`` setting does not; it is called on
-    the request path, so it must answer from memory, never from the network.
+    Called by whatever does that, when it is set up.
     """
-    _enforcer[:] = [hub_resolver]
+    _enforced[:] = [True]
 
 
 def stop_enforcing() -> None:
     """Undo :func:`enforce_scoped` (tests)."""
-    _enforcer.clear()
+    _enforced.clear()
 
 
 def is_enforced() -> bool:
-    """Whether something in this process narrows reads to a scoped member's objects."""
-    return bool(_enforcer)
+    """Whether something in this process holds a guest's reads to their collaborations."""
+    return bool(_enforced)
 
 
-def current_hub(settings: AuthentikateSettings) -> str | None:
-    """This service's hub, whose entry of a scoped token's ``objects`` it reads."""
-    if settings.hub is not None:
-        return settings.hub
-    resolver = _enforcer[0] if _enforcer else None
-    return resolver() if resolver is not None else None
+def current_instance(settings: AuthentikateSettings) -> str | None:
+    """This service instance, whose entry of a guest's ``collabs`` it reads: its ``audience``,
+    unless that is ``*`` (any audience names no instance)."""
+    return settings.audience if settings.audience != ANY_AUDIENCE else None
 
 
 def scoped_mode(settings: AuthentikateSettings) -> ScopedMode:
@@ -81,9 +79,9 @@ def check_scoped_token(token: JWTToken, settings: AuthentikateSettings) -> None:
     mode = scoped_mode(settings)
     if mode == "reject":
         raise ScopedTokenUnsupported("This service does not serve scoped members")
-    if mode == "enforce" and current_hub(settings) is None:
+    if mode == "enforce" and current_instance(settings) is None:
         raise ScopedTokenUnsupported(
-            "This service narrows scoped members but does not know its hub (set AUTHENTIKATE.HUB)"
+            "This service serves guests but its audience names no instance (it is *)"
         )
 
 
@@ -101,7 +99,7 @@ def require_full_member(token: JWTToken | None = None) -> JWTToken:
     if token is None:
         raise FullMembershipRequired("No authenticated token")
     if token.is_scoped:
-        raise FullMembershipRequired(f"{token.sub} is a scoped member")
+        raise FullMembershipRequired(f"{token.sub} is a guest")
     return token
 
 
@@ -134,10 +132,9 @@ def full_members_only(view: Callable[..., Any]) -> Callable[..., Any]:
 
 
 __all__ = [
-    "HubResolver",
     "ScopedMode",
     "check_scoped_token",
-    "current_hub",
+    "current_instance",
     "enforce_scoped",
     "full_members_only",
     "is_enforced",

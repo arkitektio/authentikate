@@ -49,10 +49,10 @@ INSUFFICIENT_ORGANIZATION_ROLE = "INSUFFICIENT_ORGANIZATION_ROLE"
 
 
 FULL_MEMBERSHIP_REQUIRED = "FULL_MEMBERSHIP_REQUIRED"
-"""A scoped member (shared objects only) asked for a field that requires a role."""
+"""A guest (granted collaborations only) asked for a field that requires a role."""
 
 SCOPED_READ_ONLY = "SCOPED_READ_ONLY"
-"""A scoped member sent a mutation or subscription that did not opt in to them."""
+"""A guest sent a mutation or subscription that did not opt in to them."""
 
 
 class AuthentikateGraphQLError(KanteError):

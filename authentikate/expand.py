@@ -283,44 +283,6 @@ async def aexpand_token_context(
     )
 
 
-async def anarrow_scoped_token(
-    token: base_models.JWTToken,
-    organization: models.Organization | None,
-) -> base_models.JWTToken:
-    """A scoped token without the grants of sharers whose membership here is blocked.
-
-    A grant reaches no further than its sharer: a sharer this service blocked
-    takes their grants with them. A sharer with no membership here has never
-    used this service, and is not blocked. A full member's token is unchanged.
-    """
-    sharers = token.sharers
-    if not token.is_scoped or not sharers or organization is None:
-        return token
-    blocked = {
-        sub
-        async for sub in models.Membership.objects.filter(
-            organization=organization, user__sub__in=sharers, user__iss=token.iss, blocked=True
-        ).values_list("user__sub", flat=True)
-    }
-    return token.without_sharers(blocked)
-
-
-def narrow_scoped_token(
-    token: base_models.JWTToken,
-    organization: models.Organization | None,
-) -> base_models.JWTToken:
-    """The blocking twin of :func:`anarrow_scoped_token`."""
-    sharers = token.sharers
-    if not token.is_scoped or not sharers or organization is None:
-        return token
-    blocked = set(
-        models.Membership.objects.filter(
-            organization=organization, user__sub__in=sharers, user__iss=token.iss, blocked=True
-        ).values_list("user__sub", flat=True)
-    )
-    return token.without_sharers(blocked)
-
-
 async def aexpand_user_from_token(
     token: base_models.JWTToken,
 ) -> models.User:

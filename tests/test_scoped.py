@@ -1,4 +1,4 @@
-"""Scoped members: a token with an ``objects`` claim, shared a few objects only."""
+"""Guests: a token with a ``collabs`` claim, granted a few collaborations of a service instance only."""
 
 import asyncio
 import copy
@@ -9,18 +9,17 @@ from django.conf import settings
 from kante.testing import GraphQLHttpTestClient, GraphQLWebSocketTestClient
 
 from authentikate import scoped
-from authentikate.base_models import AuthentikateSettings, JWTToken, StaticToken
+from authentikate.base_models import AuthentikateSettings, StaticToken
 from authentikate.errors import FullMembershipRequired, ScopedTokenUnsupported
-from authentikate.grants import ObjectGrant, parse_grant
 from authentikate.utils import authenticate_token
 from test_project.asgi import application
 
-GRANTS = {"3": ["@mikro/arraydataset:42#derived", "@mikro/scene:7", "not a grant"], "9": ["@mikro/scene:1"]}
+COLLABS = {"12": {"5": ["editor"], "9": []}, "13": {"1": ["admin"]}}
 
 
 @pytest.fixture(autouse=True)
 def _no_enforcer():
-    """Every test starts in a process that narrows nothing."""
+    """Every test starts in a process that serves no guests."""
     scoped.stop_enforcing()
     yield
     scoped.stop_enforcing()
@@ -32,133 +31,69 @@ def _token(**claims: Any) -> StaticToken:
 
 def _settings(**options: Any) -> AuthentikateSettings:
     return AuthentikateSettings(
-        audience="*",
+        **{"audience": "*", **options},
         issuers=[],
-        static_tokens={"scoped": _token(objects=GRANTS), "full": StaticToken(sub="member")},
-        **options,
+        static_tokens={"scoped": _token(collabs=COLLABS), "full": StaticToken(sub="member")},
     )
 
 
 # --- the claim --------------------------------------------------------------------------
 
 
-def test_a_token_without_objects_is_a_full_member() -> None:
+def test_a_token_without_collabs_is_a_full_member() -> None:
     assert not StaticToken(sub="member").is_scoped
-    assert StaticToken(sub="member").grants_for("3") == ()
+    assert StaticToken(sub="member").collabs_here("12") == {}
 
 
-def test_empty_objects_share_nothing() -> None:
-    token = _token(objects={})
+def test_empty_collabs_grant_nothing() -> None:
+    token = _token(collabs={})
     assert token.is_scoped
-    assert token.grants_for("3") == ()
+    assert token.collabs_here("12") == {}
 
 
-def test_grants_are_read_for_one_hub_and_unreadable_ones_dropped() -> None:
-    token = _token(objects=GRANTS)
-    assert token.grants_for("3") == (
-        ObjectGrant("@mikro/arraydataset", "42", "derived"),
-        ObjectGrant("@mikro/scene", "7"),
-    )
-    assert token.grants_for("9") == (ObjectGrant("@mikro/scene", "1"),)
-    assert token.grants_for("4") == ()
+def test_collaborations_are_read_for_one_instance_with_their_roles() -> None:
+    token = _token(collabs=COLLABS)
+    assert token.collabs_here("12") == {"5": ("editor",), "9": ()}
+    assert token.collabs_here("14") == {}
+    assert token.collabs_here(None) == {}
 
 
-@pytest.mark.parametrize("claim", [["@mikro/scene:7"], {"3": "@mikro/scene:7"}, {"3": [7]}])
-def test_an_objects_claim_of_another_shape_is_refused(claim: Any) -> None:
+@pytest.mark.parametrize("claim", [["5"], {"12": ["5"]}, {"12": {"5": "editor"}}, {"12": {"5": [1]}}])
+def test_a_collabs_claim_of_another_shape_is_refused(claim: Any) -> None:
     with pytest.raises(ValueError):
-        JWTToken(**{**StaticToken(sub="x").model_dump(), "objects": claim})
+        _token(collabs=claim)
 
 
-@pytest.mark.parametrize(
-    "raw",
-    [
-        "@mikro/arraydataset:42",
-        "@mikro/arraydataset:42#derived",
-        "@kraph.v2/node-x:a_b.c-1#self-and-more",
-        "@mikro/image:42~8",
-        "@mikro/image:42#derived~8",
-        "@mikro/image:42~user.name-1",
-    ],
-)
-def test_parse_grant_round_trips_lok_format(raw: str) -> None:
-    assert str(parse_grant(raw)) == raw.removesuffix("#self")
+# --- accepting a guest's token ----------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "raw",
-    [
-        "@Mikro/arraydataset:42",
-        "mikro/arraydataset:42",
-        "@mikro/arraydataset",
-        "@mikro/arraydataset:",
-        "@mikro/x:1#",
-        "@mikro/x:1#Derived",
-        "@mikro/x:a:b",
-        "@mikro/x:1~",
-        "@mikro/x:~8",
-        "@mikro/x:1~8~9",
-        "@mikro/x:1#~8",
-        "@mikro/x:1~8#derived",
-        "@mikro/x:1~a/b",
-    ],
-)
-def test_parse_grant_refuses_what_lok_would_not_write(raw: str) -> None:
-    with pytest.raises(ValueError):
-        parse_grant(raw)
-
-
-def test_a_grant_names_its_sharer() -> None:
-    assert parse_grant("@mikro/image:42#derived~8") == ObjectGrant("@mikro/image", "42", "derived", "8")
-    assert parse_grant("@mikro/image:42").sharer is None
-
-
-def test_sharers_and_dropping_theirs() -> None:
-    token = _token(objects={"3": ["@mikro/image:1~8", "@mikro/image:2#derived~9", "@mikro/image:3"], "4": ["@mikro/scene:5~8"]})
-    assert token.sharers == {"8", "9"}
-    narrowed = token.without_sharers({"8"})
-    assert narrowed.grants_for("3") == (ObjectGrant("@mikro/image", "2", "derived", "9"), ObjectGrant("@mikro/image", "3"))
-    assert narrowed.grants_for("4") == ()
-    assert narrowed.is_scoped and token.grants_for("4")  # the original is left as it was
-    assert token.without_sharers(set()) is token
-    assert StaticToken(sub="member").without_sharers({"8"}).objects is None
-
-
-# --- accepting a scoped token -----------------------------------------------------------
-
-
-def test_scoped_token_is_rejected_where_nothing_narrows() -> None:
+def test_a_guest_is_rejected_where_no_collaboration_holds_reads() -> None:
     with pytest.raises(ScopedTokenUnsupported):
         asyncio.run(authenticate_token("scoped", _settings()))
     assert asyncio.run(authenticate_token("full", _settings())).sub == "member"
 
 
-def test_scoped_token_is_accepted_where_narrowed_with_a_hub() -> None:
+def test_a_guest_is_accepted_where_held_and_the_audience_names_the_instance() -> None:
     scoped.enforce_scoped()
-    assert asyncio.run(authenticate_token("scoped", _settings(hub=3))).is_scoped
+    assert asyncio.run(authenticate_token("scoped", _settings(audience="12"))).is_scoped
+    assert scoped.current_instance(_settings(audience="12")) == "12"
+    assert scoped.current_instance(_settings()) is None  # `*` names no instance
 
 
-def test_the_hub_may_come_from_the_enforcer() -> None:
-    scoped.enforce_scoped(hub_resolver=lambda: "3")
-    settings = _settings()
-    assert asyncio.run(authenticate_token("scoped", settings)).is_scoped
-    assert scoped.current_hub(settings) == "3"
-    assert scoped.current_hub(_settings(hub="5")) == "5"
-
-
-def test_narrowed_without_a_hub_is_rejected() -> None:
+def test_held_without_an_instance_is_rejected() -> None:
     scoped.enforce_scoped()
     with pytest.raises(ScopedTokenUnsupported):
         asyncio.run(authenticate_token("scoped", _settings()))
     assert asyncio.run(authenticate_token("full", _settings())).sub == "member"
 
 
-def test_reject_rejects_even_where_narrowed() -> None:
+def test_reject_rejects_even_where_held() -> None:
     scoped.enforce_scoped()
     with pytest.raises(ScopedTokenUnsupported):
-        asyncio.run(authenticate_token("scoped", _settings(hub="3", scoped_tokens="reject")))
+        asyncio.run(authenticate_token("scoped", _settings(audience="12", scoped_tokens="reject")))
 
 
-def test_self_accepts_without_an_enforcer_or_hub() -> None:
+def test_self_accepts_without_an_enforcer_or_instance() -> None:
     assert scoped.scoped_mode(_settings(scoped_tokens="self")) == "self"
     assert asyncio.run(authenticate_token("scoped", _settings(scoped_tokens="self"))).is_scoped
 
@@ -166,7 +101,7 @@ def test_self_accepts_without_an_enforcer_or_hub() -> None:
 def test_require_full_member() -> None:
     assert scoped.require_full_member(StaticToken(sub="member")).sub == "member"
     with pytest.raises(FullMembershipRequired):
-        scoped.require_full_member(_token(objects={}))
+        scoped.require_full_member(_token(collabs={}))
     with pytest.raises(FullMembershipRequired):
         scoped.require_full_member()  # no token on the request
 
@@ -176,15 +111,15 @@ def test_require_full_member() -> None:
 
 @pytest.fixture
 def scoped_service(db):
-    """The test project accepting the static tokens ``scoped`` and ``full``, narrowed on hub 3."""
+    """The test project serving guests on instance 12, with the static tokens below."""
     original = settings.AUTHENTIKATE
     settings.AUTHENTIKATE = copy.deepcopy(original)
-    settings.AUTHENTIKATE["HUB"] = "3"
+    settings.AUTHENTIKATE["AUDIENCE"] = "12"
     settings.AUTHENTIKATE["STATIC_TOKENS"] = {
-        "scoped": {"sub": "guest", "iss": "lok", "roles": [], "objects": GRANTS, "scope": "read write"},
+        "scoped": {"sub": "guest", "iss": "lok", "roles": [], "collabs": COLLABS, "scope": "read write"},
+        "viewer": {"sub": "guest", "iss": "lok", "roles": [], "collabs": {"12": {"9": []}, "13": {"1": ["editor"]}}, "scope": "read write"},
         "full": {"sub": "member", "iss": "lok", "scope": "read write"},
         "editor": {"sub": "editor", "iss": "lok", "roles": ["editor"], "scope": "read write"},
-        "no-scene": {"sub": "guest", "iss": "lok", "roles": [], "objects": {"3": ["@mikro/image:1~8"]}},
     }
     scoped.enforce_scoped()
     yield
@@ -201,42 +136,10 @@ def _reason(answer: dict[str, Any]) -> str | None:
     return errors[0]["extensions"].get("reason") if errors else None
 
 
-SHARED = {"3": ["@mikro/image:1~8", "@mikro/image:2#derived~9", "@mikro/image:3"]}
-
-
-@pytest.fixture
-def shared_by_two(scoped_service):
-    """The static token `shared` lists grants of sharers 8 and 9, and one that names none."""
-    settings.AUTHENTIKATE["STATIC_TOKENS"]["shared"] = {"sub": "guest", "iss": "lok", "roles": [], "objects": SHARED}
-
-
-def _member(sub: str, org: str, *, blocked: bool) -> None:
-    from authentikate.models import Membership, Organization, User
-
-    # Rows written through the app outlive a test here, so this is idempotent.
-    user, _ = User.objects.get_or_create(sub=sub, iss="lok", defaults={"username": f"u{sub}"})
-    organization, _ = Organization.objects.get_or_create(slug=org)
-    Membership.objects.filter(user=user).delete()
-    Membership.objects.create(user=user, organization=organization, blocked=blocked)
-
-
 @pytest.mark.asyncio
-async def test_a_blocked_sharer_takes_their_grants_along(shared_by_two) -> None:
-    from asgiref.sync import sync_to_async
-
-    await sync_to_async(_member)("8", "static_org", blocked=True)
-    await sync_to_async(_member)("9", "static_org", blocked=False)
-    answer = await _run("shared", 'query { grants(hub: "3") }')
-    assert answer["data"]["grants"] == ["@mikro/image:2#derived~9", "@mikro/image:3"]
-
-
-@pytest.mark.asyncio
-async def test_a_sharer_blocked_elsewhere_or_unknown_here_still_shares(shared_by_two) -> None:
-    from asgiref.sync import sync_to_async
-
-    await sync_to_async(_member)("8", "another_org", blocked=True)
-    answer = await _run("shared", 'query { grants(hub: "3") }')
-    assert answer["data"]["grants"] == SHARED["3"]
+async def test_a_guest_reads_their_collabs_here(scoped_service) -> None:
+    answer = await _run("scoped", "query { collabs }")
+    assert answer["data"]["collabs"] == ["5:editor", "9:"]
 
 
 @pytest.mark.asyncio
@@ -381,19 +284,19 @@ async def test_full_members_only_view(scoped_service) -> None:
 
 
 
-# --- a mutation shares can permit, and what the schema says --------------------------------
+# --- roles that hold inside a collaboration -------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_a_share_of_a_listed_structure_opens_the_mutation(scoped_service) -> None:
+async def test_a_role_a_collaboration_holds_opens_the_field(scoped_service) -> None:
     answer = await _run("scoped", "mutation { annotate }")
-    assert answer["data"]["annotate"] == "annotated"  # the role is the sharer's to hold, checked by the resolver
+    assert answer["data"]["annotate"] == "annotated"  # editor in collaboration 5; the resolver checks the target's collaboration
 
 
 @pytest.mark.asyncio
-async def test_no_share_of_a_listed_structure_is_refused(scoped_service) -> None:
-    answer = await _run("no-scene", "mutation { annotate }")
-    assert _reason(answer) == "SCOPED_READ_ONLY"
+async def test_a_role_held_only_in_another_instances_collaboration_does_not(scoped_service) -> None:
+    answer = await _run("viewer", "mutation { annotate }")
+    assert _reason(answer) == "INSUFFICIENT_ROLE"
 
 
 @pytest.mark.asyncio
@@ -402,15 +305,14 @@ async def test_a_member_still_needs_the_role(scoped_service) -> None:
     assert (await _run("editor", "mutation { annotate }"))["data"]["annotate"] == "annotated"
 
 
-def test_the_schema_says_who_may_and_through_which_share() -> None:
+def test_the_schema_says_who_may() -> None:
     from test_project.schema import schema
 
     sdl = str(schema)
     lines = {line.strip().split(":")[0]: line.strip() for line in sdl.splitlines() if line.startswith("  ")}
-    assert lines["annotate"] == 'annotate: String! @auth(any_role_of: ["editor"], allow_scoped: true) @shared(by: ["@mikro/scene#annotate"])'
+    assert lines["annotate"] == 'annotate: String! @auth(any_role_of: ["editor"], allow_scoped: true)'
     assert lines["yieldOpen"] == "yieldOpen: String! @auth"  # only what a field requires is said
-    assert "directive @shared(by: [String!]!) on OBJECT | FIELD_DEFINITION" in sdl
-
+    assert "@shared" not in sdl
 
 
 @pytest.mark.asyncio

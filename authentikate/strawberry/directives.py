@@ -3,7 +3,6 @@ from strawberry import UNSET
 from typing import Awaitable, Callable, Any, Optional, List, Sequence
 from authentikate.strawberry.errors import (
     FULL_MEMBERSHIP_REQUIRED,
-    SCOPED_READ_ONLY,
     INSUFFICIENT_ORGANIZATION_ROLE,
     INSUFFICIENT_ROLE,
     INSUFFICIENT_SCOPE,
@@ -47,31 +46,11 @@ class Auth:
     allow_scoped: Optional[bool] = strawberry.directive_field(
         name="allow_scoped", default=UNSET
     )
-    """Whether a scoped member (shared objects only) may call this mutation.
+    """Whether a guest (granted collaborations only) may call this mutation.
 
-    Published only where it is true: on a read-like mutation (a download link)
-    whose resolver checks the object it hands out is shared.
+    Published only where it is true. A guest's roles are those of their collaborations:
+    the resolver checks the object it acts on is in a collaboration where they hold them.
     """
-
-
-@strawberry.schema_directive(
-    locations=[Location.OBJECT, Location.FIELD_DEFINITION], name="shared"
-)
-class Shared:
-    """Which shares reach this, in grant notation (``<structure>[#<reach>]``).
-
-    On a type: the grants through which a scoped member sees its rows. On a
-    field of a shared type: the reaches of the parent's share that reveal it
-    (``#derived``); ``[]`` when no share of the parent does. On a mutation: the
-    shares that permit it, one of them per call.
-    """
-
-    by: List[str]
-
-
-def _structure_of(shared: str) -> str:
-    """``@mikro/scene#annotate`` → ``@mikro/scene``."""
-    return shared.partition("#")[0]
 
 
 def _as_list(value: Optional[List[str]] | str) -> Optional[List[str]]:
@@ -127,21 +106,15 @@ class _AuthChecks:
         org_roles: Optional[List[str]] | str = None,
         any_org_role_of: Optional[List[str]] = None,
         allow_scoped: bool = False,
-        shared_by: Optional[List[str]] = None,
     ) -> None:
         """Record the requirements this field places on the caller.
 
-        ``allow_scoped`` opens a mutation to scoped members, who are otherwise
-        refused every mutation and subscription (``SCOPED_READ_ONLY``). The
-        resolver then answers for checking that what it touches is shared.
-
-        ``shared_by`` (``["@mikro/scene#annotate"]``) opens it to the scoped
-        members those shares were made with, and says so in the schema
-        (``@shared``). A scoped member holding no grant of those structures is
-        refused here; whether the grant they hold covers the object and reach,
-        and whether its sharer holds the roles this field requires, is the
-        resolver's to check (``arkitekt_service.sharing.require_shared``). For a
-        scoped member the roles are the sharer's to hold, not theirs.
+        ``allow_scoped`` opens a mutation to guests, who are otherwise refused
+        every mutation and subscription (``SCOPED_READ_ONLY``). A guest's roles
+        are those of the collaborations granted to them, each holding only inside its
+        collaboration: the field passes when one of their collaborations holds what it requires,
+        and the resolver answers for checking that what it touches is in such a
+        collaboration (``arkitekt_service.collaborations.require_in_collaboration``).
         """
         self.scopes: Optional[List[str]] = _as_list(scopes)
         self.roles: Optional[List[str]] = _as_list(roles)
@@ -149,8 +122,7 @@ class _AuthChecks:
         self.any_scope_of: Optional[List[str]] = any_scope_of
         self.org_roles: Optional[List[str]] = _as_list(org_roles)
         self.any_org_role_of: Optional[List[str]] = any_org_role_of
-        self.shared_by: Optional[List[str]] = shared_by
-        self.allow_scoped: bool = allow_scoped or bool(shared_by)
+        self.allow_scoped: bool = allow_scoped
 
     def _directive(self) -> Auth:
         """The schema directive describing these requirements."""
@@ -165,8 +137,8 @@ class _AuthChecks:
         )
 
     def _directives(self) -> list[object]:
-        """Every schema directive this field carries: ``@auth``, and ``@shared`` when shares permit it."""
-        return [self._directive(), *([Shared(by=list(self.shared_by))] if self.shared_by else [])]
+        """Every schema directive this field carries: ``@auth``."""
+        return [self._directive()]
 
     def check(self, info: Info) -> None:
         """Raise a coded error unless the request satisfies every requirement.
@@ -194,15 +166,9 @@ class _AuthChecks:
         requires_roles = bool(
             self.roles or self.any_role_of or self.org_roles or self.any_org_role_of
         )
-        if token.is_scoped and self.shared_by and not self._holds_a_share(token):
-            raise denied(
-                "Nothing shared with you permits this",
-                SCOPED_READ_ONLY,
-                sharedBy=self.shared_by,
-            )
         if token.is_scoped and requires_roles and not self.allow_scoped:
-            # A scoped member holds no role, so these would fail below anyway;
-            # said here so that it stays true whatever roles a token carries.
+            # A guest holds no role in the organization, so these would fail below
+            # anyway; said here so that it stays true whatever roles a token carries.
             raise denied(
                 "This field requires full membership of the organization",
                 FULL_MEMBERSHIP_REQUIRED,
@@ -223,8 +189,11 @@ class _AuthChecks:
             )
 
         if token.is_scoped:
-            # Opened to scoped members: the roles are their sharer's to hold,
-            # which the resolver checks against the grant it acts on.
+            if requires_roles and not self._a_collaboration_holds(token):
+                raise denied(
+                    "None of your collaborations grants you the roles this requires",
+                    INSUFFICIENT_ROLE,
+                )
             return
 
         if self.roles and not token.has_roles(self.roles):
@@ -245,16 +214,22 @@ class _AuthChecks:
         if self.org_roles or self.any_org_role_of:
             self._check_org_roles(info)
 
-    def _holds_a_share(self, token: JWTToken) -> bool:
-        """Whether the token holds a grant of any structure ``shared_by`` names, on this hub."""
-        from authentikate.scoped import current_hub
+    def _a_collaboration_holds(self, token: JWTToken) -> bool:
+        """Whether one of the guest's collaborations here holds every role this field requires."""
+        from authentikate.scoped import current_instance
         from authentikate.settings import get_settings
 
-        hub = current_hub(get_settings())
-        if hub is None:
-            return False
-        structures = {_structure_of(shared) for shared in self.shared_by or ()}
-        return any(grant.structure in structures for grant in token.grants_for(hub))
+        every = set(self.roles or ()) | set(self.org_roles or ())
+        for roles in token.collabs_here(current_instance(get_settings())).values():
+            held = set(roles)
+            if not every <= held:
+                continue
+            if self.any_role_of and not held & set(self.any_role_of):
+                continue
+            if self.any_org_role_of and not held & set(self.any_org_role_of):
+                continue
+            return True
+        return False
 
     def _check_org_roles(self, info: Info) -> None:
         """Enforce the org-scoped role requirements against the membership."""
@@ -354,4 +329,4 @@ class AuthSubscribeExtension(_AuthChecks, FieldExtension):
         return next_(source, info, **kwargs)
 
 
-all_directives = [Auth, Shared]
+all_directives = [Auth]

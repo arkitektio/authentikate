@@ -44,12 +44,15 @@ class Query:
         return client.release.app if client and client.release else None
 
     @kante.django_field
-    def grants(self, info: Info, hub: str) -> list[str]:
-        """The objects the request's token shares on ``hub``, as written."""
+    def collabs(self, info: Info) -> list[str]:
+        """The collaborations the request's token grants here, as ``<collaboration>:<role>,<role>``."""
+        from authentikate.scoped import current_instance
+        from authentikate.settings import get_settings
         from authentikate.vars import get_token
 
         token = get_token()
-        return [str(grant) for grant in token.grants_for(hub)] if token else []
+        here = token.collabs_here(current_instance(get_settings())) if token else {}
+        return [f"{collaboration}:{','.join(roles)}" for collaboration, roles in sorted(here.items())]
 
     @kante.django_field
     def device(self, info: Info) -> Device | None:
@@ -89,19 +92,17 @@ class Mutation:
         """A read-like mutation a scoped member may call."""
         return "signed"
 
-    @kante.django_mutation(
-        extensions=[AuthExtension(any_role_of=["editor"], shared_by=["@mikro/scene#annotate"])]
-    )
+    @kante.django_mutation(extensions=[AuthExtension(any_role_of=["editor"], allow_scoped=True)])
     def annotate(self, info: Info) -> str:
-        """A write a share can permit: editors, and guests shared a scene to annotate."""
+        """A write a collaboration can permit: editors, and guests who are editors in one of their collaborations."""
         return "annotated"
 
-    @kante.django_mutation(extensions=[AuthExtension(shared_by=["@mikro/scene#annotate"])])
+    @kante.django_mutation(extensions=[AuthExtension(allow_scoped=True)])
     def refuse(self, info: Info) -> str:
-        """A resolver that refuses, as one checking a share does."""
+        """A resolver that refuses, as one checking the target's collaboration does."""
         from authentikate.errors import ShareInsufficient
 
-        raise ShareInsufficient("scene 7 is not shared with you to annotate")
+        raise ShareInsufficient("scene 7 is in none of your collaborations")
 
     @kante.django_mutation(extensions=[AuthExtension(roles="admin")])
     def administrate(self, info: Info) -> str:

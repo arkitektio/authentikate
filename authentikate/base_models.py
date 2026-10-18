@@ -19,7 +19,6 @@ import datetime
 from typing import Dict, Any
 from joserfc.jwk import KeySet, RSAKey
 from authentikate.errors import JwksError, InvalidJwtTokenError
-from authentikate.grants import ObjectGrant, parse_grant
 from authentikate.revocation import RevocationList
 
 
@@ -155,14 +154,30 @@ class JWTToken(BaseModel):
     client_device: str | None = None
     """ The client device identifier """
 
-    objects: dict[str, list[str]] | None = None
-    """The objects a scoped member was shared, by hub: ``{"3": ["@mikro/arraydataset:42"]}``.
+    collabs: dict[str, dict[str, list[str]]] | None = None
+    """The collaborations a guest was granted, by service instance, with their roles there:
+    ``{"12": {"5": ["editor"], "9": []}}``.
 
     Absent (None) for a full member, who acts for the whole organization. Present
-    -- even empty -- for a scoped member, who may see only these. ``{}`` or no
-    entry for a hub shares nothing there; it never means "everything". See
-    :mod:`authentikate.grants`.
+    -- even empty -- for a guest, who may see only what is in these collaborations, and
+    holds each collaboration's roles only inside it (``[]``: view only). No entry for an
+    instance grants nothing there; it never means "everything".
     """
+
+    @field_validator("collabs", mode="before")
+    @classmethod
+    def collabs_are_roles_by_collaboration_by_instance(cls, v: Any) -> Any:
+        """Refuse a ``collabs`` claim of any other shape: it would grant who knows what."""
+        if v is None:
+            return v
+        if not isinstance(v, dict) or not all(
+            isinstance(instance, str)
+            and isinstance(collaborations, dict)
+            and all(isinstance(collaboration, str) and isinstance(roles, list) and all(isinstance(r, str) for r in roles) for collaboration, roles in collaborations.items())
+            for instance, collaborations in v.items()
+        ):
+            raise ValueError("collaborations must map service instances to collaborations to lists of roles")
+        return v
 
     @field_validator("aud", mode="before")
     @classmethod
@@ -206,54 +221,17 @@ class JWTToken(BaseModel):
 
     @property
     def is_scoped(self) -> bool:
-        """Whether the token is a scoped member's: shared some objects, not the organization."""
-        return self.objects is not None
+        """Whether the token is a guest's: granted some collaborations, not the organization."""
+        return self.collabs is not None
 
-    def grants_for(self, hub: str) -> tuple[ObjectGrant, ...]:
-        """The objects shared with this member on ``hub`` (the issuer's hub pk).
+    def collabs_here(self, instance: str | None) -> dict[str, tuple[str, ...]]:
+        """The collaborations granted on the service ``instance``, each with the roles held in it.
 
-        Empty for a full member too: ask :attr:`is_scoped` first. An entry that
-        does not parse is dropped and logged -- it shares nothing.
+        Empty for a full member too: ask :attr:`is_scoped` first.
         """
-        grants: list[ObjectGrant] = []
-        for raw in (self.objects or {}).get(str(hub), ()):
-            try:
-                grants.append(parse_grant(raw))
-            except ValueError as error:
-                logger.warning("Dropping an unreadable object grant of %s: %s", self.sub, error)
-        return tuple(grants)
-
-    @property
-    def sharers(self) -> frozenset[str]:
-        """Who shared the objects listed, on any hub (``~8``); empty when the issuer does not say."""
-        found: set[str] = set()
-        for raws in (self.objects or {}).values():
-            for raw in raws:
-                try:
-                    sharer = parse_grant(raw).sharer
-                except ValueError:
-                    continue
-                if sharer is not None:
-                    found.add(sharer)
-        return frozenset(found)
-
-    def without_sharers(self, sharers: "set[str] | frozenset[str]") -> "JWTToken":
-        """This token, listing none of the objects these sharers shared.
-
-        A grant reaches no further than its sharer: whoever may no longer share
-        here takes their grants with them. The rest stay as the issuer wrote them.
-        """
-        if self.objects is None or not sharers:
-            return self
-
-        def kept(raw: str) -> bool:
-            try:
-                return parse_grant(raw).sharer not in sharers
-            except ValueError:
-                return False
-
-        objects = {hub: [raw for raw in raws if kept(raw)] for hub, raws in self.objects.items()}
-        return self.model_copy(update={"objects": objects})
+        if instance is None:
+            return {}
+        return {collaboration: tuple(roles) for collaboration, roles in (self.collabs or {}).get(str(instance), {}).items()}
 
     @property
     def profile(self) -> dict[str, str | bool | None]:
@@ -1043,35 +1021,19 @@ class AuthentikateSettings(BaseModel):
         ),
     )
     """Escape hatch to permit ``static_tokens`` while ``DEBUG`` is False."""
-    hub: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("hub", "HUB"),
-    )
-    """The issuer's id of the hub this service runs in (lok's hub pk, as a string).
-
-    A scoped token lists its objects by hub; this is the entry this service reads.
-    Unset, whatever enforces scoping here may name it (:mod:`authentikate.scoped`).
-    """
     scoped_tokens: Literal["auto", "reject", "self"] = Field(
         default="auto",
         validation_alias=AliasChoices("scoped_tokens", "SCOPED_TOKENS"),
     )
-    """What this service does with a scoped member's token (one with ``objects``).
+    """What this service does with a guest's token (one with ``collabs``).
 
-    ``auto`` (the default) accepts it read-only where something narrows reads to
-    the shared objects (:func:`authentikate.scoped.enforce_scoped`), and rejects
+    ``auto`` (the default) accepts it read-only where something holds reads to
+    the guest's collaborations (:func:`authentikate.scoped.enforce_scoped`), and rejects
     it everywhere else. ``reject`` always rejects it. ``self`` accepts it and
     leaves every rule to the service itself -- for a service that already knows
     what a scoped member may do (lok).
     """
 
-    @field_validator("hub", mode="before")
-    @classmethod
-    def hub_to_string(cls, v: str | int | None) -> str | None:
-        """A hub pk written as a number in YAML is the same hub."""
-        if isinstance(v, int):
-            return str(v)
-        return v
 
     @field_validator("algorithms")
     @classmethod

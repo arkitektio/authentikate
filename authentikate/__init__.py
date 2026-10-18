@@ -67,7 +67,6 @@ if TYPE_CHECKING:
         ShareInsufficient,
         TokenRevokedError,
     )
-    from authentikate.grants import ObjectGrant, parse_grant
     from authentikate.scoped import (
         enforce_scoped,
         full_members_only,
@@ -101,9 +100,7 @@ _EXPORTS: dict[str, str] = {
     # tokens
     "JWTToken": "authentikate.base_models",
     "StaticToken": "authentikate.base_models",
-    "ObjectGrant": "authentikate.grants",
-    "parse_grant": "authentikate.grants",
-    # scoped members (shared objects only)
+    # guests (granted collaborations only)
     "enforce_scoped": "authentikate.scoped",
     "require_full_member": "authentikate.scoped",
     "full_members_only": "authentikate.scoped",
@@ -161,7 +158,6 @@ __all__ = [
     "MalformedJwtTokenError",
     "MissingActiveOrganization",
     "NoAuthorizationHeader",
-    "ObjectGrant",
     "OrganizationNotAllowed",
     "ScopedReadOnly",
     "ScopedTokenUnsupported",
@@ -184,7 +180,6 @@ __all__ = [
     "get_settings",
     "get_token",
     "get_user",
-    "parse_grant",
     "require_full_member",
 ]
 

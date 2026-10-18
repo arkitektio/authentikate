@@ -57,8 +57,8 @@ async def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTT
         decoded = await adecode_token(token, settings)
 
     _check_organization_allowed(decoded, settings)
-    # A scoped member's token is only served where reads are narrowed to its
-    # objects (authentikate.scoped); everywhere else it is rejected here, before
+    # A guest's token is only served where reads are held to its collaborations
+    # (authentikate.scoped); everywhere else it is rejected here, before
     # any expansion writes a row for it.
     check_scoped_token(decoded, settings)
 
