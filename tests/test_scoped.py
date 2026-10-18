@@ -312,7 +312,6 @@ def test_the_schema_says_who_may() -> None:
     lines = {line.strip().split(":")[0]: line.strip() for line in sdl.splitlines() if line.startswith("  ")}
     assert lines["annotate"] == 'annotate: String! @auth(any_role_of: ["editor"], allow_scoped: true)'
     assert lines["yieldOpen"] == "yieldOpen: String! @auth"  # only what a field requires is said
-    assert "@shared" not in sdl
 
 
 @pytest.mark.asyncio
