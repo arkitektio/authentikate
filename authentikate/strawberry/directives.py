@@ -1,4 +1,5 @@
 import strawberry
+from strawberry import UNSET
 from typing import Awaitable, Callable, Any, Optional, List, Sequence
 from authentikate.strawberry.errors import (
     FULL_MEMBERSHIP_REQUIRED,
@@ -19,28 +20,32 @@ from authentikate.base_models import JWTToken
 
 @strawberry.schema_directive(locations=[Location.FIELD_DEFINITION])
 class Auth:
-    """A directive to enforce authentication and authorization on fields."""
+    """A directive to enforce authentication and authorization on fields.
+
+    It prints only what the field requires (``@auth(any_role_of: ["editor"])``, or a bare
+    ``@auth`` for authentication alone): a requirement left unset is left out.
+    """
 
     required_scopes: Optional[List[str]] = strawberry.directive_field(
-        name="required_scopes", default=None
+        name="required_scopes", default=UNSET
     )
     required_roles: Optional[List[str]] = strawberry.directive_field(
-        name="required_roles", default=None
+        name="required_roles", default=UNSET
     )
     required_org_roles: Optional[List[str]] = strawberry.directive_field(
-        name="required_org_roles", default=None
+        name="required_org_roles", default=UNSET
     )
     any_scope_of: Optional[List[str]] = strawberry.directive_field(
-        name="any_scope_of", default=None
+        name="any_scope_of", default=UNSET
     )
     any_role_of: Optional[List[str]] = strawberry.directive_field(
-        name="any_role_of", default=None
+        name="any_role_of", default=UNSET
     )
     any_org_role_of: Optional[List[str]] = strawberry.directive_field(
-        name="any_org_role_of", default=None
+        name="any_org_role_of", default=UNSET
     )
     allow_scoped: Optional[bool] = strawberry.directive_field(
-        name="allow_scoped", default=None
+        name="allow_scoped", default=UNSET
     )
     """Whether a scoped member (shared objects only) may call this mutation.
 
@@ -150,13 +155,13 @@ class _AuthChecks:
     def _directive(self) -> Auth:
         """The schema directive describing these requirements."""
         return Auth(
-            required_scopes=self.scopes,
-            required_roles=self.roles,
-            required_org_roles=self.org_roles,
-            any_scope_of=self.any_scope_of,
-            any_role_of=self.any_role_of,
-            any_org_role_of=self.any_org_role_of,
-            allow_scoped=True if self.allow_scoped else None,
+            required_scopes=self.scopes or UNSET,
+            required_roles=self.roles or UNSET,
+            required_org_roles=self.org_roles or UNSET,
+            any_scope_of=self.any_scope_of or UNSET,
+            any_role_of=self.any_role_of or UNSET,
+            any_org_role_of=self.any_org_role_of or UNSET,
+            allow_scoped=True if self.allow_scoped else UNSET,
         )
 
     def _directives(self) -> list[object]:

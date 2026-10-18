@@ -406,7 +406,7 @@ def test_the_schema_says_who_may_and_through_which_share() -> None:
     from test_project.schema import schema
 
     sdl = str(schema)
-    (line,) = [line for line in sdl.splitlines() if line.strip().startswith("annotate:")]
-    assert 'any_role_of: ["editor"]' in line and "allow_scoped: true" in line
-    assert line.endswith('@shared(by: ["@mikro/scene#annotate"])')
+    lines = {line.strip().split(":")[0]: line.strip() for line in sdl.splitlines() if line.startswith("  ")}
+    assert lines["annotate"] == 'annotate: String! @auth(any_role_of: ["editor"], allow_scoped: true) @shared(by: ["@mikro/scene#annotate"])'
+    assert lines["yieldOpen"] == "yieldOpen: String! @auth"  # only what a field requires is said
     assert "directive @shared(by: [String!]!) on OBJECT | FIELD_DEFINITION" in sdl
