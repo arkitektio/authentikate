@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v4.4.0 (2026-10-18)
+
+### Features
+
+- A grant names who shared it, and reaches no further than they may
+  ([`a8febbc`](https://github.com/arkitektio/authentikate/commit/a8febbcea5d9a6d2808c75d62d15708a378d3ffd))
+
+A grant in the `objects` claim may end in `~<sharer>`, the sharer's sub:
+  `@mikro/image:42#derived~8`. `ObjectGrant.sharer` carries it, `parse_grant` and `str()` round-trip
+  it, and grants without one still parse.
+
+Where a sharer's membership in this service is blocked, the GraphQL extension drops their grants
+  from the request's token (`anarrow_scoped_token`, and its sync twin) before anything reads it; a
+  sharer with no membership here has never used the service and is not blocked. `JWTToken.sharers`
+  and `without_sharers` do the bookkeeping.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+- A share can permit a write, and the schema says what each field requires and which share reaches
+  it
+  ([`c832c96`](https://github.com/arkitektio/authentikate/commit/c832c96a28fff2ab44875ab2622e07f4bda70ea5))
+
+`@auth` now publishes every requirement: `any_scope_of`, `any_role_of` and `any_org_role_of` were
+  checked but never shown. A new `@shared(by: [...])` schema directive (OBJECT, FIELD_DEFINITION)
+  speaks the grant notation: which shares reveal a type, which reach of the parent's share reveals a
+  field, which shares permit a mutation.
+
+`AuthExtension(..., shared_by=["@mikro/scene#annotate"])` opens a mutation to scoped members holding
+  a grant of a listed structure, publishes `@shared`, and refuses everyone else among them
+  (SCOPED_READ_ONLY). For a scoped member the field's roles are their sharer's to hold: the resolver
+  checks the object, the reach and the sharer (SHARE_INSUFFICIENT, raised by arkitekt-service's
+  `require_shared`). Full members are checked as before.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v4.3.0 (2026-10-17)
 
 ### Bug Fixes
