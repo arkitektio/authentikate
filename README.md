@@ -189,6 +189,30 @@ AUTHENTIKATE = {
 - `reject` always rejects it.
 - `self` accepts it and leaves every rule to the service itself.
 
+A share can also permit a write. `AuthExtension(any_role_of=["editor"],
+shared_by=["@mikro/scene#annotate"])` opens the mutation to scoped members holding a
+grant of a listed structure (anyone else gets `SCOPED_READ_ONLY`). For them, the
+field's roles are not theirs to hold but their **sharer's**: the resolver must check
+that the object it writes to is shared at that reach, and that the grant's sharer
+holds those roles (`arkitekt_service.sharing.require_shared`, which raises
+`SHARE_INSUFFICIENT`). Full members are checked against the roles as before.
+
+The schema says all of it. `@auth` publishes every requirement (`required_*`,
+`any_*`, `allow_scoped`), and `@shared(by: [...])`, in grant notation, says which
+shares permit a mutation. arkitekt-service adds it to types and their fields
+(which share reveals a type, which reach of the parent's share reveals a field):
+
+```graphql
+type Scene @shared(by: ["@mikro/scene"]) {
+  annotations: [Annotation!]! @shared(by: ["#annotate"])
+}
+type Mutation {
+  createAnnotation(input: CreateAnnotationInput!): Annotation!
+    @auth(any_role_of: ["admin", "editor", "bot"], allow_scoped: true)
+    @shared(by: ["@mikro/scene#annotate", "@mikro/annotationcollection#annotate"])
+}
+```
+
 Outside GraphQL, `require_full_member(token)` and the `@full_members_only` view
 decorator refuse a scoped member (`FULL_MEMBERSHIP_REQUIRED`).
 

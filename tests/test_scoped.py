@@ -183,6 +183,8 @@ def scoped_service(db):
     settings.AUTHENTIKATE["STATIC_TOKENS"] = {
         "scoped": {"sub": "guest", "iss": "lok", "roles": [], "objects": GRANTS, "scope": "read write"},
         "full": {"sub": "member", "iss": "lok", "scope": "read write"},
+        "editor": {"sub": "editor", "iss": "lok", "roles": ["editor"], "scope": "read write"},
+        "no-scene": {"sub": "guest", "iss": "lok", "roles": [], "objects": {"3": ["@mikro/image:1~8"]}},
     }
     scoped.enforce_scoped()
     yield
@@ -376,3 +378,35 @@ async def test_full_members_only_view(scoped_service) -> None:
     assert response.content == b"member"
     with pytest.raises(FullMembershipRequired):
         await upload(factory.get("/", HTTP_AUTHORIZATION="Bearer scoped"))
+
+
+
+# --- a mutation shares can permit, and what the schema says --------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_share_of_a_listed_structure_opens_the_mutation(scoped_service) -> None:
+    answer = await _run("scoped", "mutation { annotate }")
+    assert answer["data"]["annotate"] == "annotated"  # the role is the sharer's to hold, checked by the resolver
+
+
+@pytest.mark.asyncio
+async def test_no_share_of_a_listed_structure_is_refused(scoped_service) -> None:
+    answer = await _run("no-scene", "mutation { annotate }")
+    assert _reason(answer) == "SCOPED_READ_ONLY"
+
+
+@pytest.mark.asyncio
+async def test_a_member_still_needs_the_role(scoped_service) -> None:
+    assert _reason(await _run("full", "mutation { annotate }")) == "INSUFFICIENT_ROLE"
+    assert (await _run("editor", "mutation { annotate }"))["data"]["annotate"] == "annotated"
+
+
+def test_the_schema_says_who_may_and_through_which_share() -> None:
+    from test_project.schema import schema
+
+    sdl = str(schema)
+    (line,) = [line for line in sdl.splitlines() if line.strip().startswith("annotate:")]
+    assert 'any_role_of: ["editor"]' in line and "allow_scoped: true" in line
+    assert line.endswith('@shared(by: ["@mikro/scene#annotate"])')
+    assert "directive @shared(by: [String!]!) on OBJECT | FIELD_DEFINITION" in sdl

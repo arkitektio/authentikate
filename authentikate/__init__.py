@@ -64,6 +64,7 @@ if TYPE_CHECKING:
         FullMembershipRequired,
         ScopedReadOnly,
         ScopedTokenUnsupported,
+        ShareInsufficient,
         TokenRevokedError,
     )
     from authentikate.grants import ObjectGrant, parse_grant
@@ -141,6 +142,7 @@ _EXPORTS: dict[str, str] = {
     "ScopedTokenUnsupported": "authentikate.errors",
     "ScopedReadOnly": "authentikate.errors",
     "FullMembershipRequired": "authentikate.errors",
+    "ShareInsufficient": "authentikate.errors",
 }
 
 __all__ = [
@@ -163,6 +165,7 @@ __all__ = [
     "OrganizationNotAllowed",
     "ScopedReadOnly",
     "ScopedTokenUnsupported",
+    "ShareInsufficient",
     "StaticToken",
     "TokenRevokedError",
     "adecode_token",

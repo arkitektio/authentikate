@@ -89,6 +89,13 @@ class Mutation:
         """A read-like mutation a scoped member may call."""
         return "signed"
 
+    @kante.django_mutation(
+        extensions=[AuthExtension(any_role_of=["editor"], shared_by=["@mikro/scene#annotate"])]
+    )
+    def annotate(self, info: Info) -> str:
+        """A write a share can permit: editors, and guests shared a scene to annotate."""
+        return "annotated"
+
     @kante.django_mutation(extensions=[AuthExtension(roles="admin")])
     def administrate(self, info: Info) -> str:
         """A mutation gated on a role."""

@@ -8,6 +8,7 @@ from .errors import (
 from .directives import (
     AuthExtension,
     Auth,
+    Shared,
     all_directives,
     AuthSubscribeExtension,
     get_org_roles,
@@ -22,6 +23,7 @@ __all__ = [
     "to_graphql_error",
     "AuthExtension",
     "Auth",
+    "Shared",
     "all_directives",
     "AuthSubscribeExtension",
     "get_org_roles",

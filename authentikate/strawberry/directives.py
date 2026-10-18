@@ -2,6 +2,7 @@ import strawberry
 from typing import Awaitable, Callable, Any, Optional, List, Sequence
 from authentikate.strawberry.errors import (
     FULL_MEMBERSHIP_REQUIRED,
+    SCOPED_READ_ONLY,
     INSUFFICIENT_ORGANIZATION_ROLE,
     INSUFFICIENT_ROLE,
     INSUFFICIENT_SCOPE,
@@ -29,6 +30,15 @@ class Auth:
     required_org_roles: Optional[List[str]] = strawberry.directive_field(
         name="required_org_roles", default=None
     )
+    any_scope_of: Optional[List[str]] = strawberry.directive_field(
+        name="any_scope_of", default=None
+    )
+    any_role_of: Optional[List[str]] = strawberry.directive_field(
+        name="any_role_of", default=None
+    )
+    any_org_role_of: Optional[List[str]] = strawberry.directive_field(
+        name="any_org_role_of", default=None
+    )
     allow_scoped: Optional[bool] = strawberry.directive_field(
         name="allow_scoped", default=None
     )
@@ -37,6 +47,26 @@ class Auth:
     Published only where it is true: on a read-like mutation (a download link)
     whose resolver checks the object it hands out is shared.
     """
+
+
+@strawberry.schema_directive(
+    locations=[Location.OBJECT, Location.FIELD_DEFINITION], name="shared"
+)
+class Shared:
+    """Which shares reach this, in grant notation (``<structure>[#<reach>]``).
+
+    On a type: the grants through which a scoped member sees its rows. On a
+    field of a shared type: the reaches of the parent's share that reveal it
+    (``#derived``); ``[]`` when no share of the parent does. On a mutation: the
+    shares that permit it, one of them per call.
+    """
+
+    by: List[str]
+
+
+def _structure_of(shared: str) -> str:
+    """``@mikro/scene#annotate`` → ``@mikro/scene``."""
+    return shared.partition("#")[0]
 
 
 def _as_list(value: Optional[List[str]] | str) -> Optional[List[str]]:
@@ -92,12 +122,21 @@ class _AuthChecks:
         org_roles: Optional[List[str]] | str = None,
         any_org_role_of: Optional[List[str]] = None,
         allow_scoped: bool = False,
+        shared_by: Optional[List[str]] = None,
     ) -> None:
         """Record the requirements this field places on the caller.
 
         ``allow_scoped`` opens a mutation to scoped members, who are otherwise
         refused every mutation and subscription (``SCOPED_READ_ONLY``). The
         resolver then answers for checking that what it touches is shared.
+
+        ``shared_by`` (``["@mikro/scene#annotate"]``) opens it to the scoped
+        members those shares were made with, and says so in the schema
+        (``@shared``). A scoped member holding no grant of those structures is
+        refused here; whether the grant they hold covers the object and reach,
+        and whether its sharer holds the roles this field requires, is the
+        resolver's to check (``arkitekt_service.sharing.require_shared``). For a
+        scoped member the roles are the sharer's to hold, not theirs.
         """
         self.scopes: Optional[List[str]] = _as_list(scopes)
         self.roles: Optional[List[str]] = _as_list(roles)
@@ -105,7 +144,8 @@ class _AuthChecks:
         self.any_scope_of: Optional[List[str]] = any_scope_of
         self.org_roles: Optional[List[str]] = _as_list(org_roles)
         self.any_org_role_of: Optional[List[str]] = any_org_role_of
-        self.allow_scoped: bool = allow_scoped
+        self.shared_by: Optional[List[str]] = shared_by
+        self.allow_scoped: bool = allow_scoped or bool(shared_by)
 
     def _directive(self) -> Auth:
         """The schema directive describing these requirements."""
@@ -113,8 +153,15 @@ class _AuthChecks:
             required_scopes=self.scopes,
             required_roles=self.roles,
             required_org_roles=self.org_roles,
+            any_scope_of=self.any_scope_of,
+            any_role_of=self.any_role_of,
+            any_org_role_of=self.any_org_role_of,
             allow_scoped=True if self.allow_scoped else None,
         )
+
+    def _directives(self) -> list[object]:
+        """Every schema directive this field carries: ``@auth``, and ``@shared`` when shares permit it."""
+        return [self._directive(), *([Shared(by=list(self.shared_by))] if self.shared_by else [])]
 
     def check(self, info: Info) -> None:
         """Raise a coded error unless the request satisfies every requirement.
@@ -139,9 +186,16 @@ class _AuthChecks:
             # either way the request is not authenticated.
             raise unauthenticated("Authentication required", NOT_AUTHENTICATED)
 
-        if token.is_scoped and (
+        requires_roles = bool(
             self.roles or self.any_role_of or self.org_roles or self.any_org_role_of
-        ):
+        )
+        if token.is_scoped and self.shared_by and not self._holds_a_share(token):
+            raise denied(
+                "Nothing shared with you permits this",
+                SCOPED_READ_ONLY,
+                sharedBy=self.shared_by,
+            )
+        if token.is_scoped and requires_roles and not self.allow_scoped:
             # A scoped member holds no role, so these would fail below anyway;
             # said here so that it stays true whatever roles a token carries.
             raise denied(
@@ -163,6 +217,11 @@ class _AuthChecks:
                 requiredAnyScopeOf=self.any_scope_of,
             )
 
+        if token.is_scoped:
+            # Opened to scoped members: the roles are their sharer's to hold,
+            # which the resolver checks against the grant it acts on.
+            return
+
         if self.roles and not token.has_roles(self.roles):
             raise denied(
                 f"User does not have the required roles: {', '.join(self.roles)}",
@@ -180,6 +239,17 @@ class _AuthChecks:
 
         if self.org_roles or self.any_org_role_of:
             self._check_org_roles(info)
+
+    def _holds_a_share(self, token: JWTToken) -> bool:
+        """Whether the token holds a grant of any structure ``shared_by`` names, on this hub."""
+        from authentikate.scoped import current_hub
+        from authentikate.settings import get_settings
+
+        hub = current_hub(get_settings())
+        if hub is None:
+            return False
+        structures = {_structure_of(shared) for shared in self.shared_by or ()}
+        return any(grant.structure in structures for grant in token.grants_for(hub))
 
     def _check_org_roles(self, info: Info) -> None:
         """Enforce the org-scoped role requirements against the membership."""
@@ -221,7 +291,7 @@ class AuthExtension(_AuthChecks, FieldExtension):
         assert (
             not field.is_subscription
         ), "Auth directive cannot be applied to subscriptions use AuthSubscribeExtension instead."
-        field.directives.append(self._directive())
+        field.directives.extend(self._directives())
 
     def resolve(
         self, next_: Callable[..., Any], source: Any, info: Info, **kwargs: Any
@@ -257,7 +327,7 @@ class AuthSubscribeExtension(_AuthChecks, FieldExtension):
         assert (
             not self.allow_scoped
         ), "A subscription streams the organization's events: it cannot be opened to scoped members."
-        field.directives.append(self._directive())
+        field.directives.extend(self._directives())
 
     def resolve(
         self, next_: Callable[..., Any], source: Any, info: Info, **kwargs: Any
@@ -279,4 +349,4 @@ class AuthSubscribeExtension(_AuthChecks, FieldExtension):
         return next_(source, info, **kwargs)
 
 
-all_directives = [Auth]
+all_directives = [Auth, Shared]

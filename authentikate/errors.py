@@ -259,3 +259,14 @@ class FullMembershipRequired(AuthentikatePermissionDenied):
 
     reason = "FULL_MEMBERSHIP_REQUIRED"
     client_message = "This requires full membership of the organization."
+
+
+class ShareInsufficient(AuthentikatePermissionDenied):
+    """Raised when what was shared with a scoped member does not permit what they asked.
+
+    The object is not shared with them at the reach it needs, or the grant's
+    sharer may not do it themselves.
+    """
+
+    reason = "SHARE_INSUFFICIENT"
+    client_message = "What was shared with you does not permit this."
