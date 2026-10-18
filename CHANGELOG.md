@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v4.4.1 (2026-10-18)
+
+### Bug Fixes
+
+- @auth prints only what a field requires
+  ([`94e95d0`](https://github.com/arkitektio/authentikate/commit/94e95d028b9057df12b4094bc4fcebdc354cb9f0))
+
+Every argument of `@auth` was printed, as `null` when unset, so each field's requirements were
+  buried in seven nulls. Unset ones are left out now: `@auth(any_role_of: ["editor"])`, or a bare
+  `@auth` for authentication alone.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v4.4.0 (2026-10-18)
 
 ### Features
