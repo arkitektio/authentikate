@@ -157,13 +157,21 @@ A member who was shared a few objects of an organization, and nothing else, gets
 token with an `objects` claim, keyed by the hub that hosts them:
 
 ```json
-{"org": "12", "roles": [], "objects": {"3": ["@mikro/arraydataset:42#derived"]}}
+{"org": "12", "roles": [], "objects": {"3": ["@mikro/arraydataset:42#derived~8"]}}
 ```
 
+Each grant is `<structure>:<id>[#<reach>][~<sharer>]`: the object, how far the share
+reaches beyond it (`self` when left out), and who shared it (`~8`: user 8's `sub`).
+
 `token.is_scoped` tells the two kinds of member apart, and `token.grants_for(hub)`
-lists the shared objects as `ObjectGrant(structure, object_id, reach)`. Which rows an
-object and its reach cover is the hosting service's business: authentikate only
-decides whether such a token is served at all.
+lists the shared objects as `ObjectGrant(structure, object_id, reach, sharer)`. Which
+rows an object and its reach cover is the hosting service's business: authentikate
+only decides whether such a token is served at all.
+
+A grant reaches no further than its sharer. The issuer leaves out the grants of a
+sharer who is no longer a full member; and where a sharer's membership in *this*
+service is blocked, the GraphQL extension drops their grants from the request's token
+(`authentikate.expand.anarrow_scoped_token`) before anything reads it.
 
 ```python
 AUTHENTIKATE = {

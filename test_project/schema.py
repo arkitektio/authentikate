@@ -44,6 +44,14 @@ class Query:
         return client.release.app if client and client.release else None
 
     @kante.django_field
+    def grants(self, info: Info, hub: str) -> list[str]:
+        """The objects the request's token shares on ``hub``, as written."""
+        from authentikate.vars import get_token
+
+        token = get_token()
+        return [str(grant) for grant in token.grants_for(hub)] if token else []
+
+    @kante.django_field
     def device(self, info: Info) -> Device | None:
         """Get the current client device identifier"""
 

@@ -71,7 +71,14 @@ def test_an_objects_claim_of_another_shape_is_refused(claim: Any) -> None:
 
 @pytest.mark.parametrize(
     "raw",
-    ["@mikro/arraydataset:42", "@mikro/arraydataset:42#derived", "@kraph.v2/node-x:a_b.c-1#self-and-more"],
+    [
+        "@mikro/arraydataset:42",
+        "@mikro/arraydataset:42#derived",
+        "@kraph.v2/node-x:a_b.c-1#self-and-more",
+        "@mikro/image:42~8",
+        "@mikro/image:42#derived~8",
+        "@mikro/image:42~user.name-1",
+    ],
 )
 def test_parse_grant_round_trips_lok_format(raw: str) -> None:
     assert str(parse_grant(raw)) == raw.removesuffix("#self")
@@ -79,11 +86,41 @@ def test_parse_grant_round_trips_lok_format(raw: str) -> None:
 
 @pytest.mark.parametrize(
     "raw",
-    ["@Mikro/arraydataset:42", "mikro/arraydataset:42", "@mikro/arraydataset", "@mikro/arraydataset:", "@mikro/x:1#", "@mikro/x:1#Derived", "@mikro/x:a:b"],
+    [
+        "@Mikro/arraydataset:42",
+        "mikro/arraydataset:42",
+        "@mikro/arraydataset",
+        "@mikro/arraydataset:",
+        "@mikro/x:1#",
+        "@mikro/x:1#Derived",
+        "@mikro/x:a:b",
+        "@mikro/x:1~",
+        "@mikro/x:~8",
+        "@mikro/x:1~8~9",
+        "@mikro/x:1#~8",
+        "@mikro/x:1~8#derived",
+        "@mikro/x:1~a/b",
+    ],
 )
 def test_parse_grant_refuses_what_lok_would_not_write(raw: str) -> None:
     with pytest.raises(ValueError):
         parse_grant(raw)
+
+
+def test_a_grant_names_its_sharer() -> None:
+    assert parse_grant("@mikro/image:42#derived~8") == ObjectGrant("@mikro/image", "42", "derived", "8")
+    assert parse_grant("@mikro/image:42").sharer is None
+
+
+def test_sharers_and_dropping_theirs() -> None:
+    token = _token(objects={"3": ["@mikro/image:1~8", "@mikro/image:2#derived~9", "@mikro/image:3"], "4": ["@mikro/scene:5~8"]})
+    assert token.sharers == {"8", "9"}
+    narrowed = token.without_sharers({"8"})
+    assert narrowed.grants_for("3") == (ObjectGrant("@mikro/image", "2", "derived", "9"), ObjectGrant("@mikro/image", "3"))
+    assert narrowed.grants_for("4") == ()
+    assert narrowed.is_scoped and token.grants_for("4")  # the original is left as it was
+    assert token.without_sharers(set()) is token
+    assert StaticToken(sub="member").without_sharers({"8"}).objects is None
 
 
 # --- accepting a scoped token -----------------------------------------------------------
@@ -160,6 +197,44 @@ async def _run(token: str, query: str) -> dict[str, Any]:
 def _reason(answer: dict[str, Any]) -> str | None:
     errors = answer.get("errors") or []
     return errors[0]["extensions"].get("reason") if errors else None
+
+
+SHARED = {"3": ["@mikro/image:1~8", "@mikro/image:2#derived~9", "@mikro/image:3"]}
+
+
+@pytest.fixture
+def shared_by_two(scoped_service):
+    """The static token `shared` lists grants of sharers 8 and 9, and one that names none."""
+    settings.AUTHENTIKATE["STATIC_TOKENS"]["shared"] = {"sub": "guest", "iss": "lok", "roles": [], "objects": SHARED}
+
+
+def _member(sub: str, org: str, *, blocked: bool) -> None:
+    from authentikate.models import Membership, Organization, User
+
+    # Rows written through the app outlive a test here, so this is idempotent.
+    user, _ = User.objects.get_or_create(sub=sub, iss="lok", defaults={"username": f"u{sub}"})
+    organization, _ = Organization.objects.get_or_create(slug=org)
+    Membership.objects.filter(user=user).delete()
+    Membership.objects.create(user=user, organization=organization, blocked=blocked)
+
+
+@pytest.mark.asyncio
+async def test_a_blocked_sharer_takes_their_grants_along(shared_by_two) -> None:
+    from asgiref.sync import sync_to_async
+
+    await sync_to_async(_member)("8", "static_org", blocked=True)
+    await sync_to_async(_member)("9", "static_org", blocked=False)
+    answer = await _run("shared", 'query { grants(hub: "3") }')
+    assert answer["data"]["grants"] == ["@mikro/image:2#derived~9", "@mikro/image:3"]
+
+
+@pytest.mark.asyncio
+async def test_a_sharer_blocked_elsewhere_or_unknown_here_still_shares(shared_by_two) -> None:
+    from asgiref.sync import sync_to_async
+
+    await sync_to_async(_member)("8", "another_org", blocked=True)
+    answer = await _run("shared", 'query { grants(hub: "3") }')
+    assert answer["data"]["grants"] == SHARED["3"]
 
 
 @pytest.mark.asyncio

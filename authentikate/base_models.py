@@ -224,6 +224,38 @@ class JWTToken(BaseModel):
         return tuple(grants)
 
     @property
+    def sharers(self) -> frozenset[str]:
+        """Who shared the objects listed, on any hub (``~8``); empty when the issuer does not say."""
+        found: set[str] = set()
+        for raws in (self.objects or {}).values():
+            for raw in raws:
+                try:
+                    sharer = parse_grant(raw).sharer
+                except ValueError:
+                    continue
+                if sharer is not None:
+                    found.add(sharer)
+        return frozenset(found)
+
+    def without_sharers(self, sharers: "set[str] | frozenset[str]") -> "JWTToken":
+        """This token, listing none of the objects these sharers shared.
+
+        A grant reaches no further than its sharer: whoever may no longer share
+        here takes their grants with them. The rest stay as the issuer wrote them.
+        """
+        if self.objects is None or not sharers:
+            return self
+
+        def kept(raw: str) -> bool:
+            try:
+                return parse_grant(raw).sharer not in sharers
+            except ValueError:
+                return False
+
+        objects = {hub: [raw for raw in raws if kept(raw)] for hub, raws in self.objects.items()}
+        return self.model_copy(update={"objects": objects})
+
+    @property
     def profile(self) -> dict[str, str | bool | None]:
         """The optional OIDC profile claims, keyed by claim name."""
         return {claim: getattr(self, claim) for claim in PROFILE_CLAIMS}

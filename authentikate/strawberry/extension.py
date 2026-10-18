@@ -143,6 +143,14 @@ class AuthentikateExtension(SchemaExtension):
             cast(MembershipModel, expanded.membership),
         )
 
+    async def anarrow_scoped_token(
+        self, token: JWTToken, organization: OrganizationModel
+    ) -> JWTToken:
+        """Drop a scoped token's grants whose sharer is blocked here (see :mod:`authentikate.expand`)."""
+        from authentikate.expand import anarrow_scoped_token
+
+        return await anarrow_scoped_token(token, cast(Any, organization))
+
     async def aexpand_user_from_token(self, token: JWTToken) -> User:
         """Expand a user from the provided JWT token.
 
@@ -256,6 +264,11 @@ class AuthentikateExtension(SchemaExtension):
                     user, client, organization, membership = (
                         await self.aexpand_token_context(token)
                     )
+                    narrowed = await self.anarrow_scoped_token(token, organization)
+                    if narrowed is not token:
+                        token_var.reset(reset_token)
+                        token = narrowed
+                        reset_token = token_var.set(token)
 
                     reset_client = client_var.set(client)
                     reset_user = user_var.set(cast(UserModel, user))
