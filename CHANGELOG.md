@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v5.0.0 (2026-10-18)
+
+### Features
+
+- A guest is granted collaborations, with roles that hold only inside them
+  ([`08a4030`](https://github.com/arkitektio/authentikate/commit/08a4030c56c97625577d0992f5238bfdf6f4ccb1))
+
+A guest's token carries a collabs claim, by service instance, with the roles held in each
+  collaboration ({"12": {"5": ["editor"], "9": []}}), instead of per-object grants.
+  token.collabs_here(instance) reads them, for this service's own instance: its audience (one that
+  is * names no instance, and serves no guests). On an allow_scoped field a guest passes the role
+  requirements when one of their collaborations holds them; the resolver checks the target is in
+  such a collaboration.
+
+BREAKING CHANGE: the objects claim, ObjectGrant/parse_grant, grants_for, sharers and their
+  narrowing, the HUB setting, current_hub, the @shared directive and AuthExtension(shared_by=...)
+  are removed, and enforce_scoped() takes no resolver.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- The objects claim, ObjectGrant/parse_grant, grants_for, sharers and their narrowing, the HUB
+  setting, current_hub, the @shared directive and AuthExtension(shared_by=...) are removed, and
+  enforce_scoped() takes no resolver.
+
+
 ## v4.4.2 (2026-10-18)
 
 ### Bug Fixes
