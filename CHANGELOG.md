@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v4.4.2 (2026-10-18)
+
+### Bug Fixes
+
+- An authentikate error a resolver raises reaches the client with its code
+  ([`b1759b8`](https://github.com/arkitektio/authentikate/commit/b1759b8fa917b06cd6348119a92bee6223a2d3c5))
+
+A resolver refusing a scoped member (ShareInsufficient from `require_shared`,
+  FullMembershipRequired) raised the plain exception, so its client saw the server-side message and
+  no `code`/`reason`. AuthentikateExtension now rewrites such errors after execution, as
+  strawberry's MaskErrors does: `PERMISSION_DENIED`/`SHARE_INSUFFICIENT` and the client message, the
+  detail left in the log.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v4.4.1 (2026-10-18)
 
 ### Bug Fixes
