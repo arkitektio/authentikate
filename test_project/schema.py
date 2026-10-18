@@ -96,6 +96,13 @@ class Mutation:
         """A write a share can permit: editors, and guests shared a scene to annotate."""
         return "annotated"
 
+    @kante.django_mutation(extensions=[AuthExtension(shared_by=["@mikro/scene#annotate"])])
+    def refuse(self, info: Info) -> str:
+        """A resolver that refuses, as one checking a share does."""
+        from authentikate.errors import ShareInsufficient
+
+        raise ShareInsufficient("scene 7 is not shared with you to annotate")
+
     @kante.django_mutation(extensions=[AuthExtension(roles="admin")])
     def administrate(self, info: Info) -> str:
         """A mutation gated on a role."""

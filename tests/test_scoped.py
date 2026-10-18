@@ -410,3 +410,13 @@ def test_the_schema_says_who_may_and_through_which_share() -> None:
     assert lines["annotate"] == 'annotate: String! @auth(any_role_of: ["editor"], allow_scoped: true) @shared(by: ["@mikro/scene#annotate"])'
     assert lines["yieldOpen"] == "yieldOpen: String! @auth"  # only what a field requires is said
     assert "directive @shared(by: [String!]!) on OBJECT | FIELD_DEFINITION" in sdl
+
+
+
+@pytest.mark.asyncio
+async def test_a_resolvers_refusal_reaches_the_client_with_its_code(scoped_service) -> None:
+    answer = await _run("scoped", "mutation { refuse }")
+    (error,) = answer["errors"]
+    assert error["extensions"]["code"] == "PERMISSION_DENIED"
+    assert error["extensions"]["reason"] == "SHARE_INSUFFICIENT"
+    assert error["message"] == "What was shared with you does not permit this."  # the detail stays in the log

@@ -303,6 +303,22 @@ class AuthentikateExtension(SchemaExtension):
 
         return
 
+    async def on_execute(self) -> AsyncIterator[None]:
+        """Give an authentikate error a resolver raised its code, as the extension's own errors have.
+
+        A resolver that refuses (``ShareInsufficient``, ``FullMembershipRequired``) raises the
+        plain exception; without this its client sees the message and no ``code``/``reason``.
+        As strawberry's ``MaskErrors`` does, the errors are rewritten after execution.
+        """
+        yield
+        result = self.execution_context.result
+        for error in getattr(result, "errors", None) or ():
+            original = getattr(error, "original_error", None)
+            if isinstance(original, (AuthentikateError, AuthentikatePermissionDenied)):
+                coded = to_graphql_error(original)
+                error.message = coded.message
+                error.extensions = {**(error.extensions or {}), **(coded.extensions or {})}
+
     async def on_validate(self) -> AsyncIterator[None]:
         """Keep a scoped member's operation read-only.
 
