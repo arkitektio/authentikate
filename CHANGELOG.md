@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v5.1.0 (2026-10-19)
+
+### Features
+
+- A service that knows its hub accepts only tokens minted for that hub
+  ([`23baa3a`](https://github.com/arkitektio/authentikate/commit/23baa3a26cc19afff5c998d0651983e983ada200))
+
+AUTHENTIKATE.HUB (the hub's uuid) makes the token's hub claim essential and equal to it. An audience
+  names a service only within its hub (aud: mikro), so the hub is what tells two hubs' services
+  apart. A service of no hub (the coordination server) does not check it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Testing
+
+- No longer check for a directive that is gone
+  ([`8517fa0`](https://github.com/arkitektio/authentikate/commit/8517fa015d745dc47b1a31431e7871ec01e39e82))
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v5.0.0 (2026-10-18)
 
 ### Features
