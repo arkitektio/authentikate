@@ -154,6 +154,12 @@ class JWTToken(BaseModel):
     client_device: str | None = None
     """ The client device identifier """
 
+    hub: str | None = None
+    """The hub the token was minted for: its uuid, which the hub generated itself.
+
+    An audience names a service only within its hub (``mikro``); a service that
+    knows its hub (``AUTHENTIKATE.HUB``) accepts only tokens minted for it.
+    """
     collabs: dict[str, dict[str, list[str]]] | None = None
     """The collaborations a guest was granted, by service instance, with their roles there:
     ``{"12": {"5": ["editor"], "9": []}}``.
@@ -980,6 +986,10 @@ class AuthentikateSettings(BaseModel):
         validation_alias=AliasChoices("provenance", "PROVENANCE"),
     )
     """Configuration for verifying inbound provenance tokens (None disables it)."""
+    hub: str | None = Field(default=None, validation_alias=AliasChoices("hub", "HUB"))
+    """The hub this service belongs to (its uuid). Set, a token's ``hub`` claim must
+    equal it: ``audience`` names the service only within its hub. Unset (a service
+    that belongs to no hub, such as the coordination server), the claim is not checked."""
     audience: str = Field(validation_alias=AliasChoices("audience", "AUDIENCE"))
     """This service's identifier; checked against the token's ``aud`` claim.
 

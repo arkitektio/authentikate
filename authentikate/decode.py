@@ -11,6 +11,7 @@ def _validate_claims(
     decoded: jwt.Token,
     issuer: str | None = None,
     audience: str | None = None,
+    hub: str | None = None,
 ) -> None:
     """Validate the registered claims of a decoded token.
 
@@ -22,6 +23,11 @@ def _validate_claims(
     :data:`~authentikate.base_models.ANY_AUDIENCE`. Callers that enforce audience
     themselves -- the provenance path, which reports its own error -- pass None
     and are unaffected.
+
+    ``hub`` confirms the token was minted for this service's hub: an audience
+    names a service only within its hub (``mikro``), so two hubs' services share
+    names and the hub tells them apart. Supplied, the ``hub`` claim is essential
+    and must equal it.
     """
     # The registry pins "now" at construction time, so it must be created
     # per validation rather than once at module level.
@@ -44,6 +50,9 @@ def _validate_claims(
             aud_option["value"] = audience
 
         claims_options["aud"] = aud_option
+
+    if hub is not None:
+        claims_options["hub"] = {"essential": True, "value": hub}
 
     registry = jwt.JWTClaimsRegistry(**claims_options)
     try:
@@ -169,7 +178,7 @@ def decode_token(
     except Exception as e:
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
-    _validate_claims(decoded, issuer=iss, audience=settings.audience)
+    _validate_claims(decoded, issuer=iss, audience=settings.audience, hub=settings.hub)
 
     issuer = settings.find_issuer(iss)
     jti = _revocation_subject(decoded, issuer)
@@ -197,7 +206,7 @@ async def adecode_token(
     except Exception as e:
         raise errors.InvalidJwtTokenError("Error decoding token") from e
 
-    _validate_claims(decoded, issuer=iss, audience=settings.audience)
+    _validate_claims(decoded, issuer=iss, audience=settings.audience, hub=settings.hub)
 
     issuer = settings.find_issuer(iss)
     jti = _revocation_subject(decoded, issuer)
