@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v6.0.0 (2026-10-27)
+
+### Features
+
+- An organization is named by its issuer and the issuer's id
+  ([`df64687`](https://github.com/arkitektio/authentikate/commit/df646874ff70ed6376d119c32a903a7824b353ce))
+
+The org claim is only unique per issuer: a service that trusts two loks saw both organizations "1"
+  as one row. Organization.slug becomes `identifier`, holding "<iss>#<org>"
+  (JWTToken.org_identifier), and the allow-list matches it. An issuer containing "#" is refused.
+  ProvenanceToken gains an optional `org` claim.
+
+BREAKING CHANGE: Organization.slug is renamed `identifier` and holds "<iss>#<org>";
+  allowed_organizations entries must name the issuer too.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- Organization.slug is renamed `identifier` and holds "<iss>#<org>"; allowed_organizations entries
+  must name the issuer too.
+
+
 ## v5.1.0 (2026-10-19)
 
 ### Features
