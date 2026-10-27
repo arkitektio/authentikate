@@ -32,9 +32,9 @@ def _check_organization_allowed(
     if allowed is None:
         return
 
-    if decoded.org not in allowed:
+    if decoded.org_identifier not in allowed:
         raise OrganizationNotAllowed(
-            f"Organization {decoded.org!r} is not accepted by this service"
+            f"Organization {decoded.org_identifier!r} is not accepted by this service"
         )
 
 

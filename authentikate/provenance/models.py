@@ -72,6 +72,8 @@ class ProvenanceToken(BaseModel):
     """Root assignation id of the whole tree (== tsk when this is the root)."""
     rcb: str
     """The human principal at the root of the tree (always human)."""
+    org: str | None = None
+    """The organization the task runs in, ``"<iss>#<org>"`` (None from an older issuer)."""
     ahs: str
     """SHA-256 of the canonicalized args."""
     aha: str

@@ -32,7 +32,7 @@ async def test_user_query(db, valid_auth_headers, key_pair_str) -> None:
                 sub
                 activeOrganization {
                     id
-                    slug
+                    identifier
                 }
             }
         }
@@ -47,7 +47,7 @@ async def test_user_query(db, valid_auth_headers, key_pair_str) -> None:
         answer["data"]["me"]["activeOrganization"] is not None
     ), f"Expected 'activeOrganization' to be not None, got {answer['data']['me']['activeOrganization']}"
     assert (
-        answer["data"]["me"]["activeOrganization"]["slug"] == "kkk"
+        answer["data"]["me"]["activeOrganization"]["identifier"] == "XXXX#kkk"
     ), f"Expected '1', got {answer['data']['me']['activeOrganization']['id']}"
 
 
@@ -88,7 +88,7 @@ async def test_http_query_uses_bundled_token_expansion(
 ) -> None:
     settings.AUTHENTIKATE["ISSUERS"][0]["public_key"] = key_pair_str.public_key
 
-    organization, _ = await Organization.objects.aget_or_create(slug="bundle-org")
+    organization, _ = await Organization.objects.aget_or_create(identifier="XXXX#bundle-org")
     user, _ = await User.objects.aget_or_create(
         sub="1",
         iss="XXXX",

@@ -126,7 +126,7 @@ async def aexpand_organization_from_token(
     if not token.org:
         raise MissingActiveOrganization("Token does not contain an active organization")
 
-    org, _ = await models.Organization.objects.aget_or_create(slug=token.org)
+    org, _ = await models.Organization.objects.aget_or_create(identifier=token.org_identifier)
     return org
 
 
@@ -159,7 +159,7 @@ def expand_organization_from_token(
     if not token.org:
         raise MissingActiveOrganization("Token does not contain an active organization")
 
-    org, _ = models.Organization.objects.get_or_create(slug=token.org)
+    org, _ = models.Organization.objects.get_or_create(identifier=token.org_identifier)
     return org
 
 
@@ -229,7 +229,7 @@ async def _aexpand_user(
             user.active_organization = organization
         elif token.org:
             current_org, _ = await models.Organization.objects.aget_or_create(
-                slug=token.org,
+                identifier=token.org_identifier,
             )
             user.active_organization = current_org
 
@@ -252,7 +252,7 @@ async def _aexpand_user(
             user.active_organization = organization
         elif token.org:
             current_org, _ = await models.Organization.objects.aget_or_create(
-                slug=token.org,
+                identifier=token.org_identifier,
             )
             user.active_organization = current_org
 
@@ -323,7 +323,7 @@ def _expand_user(
             user.active_organization = organization
         elif token.org:
             current_org, _ = models.Organization.objects.get_or_create(
-                slug=token.org
+                identifier=token.org_identifier
             )
             user.active_organization = current_org
 
@@ -346,7 +346,7 @@ def _expand_user(
             user.active_organization = organization
         elif token.org:
             current_org, _ = models.Organization.objects.get_or_create(
-                slug=token.org
+                identifier=token.org_identifier
             )
             user.active_organization = current_org
 

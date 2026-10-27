@@ -105,14 +105,14 @@ def _static_settings(**kwargs: Any) -> AuthentikateSettings:
 
 
 def test_organization_outside_the_allowlist_is_rejected() -> None:
-    settings = _static_settings(allowed_organizations=["other"])
+    settings = _static_settings(allowed_organizations=["static_issuer#other"])
 
     with pytest.raises(OrganizationNotAllowed, match="acme"):
         asyncio.run(authenticate_token("tok", settings))
 
 
 def test_organization_inside_the_allowlist_is_accepted() -> None:
-    settings = _static_settings(allowed_organizations=["acme", "other"])
+    settings = _static_settings(allowed_organizations=["static_issuer#acme", "static_issuer#other"])
 
     assert asyncio.run(authenticate_token("tok", settings)).org == "acme"
 
@@ -202,7 +202,7 @@ def test_sync_expand_rejects_blocked_membership(db) -> None:
     # First call provisions the user, organization and membership.
     user = expand_user_from_token(token)
 
-    organization = Organization.objects.get(slug="org-sync")
+    organization = Organization.objects.get(identifier="test-issuer#org-sync")
     Membership.objects.filter(user=user, organization=organization).update(blocked=True)
 
     with pytest.raises(BlockedMembership):
@@ -218,7 +218,7 @@ async def test_async_expand_rejects_blocked_membership(db) -> None:
 
     user = await aexpand_user_from_token(token)
 
-    organization = await Organization.objects.aget(slug="org-async")
+    organization = await Organization.objects.aget(identifier="test-issuer#org-async")
     await Membership.objects.filter(
         user=user, organization=organization
     ).aupdate(blocked=True)
@@ -237,7 +237,7 @@ async def test_extension_user_expansion_rejects_blocked_membership(db) -> None:
 
     user = await extension.aexpand_user_from_token(token)
 
-    organization = await Organization.objects.aget(slug="org-ext")
+    organization = await Organization.objects.aget(identifier="test-issuer#org-ext")
     await Membership.objects.filter(
         user=user, organization=organization
     ).aupdate(blocked=True)

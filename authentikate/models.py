@@ -5,17 +5,27 @@ from django.contrib.auth.models import AbstractUser
 class Organization(models.Model):
     """An Organization model to represent an organization in the system"""
 
-    slug = models.CharField(max_length=1000, unique=True)
-    """The unique identifier of the organization (mirrors the token's ``org`` claim).
+    identifier = models.CharField(max_length=1000, unique=True)
+    """The organization, unique across issuers: ``"<iss>#<org>"`` (:attr:`JWTToken.org_identifier`).
 
-    Named ``slug`` for historical reasons and kept that way because it is part of
-    the GraphQL schema; since 4.0 the ``org`` claim carries the issuer's
-    organization *id* as a string, so that is what lands here.
+    The ``org`` claim is only unique per issuer -- two loks both have an organization
+    ``1`` -- so the issuer is part of it. It is what every service and every wire names
+    the organization by; ``id`` is this service's own key and means nothing elsewhere.
     """
+
+    @property
+    def issuer(self) -> str:
+        """The issuer whose organization this is."""
+        return self.identifier.rsplit("#", 1)[0]
+
+    @property
+    def org(self) -> str:
+        """The issuer's own id of the organization (the token's ``org`` claim)."""
+        return self.identifier.rsplit("#", 1)[1]
 
     def __str__(self) -> str:
         """String representation of Organization"""
-        return self.slug
+        return self.identifier
 
 
 class User(AbstractUser):

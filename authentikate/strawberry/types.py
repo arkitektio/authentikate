@@ -31,10 +31,10 @@ class Release:
 
 @kante.django_type(models.Organization)
 class Organization:
-    """An organization that users can be members of, identified by its slug."""
+    """An organization that users can be members of."""
 
     id: strawberry.ID
-    slug: str
+    identifier: str = strawberry_django.field(description="The organization across issuers and services: `<issuer>#<org>`")
 
 
 @kante.django_type(models.User)

@@ -29,14 +29,14 @@ async def test_organization_query(db, valid_auth_headers, key_pair_str) -> None:
         query="""
         query {
             organization  {
-                slug
+                identifier
             }
         }
         """,
     )
 
     assert answer["data"]["organization"] is not None
-    assert answer["data"]["organization"]["slug"] == "kkk", f"Expected 'kkk', got {answer['data']['organization']['slug']}"
+    assert answer["data"]["organization"]["identifier"] == "XXXX#kkk", f"Expected 'XXXX#kkk', got {answer['data']['organization']['identifier']}"
 
 
     
@@ -62,14 +62,14 @@ async def test_organization_query_static(db, valid_auth_headers, key_pair_str) -
         query="""
         query {
             organization  {
-                slug
+                identifier
             }
         }
         """,
     )
 
     assert answer["data"]["organization"] is not None
-    assert answer["data"]["organization"]["slug"] == "static_org", f"Expected 'kkk', got {answer['data']['organization']['slug']}"
+    assert answer["data"]["organization"]["identifier"] == "lok#static_org", f"Expected 'lok#static_org', got {answer['data']['organization']['identifier']}"
 
 
   

@@ -57,7 +57,7 @@ async def test_app_query_static(db, valid_auth_headers, key_pair_str) -> None:
         query="""
         query {
             organization  {
-                slug
+                identifier
             }
         }
         """,
@@ -65,5 +65,5 @@ async def test_app_query_static(db, valid_auth_headers, key_pair_str) -> None:
 
     assert answer["data"]["organization"] is not None
     assert (
-        answer["data"]["organization"]["slug"] == "static_org"
-    ), f"Expected 'kkk', got {answer['data']['organization']['slug']}"
+        answer["data"]["organization"]["identifier"] == "lok#static_org"
+    ), f"Expected 'kkk', got {answer['data']['organization']['identifier']}"

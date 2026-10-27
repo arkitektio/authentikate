@@ -12,10 +12,10 @@ class OrganizationModel(Protocol):
     """A protocol for the organizaition model"""
 
     id: int
-    """The id of the client"""
+    """This service's id of the organization"""
 
-    slug: str
-    """The name of orgnaization"""
+    identifier: str
+    """The organization across issuers and services: ``"<iss>#<org>"``"""
 
 
 class MembershipModel(Protocol):

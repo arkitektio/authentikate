@@ -153,8 +153,8 @@ def test_sync_expand_user_links_organization_from_the_org_claim(db, valid_jwt, v
     user = expand_user_from_token(token)
 
     assert user.active_organization is not None
-    assert user.active_organization.slug == token.org
-    assert Organization.objects.filter(slug=token.org).count() == 1
+    assert user.active_organization.identifier == token.org_identifier == f"{token.iss}#{token.org}"
+    assert Organization.objects.filter(identifier=token.org_identifier).count() == 1
 
 
 @pytest.mark.asyncio

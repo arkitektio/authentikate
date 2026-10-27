@@ -157,7 +157,7 @@ def test_models_satisfy_the_kante_protocols() -> None:
     for model, members in (
         (User, ("id", "sub", "is_anonymous")),
         (Client, ("id", "client_id")),
-        (Organization, ("id", "slug")),
+        (Organization, ("id", "identifier")),
         (Membership, ("id",)),
     ):
         for member in members:

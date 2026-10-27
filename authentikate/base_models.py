@@ -94,7 +94,8 @@ class JWTToken(BaseModel):
     """The id of the organization the user is acting in, as a string.
 
     An opaque identifier minted by the issuer (``str(organization_id)``), not a
-    human-readable slug: it is stable across renames, which a slug is not.
+    human-readable slug: it is stable across renames, which a slug is not. It is
+    only unique per issuer: :attr:`org_identifier` is what names the organization.
     """
 
     client_id: str
@@ -190,6 +191,27 @@ class JWTToken(BaseModel):
     def aud_to_list(cls, v: str | list[str] | None) -> list[str] | None:
         """Convert the aud to a list"""
         return coerce_aud_to_list(v)
+
+    @field_validator("iss")
+    @classmethod
+    def iss_names_no_fragment(cls, v: str) -> str:
+        """Refuse an issuer with a ``#``: it separates the issuer from the org in an identifier.
+
+        OIDC forbids a fragment in an issuer identifier, so a real one never has one.
+        """
+        if "#" in v:
+            raise ValueError(f"An issuer must not contain '#': {v!r}")
+        return v
+
+    @property
+    def org_identifier(self) -> str | None:
+        """The organization the user is acting in, unique across issuers: ``"<iss>#<org>"``.
+
+        Two issuers may both have an organization ``1``; this names which one. It is
+        :attr:`authentikate.models.Organization.identifier`, and what every service and
+        every wire names the organization by.
+        """
+        return f"{self.iss}#{self.org}" if self.org else None
 
     @field_validator("sub", mode="before")
     @classmethod
@@ -1019,8 +1041,9 @@ class AuthentikateSettings(BaseModel):
     )
     """Organizations this service accepts, or None to accept whatever the token names.
 
-    Values are matched against the token's ``org`` claim, which carries the
-    issuer's organization *id* as a string -- not a slug. Without the list, every
+    Values are matched against the token's :attr:`JWTToken.org_identifier`,
+    ``"<iss>#<org>"``: an organization of one issuer, never the same-numbered one of
+    another this service also trusts. Without the list, every
     distinct ``org`` claim auto-creates an Organization and a Membership, making
     token claims an unbounded write primitive.
     """

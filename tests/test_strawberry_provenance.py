@@ -154,7 +154,7 @@ def _make_extension(
         return_value=(
             SimpleNamespace(id=1, sub="1"),
             SimpleNamespace(id=1, client_id="client-1"),
-            SimpleNamespace(id=1, slug="org-1"),
+            SimpleNamespace(id=1, identifier="test-issuer#org-1"),
             SimpleNamespace(id=1),
         )
     )

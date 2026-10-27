@@ -41,7 +41,7 @@ schema = strawberry.Schema(query=Query, extensions=[DjangoOptimizerExtension])
 
 
 def _seed() -> None:
-    org = models.Organization.objects.create(slug="acme")
+    org = models.Organization.objects.create(identifier="iss#acme")
     user = models.User.objects.create(username="u-1", sub="1", iss="iss", preferred_username="alice")
     models.Membership.objects.create(user=user, organization=org)
 
