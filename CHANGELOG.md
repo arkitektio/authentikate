@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v6.1.0 (2026-10-28)
+
+### Chores
+
+- Refresh the lock
+  ([`261657f`](https://github.com/arkitektio/authentikate/commit/261657f10a73a93a93adab3a142e63542a3dc6a5))
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Features
+
+- A service's catch-all scope and admin role pass every check
+  ([`9b4b70a`](https://github.com/arkitektio/authentikate/commit/9b4b70ae8d6b93c5d0ffff25bd1ab3ec12a42b7b))
+
+`declare_catch_alls(scope=..., role=...)` names the scope that grants an app everything a service
+  offers and the role that lets a member do everything in it. Fields keep publishing the specific
+  scope or role they need. The check lets the catch-alls through wherever one is asked for. A guest
+  never passes on a role this way.
+
+`enforce_scopes` (default on) can turn the runtime scope check off while apps' clients catch up. The
+  `@auth` directive publishes the scopes either way.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v6.0.0 (2026-10-27)
 
 ### Features
