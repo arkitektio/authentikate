@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12, <4.0"
 
 [[package]]
@@ -44,7 +44,7 @@ wheels = [
 
 [[package]]
 name = "authentikate"
-version = "4.1.0"
+version = "6.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "django" },
