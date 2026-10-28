@@ -1066,6 +1066,15 @@ class AuthentikateSettings(BaseModel):
     leaves every rule to the service itself -- for a service that already knows
     what a scoped member may do (lok).
     """
+    enforce_scopes: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("enforce_scopes", "ENFORCE_SCOPES"),
+    )
+    """Whether a field's required scopes are checked against the token's.
+
+    The ``@auth`` directive publishes them either way. Off lets apps that do not
+    ask for their scopes yet keep working while their clients catch up.
+    """
 
 
     @field_validator("algorithms")

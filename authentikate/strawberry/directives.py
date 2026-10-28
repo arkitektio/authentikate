@@ -15,6 +15,8 @@ from kante.types import Info
 from strawberry.extensions import FieldExtension
 from strawberry.types.field import StrawberryField
 from authentikate.base_models import JWTToken
+from authentikate.catch_alls import catch_alls
+from authentikate.settings import get_settings
 
 
 @strawberry.schema_directive(locations=[Location.FIELD_DEFINITION])
@@ -174,19 +176,21 @@ class _AuthChecks:
                 FULL_MEMBERSHIP_REQUIRED,
             )
 
-        if self.scopes and not token.has_scopes(self.scopes):
-            raise denied(
-                f"User does not have the required scopes: {self.scopes}",
-                INSUFFICIENT_SCOPE,
-                requiredScopes=self.scopes,
-            )
+        alls = catch_alls()
+        if get_settings().enforce_scopes and not (alls.scope and alls.scope in token.scopes):
+            if self.scopes and not token.has_scopes(self.scopes):
+                raise denied(
+                    f"User does not have the required scopes: {self.scopes}",
+                    INSUFFICIENT_SCOPE,
+                    requiredScopes=self.scopes,
+                )
 
-        if self.any_scope_of and not token.has_any_scope(self.any_scope_of):
-            raise denied(
-                f"User does not have any of the required scopes: {self.any_scope_of}",
-                INSUFFICIENT_SCOPE,
-                requiredAnyScopeOf=self.any_scope_of,
-            )
+            if self.any_scope_of and not token.has_any_scope(self.any_scope_of):
+                raise denied(
+                    f"User does not have any of the required scopes: {self.any_scope_of}",
+                    INSUFFICIENT_SCOPE,
+                    requiredAnyScopeOf=self.any_scope_of,
+                )
 
         if token.is_scoped:
             if requires_roles and not self._a_collaboration_holds(token):
@@ -194,6 +198,10 @@ class _AuthChecks:
                     "None of your collaborations grants you the roles this requires",
                     INSUFFICIENT_ROLE,
                 )
+            return
+
+        if alls.role and alls.role in token.roles:
+            # The service's admin role holds every other role of it.
             return
 
         if self.roles and not token.has_roles(self.roles):
