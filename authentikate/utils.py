@@ -51,7 +51,7 @@ async def authenticate_token(token: str, settings: AuthentikateSettings) -> JWTT
         # Static tokens skip signature verification by design, but their
         # configured expiry must still be honoured -- otherwise a short-lived
         # static token would silently never expire.
-        if decoded.exp <= datetime.datetime.now(datetime.timezone.utc):
+        if decoded.exp <= datetime.datetime.now(datetime.UTC):
             raise AuthentikateTokenExpired("Static token has expired")
     else:
         decoded = await adecode_token(token, settings)

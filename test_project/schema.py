@@ -1,6 +1,7 @@
 from kante.types import Info
 import kante
-from typing import AsyncGenerator, cast
+from typing import cast
+from collections.abc import AsyncGenerator
 from authentikate.vars import get_user, get_client
 from authentikate import models
 from authentikate.strawberry.extension import AuthentikateExtension

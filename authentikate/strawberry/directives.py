@@ -1,6 +1,7 @@
 import strawberry
 from strawberry import UNSET
-from typing import Awaitable, Callable, Any, Optional, List, Sequence
+from typing import Any
+from collections.abc import Awaitable, Callable, Sequence
 from authentikate.strawberry.errors import (
     FULL_MEMBERSHIP_REQUIRED,
     INSUFFICIENT_ORGANIZATION_ROLE,
@@ -27,25 +28,25 @@ class Auth:
     ``@auth`` for authentication alone): a requirement left unset is left out.
     """
 
-    required_scopes: Optional[List[str]] = strawberry.directive_field(
+    required_scopes: list[str] | None = strawberry.directive_field(
         name="required_scopes", default=UNSET
     )
-    required_roles: Optional[List[str]] = strawberry.directive_field(
+    required_roles: list[str] | None = strawberry.directive_field(
         name="required_roles", default=UNSET
     )
-    required_org_roles: Optional[List[str]] = strawberry.directive_field(
+    required_org_roles: list[str] | None = strawberry.directive_field(
         name="required_org_roles", default=UNSET
     )
-    any_scope_of: Optional[List[str]] = strawberry.directive_field(
+    any_scope_of: list[str] | None = strawberry.directive_field(
         name="any_scope_of", default=UNSET
     )
-    any_role_of: Optional[List[str]] = strawberry.directive_field(
+    any_role_of: list[str] | None = strawberry.directive_field(
         name="any_role_of", default=UNSET
     )
-    any_org_role_of: Optional[List[str]] = strawberry.directive_field(
+    any_org_role_of: list[str] | None = strawberry.directive_field(
         name="any_org_role_of", default=UNSET
     )
-    allow_scoped: Optional[bool] = strawberry.directive_field(
+    allow_scoped: bool | None = strawberry.directive_field(
         name="allow_scoped", default=UNSET
     )
     """Whether a guest (granted collaborations only) may call this mutation.
@@ -55,14 +56,14 @@ class Auth:
     """
 
 
-def _as_list(value: Optional[List[str]] | str) -> Optional[List[str]]:
+def _as_list(value: list[str] | None | str) -> list[str] | None:
     """Accept a bare string wherever a list of names is expected."""
     if isinstance(value, str):
         return [value]
     return value
 
 
-def get_org_roles(info: Info) -> List[str]:
+def get_org_roles(info: Info) -> list[str]:
     """The roles the user holds *within the request's active organization*.
 
     Read from the request's Membership rather than the token, so roles are
@@ -101,12 +102,12 @@ class _AuthChecks:
 
     def __init__(
         self,
-        scopes: Optional[List[str]] | str = None,
-        roles: Optional[List[str]] | str = None,
-        any_role_of: Optional[List[str]] = None,
-        any_scope_of: Optional[List[str]] = None,
-        org_roles: Optional[List[str]] | str = None,
-        any_org_role_of: Optional[List[str]] = None,
+        scopes: list[str] | None | str = None,
+        roles: list[str] | None | str = None,
+        any_role_of: list[str] | None = None,
+        any_scope_of: list[str] | None = None,
+        org_roles: list[str] | None | str = None,
+        any_org_role_of: list[str] | None = None,
         allow_scoped: bool = False,
     ) -> None:
         """Record the requirements this field places on the caller.
@@ -118,12 +119,12 @@ class _AuthChecks:
         and the resolver answers for checking that what it touches is in such a
         collaboration (``arkitekt_service.collaborations.require_in_collaboration``).
         """
-        self.scopes: Optional[List[str]] = _as_list(scopes)
-        self.roles: Optional[List[str]] = _as_list(roles)
-        self.any_role_of: Optional[List[str]] = any_role_of
-        self.any_scope_of: Optional[List[str]] = any_scope_of
-        self.org_roles: Optional[List[str]] = _as_list(org_roles)
-        self.any_org_role_of: Optional[List[str]] = any_org_role_of
+        self.scopes: list[str] | None = _as_list(scopes)
+        self.roles: list[str] | None = _as_list(roles)
+        self.any_role_of: list[str] | None = any_role_of
+        self.any_scope_of: list[str] | None = any_scope_of
+        self.org_roles: list[str] | None = _as_list(org_roles)
+        self.any_org_role_of: list[str] | None = any_org_role_of
         self.allow_scoped: bool = allow_scoped
 
     def _directive(self) -> Auth:

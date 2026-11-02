@@ -3,7 +3,8 @@ import json
 import logging
 import time
 import asyncio
-from typing import Callable, Coroutine, Literal, Union, Annotated, cast
+from typing import Literal, Annotated, cast
+from collections.abc import Callable, Coroutine
 import httpx
 from pydantic import (
     BaseModel,
@@ -16,7 +17,7 @@ from pydantic import (
     PrivateAttr,
 )
 import datetime
-from typing import Dict, Any
+from typing import Any
 from joserfc.jwk import KeySet, RSAKey
 from authentikate.errors import JwksError, InvalidJwtTokenError
 from authentikate.revocation import RevocationList
@@ -53,7 +54,7 @@ def coerce_unix_to_datetime(v: int | datetime.datetime | None) -> datetime.datet
     if v is None:
         return None
     if isinstance(v, int):
-        return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
+        return datetime.datetime.fromtimestamp(v, tz=datetime.UTC)
     return v
 
 
@@ -312,11 +313,11 @@ class StaticToken(JWTToken):
     iss: str = "static_issuer"
     """The issuer of the token"""
     iat: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+        default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
     """The issued at time of the token (defaults to now, UTC)"""
     exp: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+        default_factory=lambda: datetime.datetime.now(datetime.UTC)
         + datetime.timedelta(days=1)
     )
     """The expiration time of the token (defaults to one day from now, UTC)"""
@@ -395,7 +396,7 @@ class Issuer(BaseModel):
 
     _revocation: RevocationList | None = PrivateAttr(default=None)
 
-    def get_as_jwks(self) -> list[Dict[str, Any]]:
+    def get_as_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer"""
         raise NotImplementedError(
             "get_jwks not implemented. Must be implemented in subclass"
@@ -454,14 +455,14 @@ class JWKIssuer(Issuer):
     )
     """The issuer url (must match the iss claim of incoming tokens)"""
 
-    jwks: Dict[str, Any] = Field(
+    jwks: dict[str, Any] = Field(
         validation_alias=AliasChoices("jwks", "JWKS", "JWKS_DICT")
     )
     """The JWKS document of the issuer (a dict with a "keys" list)"""
 
     @field_validator("jwks", mode="before")
     @classmethod
-    def validate_jwks_dict(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_jwks_dict(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate the jwks dict"""
         if not isinstance(v, dict):
             raise ValueError("jwks_dict must be a dict")
@@ -471,11 +472,11 @@ class JWKIssuer(Issuer):
             raise ValueError("jwks_dict keys must be a list")
         return v
 
-    def get_as_jwks(self) -> list[Dict[str, Any]]:
+    def get_as_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer"""
         # validate_jwks_dict has already guaranteed "keys" exists and is a list;
         # the cast records that invariant rather than hiding an unchecked one.
-        return cast(list[Dict[str, Any]], self.jwks["keys"])
+        return cast(list[dict[str, Any]], self.jwks["keys"])
 
 
 class RSAKeyIssuer(Issuer):
@@ -502,7 +503,7 @@ class RSAKeyIssuer(Issuer):
     public_key: str = Field(validation_alias=AliasChoices("public_key", "PUBLIC_KEY"))
     """The PEM-encoded RSA public key used to verify token signatures"""
 
-    def get_as_jwks(self) -> list[Dict[str, Any]]:
+    def get_as_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer"""
         t = RSAKey.import_key(self.public_key)
         return [t.as_dict(kid=self.key_id)]
@@ -534,7 +535,7 @@ class RSAKeyFileIssuer(Issuer):
     )
     """Path to the PEM file containing the RSA public key"""
 
-    def get_as_jwks(self) -> list[Dict[str, Any]]:
+    def get_as_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer"""
 
         with open(self.public_key_pem_file, "rb") as f:
@@ -592,7 +593,7 @@ class JWKSUriIssuer(Issuer):
     an auth-path network call to a dependency's default: an unbounded JWKS fetch
     holds a worker for as long as the issuer keeps the socket open.
     """
-    _cache: list[Dict[str, Any]] | None = PrivateAttr(default=None)
+    _cache: list[dict[str, Any]] | None = PrivateAttr(default=None)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
     _last_refresh: float | None = PrivateAttr(default=None)
     _last_failed_load: float | None = PrivateAttr(default=None)
@@ -610,7 +611,7 @@ class JWKSUriIssuer(Issuer):
             "Cannot refresh JWKS synchronously while an event loop is running; use arefresh instead"
         )
 
-    def get_as_jwks(self) -> list[Dict[str, Any]]:
+    def get_as_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer"""
 
         if self._cache is None:
@@ -619,9 +620,9 @@ class JWKSUriIssuer(Issuer):
             # would be throttled and a rotated key missed.
             self._run_blocking(self.aget_as_jwks)
 
-        return cast(list[Dict[str, Any]], self._cache)
+        return cast(list[dict[str, Any]], self._cache)
 
-    async def aget_as_jwks(self) -> list[Dict[str, Any]]:
+    async def aget_as_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer without blocking the event loop."""
 
         if self._cache is None:
@@ -629,7 +630,7 @@ class JWKSUriIssuer(Issuer):
                 if self._cache is None:
                     await self._load_jwks()
 
-        return cast(list[Dict[str, Any]], self._cache)
+        return cast(list[dict[str, Any]], self._cache)
 
     async def _load_jwks(self) -> None:
         """Populate the cache, failing fast while a recent load attempt failed.
@@ -711,12 +712,12 @@ class JWKSUriIssuer(Issuer):
 
 
 IssuerUnion = Annotated[
-    Union[JWKIssuer, RSAKeyIssuer, RSAKeyFileIssuer, JWKSUriIssuer],
+    JWKIssuer | RSAKeyIssuer | RSAKeyFileIssuer | JWKSUriIssuer,
     Discriminator("kind"),
 ]
 
 
-def _index_issuer_keys(iss: str, keys: list[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+def _index_issuer_keys(iss: str, keys: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Validate and index a *single* issuer's keys by ``kid``.
 
     ``kid``s only need to be unique within one issuer: a token is verified
@@ -729,7 +730,7 @@ def _index_issuer_keys(iss: str, keys: list[Dict[str, Any]]) -> Dict[str, Dict[s
     if not isinstance(keys, list):
         raise JwksError(f"keys of issuer {iss!r} must be a list")
 
-    indexed: Dict[str, Dict[str, Any]] = {}
+    indexed: dict[str, dict[str, Any]] = {}
 
     for key in keys:
         kid = key.get("kid")
@@ -747,7 +748,7 @@ def _index_issuer_keys(iss: str, keys: list[Dict[str, Any]]) -> Dict[str, Dict[s
     return indexed
 
 
-async def _aget_issuer_jwks(issuer: IssuerUnion) -> list[Dict[str, Any]]:
+async def _aget_issuer_jwks(issuer: IssuerUnion) -> list[dict[str, Any]]:
     """Get one issuer's JWKS, without blocking the loop on a remote fetch."""
 
     if isinstance(issuer, JWKSUriIssuer):
@@ -755,23 +756,23 @@ async def _aget_issuer_jwks(issuer: IssuerUnion) -> list[Dict[str, Any]]:
     return issuer.get_as_jwks()
 
 
-def _collect_jwks(issuers: list[IssuerUnion]) -> list[Dict[str, Any]]:
+def _collect_jwks(issuers: list[IssuerUnion]) -> list[dict[str, Any]]:
     """Collect the validated keys of every issuer (blocking).
 
     For introspection only. Verification never uses a merged set -- it resolves
     keys against a single issuer via :func:`_resolve_issuer_key_set`.
     """
 
-    merged: list[Dict[str, Any]] = []
+    merged: list[dict[str, Any]] = []
     for issuer in issuers:
         merged.extend(_index_issuer_keys(issuer.iss, issuer.get_as_jwks()).values())
     return merged
 
 
-async def _acollect_jwks(issuers: list[IssuerUnion]) -> list[Dict[str, Any]]:
+async def _acollect_jwks(issuers: list[IssuerUnion]) -> list[dict[str, Any]]:
     """Collect the validated keys of every issuer without blocking the loop."""
 
-    merged: list[Dict[str, Any]] = []
+    merged: list[dict[str, Any]] = []
     for issuer in issuers:
         keys = await _aget_issuer_jwks(issuer)
         merged.extend(_index_issuer_keys(issuer.iss, keys).values())
@@ -926,11 +927,11 @@ class ProvenanceSettings(BaseModel):
         """Reject a blank audience, which would skip the check entirely."""
         return reject_blank_audience(v)
 
-    def get_jwks(self) -> list[Dict[str, Any]]:
+    def get_jwks(self) -> list[dict[str, Any]]:
         """Get the merged jwks of all provenance issuers."""
         return _collect_jwks(self.issuers)
 
-    async def aget_jwks(self) -> list[Dict[str, Any]]:
+    async def aget_jwks(self) -> list[dict[str, Any]]:
         """Get the merged jwks of all provenance issuers without blocking."""
         return await _acollect_jwks(self.issuers)
 
@@ -1091,12 +1092,12 @@ class AuthentikateSettings(BaseModel):
         """Reject a blank audience, which no token could ever match."""
         return reject_blank_audience(v)
 
-    def get_jwks(self) -> list[Dict[str, Any]]:
+    def get_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer"""
 
         return _collect_jwks(self.issuers)
 
-    async def aget_jwks(self) -> list[Dict[str, Any]]:
+    async def aget_jwks(self) -> list[dict[str, Any]]:
         """Get the jwks of the issuer without blocking the event loop."""
 
         return await _acollect_jwks(self.issuers)

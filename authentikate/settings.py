@@ -2,12 +2,11 @@ import logging
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings
-from typing import Optional
 from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
-cached_settings: Optional[AuthentikateSettings] = None
+cached_settings: AuthentikateSettings | None = None
 
 
 def _check_deployment_safety(parsed: AuthentikateSettings) -> None:

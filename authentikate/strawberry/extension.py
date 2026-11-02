@@ -1,5 +1,6 @@
 from contextvars import ContextVar, Token
-from typing import Any, AsyncIterator, cast
+from typing import Any, cast
+from collections.abc import AsyncIterator
 from graphql import (
     DocumentNode,
     FieldNode,

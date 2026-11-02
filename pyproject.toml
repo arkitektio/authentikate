@@ -100,8 +100,8 @@ target-version = "py312"
 # McCabe complexity (`C901`) by default.
 # ANN101/ANN102 (missing annotation on self/cls) were removed from ruff, so
 # ignoring them is a no-op and ruff warns about it -- they are gone from here.
-extend-select = ["ANN", "D1"]
-extend-ignore = ["ANN002", "ANN003", "D100", "ANN401"]
+extend-select = ["ANN", "D1", "UP"]
+extend-ignore = ["ANN002", "ANN003", "D100", "ANN401", "UP037", "UP038", "UP042", "UP040", "UP046", "UP047", "UP049"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

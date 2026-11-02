@@ -30,7 +30,8 @@ applies its own rules to scoped members (lok). ``reject`` always rejects it.
 
 import asyncio
 import functools
-from typing import Any, Callable, Literal
+from typing import Any, Literal
+from collections.abc import Callable
 
 from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings, JWTToken
 from authentikate.errors import FullMembershipRequired, ScopedTokenUnsupported
