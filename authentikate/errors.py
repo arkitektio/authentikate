@@ -244,7 +244,9 @@ class ScopedTokenUnsupported(AuthentikatePermissionDenied):
     """
 
     reason = "SCOPED_TOKEN_UNSUPPORTED"
-    client_message = "This service does not accept tokens that are limited to collaborations."
+    client_message = (
+        "This service does not accept tokens that are limited to collaborations."
+    )
 
 
 class ScopedReadOnly(AuthentikatePermissionDenied):

@@ -28,7 +28,7 @@ so a list of slugs now matches nothing and rejects every request:
 ```python
 AUTHENTIKATE = {
     "ISSUERS": [...],
-    "ALLOWED_ORGANIZATIONS": ["42", "137"],   # ids, not ["acme", "beta-corp"]
+    "ALLOWED_ORGANIZATIONS": ["42", "137"],  # ids, not ["acme", "beta-corp"]
 }
 ```
 
@@ -51,7 +51,7 @@ it for you, since only your issuer knows which id belongs to which slug.
 ```python
 AUTHENTIKATE = {
     "ISSUERS": [...],
-    "AUDIENCE": "my-service",   # this service's identifier
+    "AUDIENCE": "my-service",  # this service's identifier
 }
 ```
 
@@ -186,7 +186,7 @@ required* below.
 ```python
 AUTHENTIKATE = {
     "ISSUERS": [...],
-    "AUDIENCE": "my-service",   # this service's identifier
+    "AUDIENCE": "my-service",  # this service's identifier
 }
 ```
 
@@ -235,9 +235,11 @@ permission-bearing group therefore granted those permissions — the issuer's
 @strawberry.field
 def secret(self, info) -> str: ...
 
+
 # after: check the role directly
 @strawberry.field(extensions=[AuthExtension(roles=["admin"])])
 def secret(self, info) -> str: ...
+
 
 # or scoped to the request's active organization
 @strawberry.field(extensions=[AuthExtension(org_roles=["owner"])])

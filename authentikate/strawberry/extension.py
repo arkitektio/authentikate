@@ -1,6 +1,7 @@
+from collections.abc import AsyncIterator
 from contextvars import ContextVar, Token
 from typing import Any, cast
-from collections.abc import AsyncIterator
+
 from graphql import (
     DocumentNode,
     FieldNode,
@@ -11,36 +12,37 @@ from graphql import (
     OperationDefinitionNode,
     SelectionSetNode,
 )
+from kante.context import HttpContext, WsContext
 from strawberry.extensions import SchemaExtension
 from strawberry.schema.schema_converter import GraphQLCoreConverter
 from strawberry.types import ExecutionContext
 from strawberry.types.graphql import OperationType
-from kante.context import WsContext, HttpContext
-from authentikate.vars import (
-    token_var,
-    user_var,
-    client_var,
-    organization_var,
-    membership_var,
-)
+
 from authentikate.base_models import AuthentikateSettings, JWTToken
-from authentikate.models import Client, User
-from authentikate.utils import (
-    authenticate_header,
-    authenticate_token,
-)
-from authentikate.provenance import (
-    aauthenticate_provenance_header_or_raise,
-    verify_actor,
-)
-from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
 from authentikate.errors import (
     AuthentikateError,
     AuthentikatePermissionDenied,
     ScopedReadOnly,
 )
+from authentikate.models import Client, User
+from authentikate.protocols import MembershipModel, OrganizationModel, UserModel
+from authentikate.provenance import (
+    aauthenticate_provenance_header_or_raise,
+    verify_actor,
+)
 from authentikate.scoped import scoped_mode
 from authentikate.strawberry.errors import to_graphql_error
+from authentikate.utils import (
+    authenticate_header,
+    authenticate_token,
+)
+from authentikate.vars import (
+    client_var,
+    membership_var,
+    organization_var,
+    token_var,
+    user_var,
+)
 
 
 def _reset(var: ContextVar[Any], token: Token[Any] | None) -> None:
@@ -60,11 +62,14 @@ def _reset(var: ContextVar[Any], token: Token[Any] | None) -> None:
         pass
 
 
-def _operation(document: DocumentNode, name: str | None) -> OperationDefinitionNode | None:
+def _operation(
+    document: DocumentNode, name: str | None
+) -> OperationDefinitionNode | None:
     """The operation of ``document`` that runs: the one called ``name``, else the only one."""
     for definition in document.definitions:
         if isinstance(definition, OperationDefinitionNode) and (
-            name is None or (definition.name is not None and definition.name.value == name)
+            name is None
+            or (definition.name is not None and definition.name.value == name)
         ):
             return definition
     return None
@@ -86,7 +91,9 @@ def _root_field_names(
             name = selection.name.value
             fragment = fragments.get(name)
             if fragment is not None and name not in seen:
-                names.extend(_root_field_names(fragment.selection_set, fragments, seen | {name}))
+                names.extend(
+                    _root_field_names(fragment.selection_set, fragments, seen | {name})
+                )
     return names
 
 
@@ -107,14 +114,23 @@ def allows_scoped(execution_context: ExecutionContext) -> bool:
     if root is None:
         return False
     fragments = {
-        d.name.value: d for d in document.definitions if isinstance(d, FragmentDefinitionNode)
+        d.name.value: d
+        for d in document.definitions
+        if isinstance(d, FragmentDefinitionNode)
     }
     for name in _root_field_names(operation.selection_set, fragments):
         if name == "__typename":
             continue
         field = root.fields.get(name)
-        definition = (field.extensions or {}).get(GraphQLCoreConverter.DEFINITION_BACKREF) if field else None
-        if not any(getattr(e, "allow_scoped", False) for e in getattr(definition, "extensions", None) or ()):
+        definition = (
+            (field.extensions or {}).get(GraphQLCoreConverter.DEFINITION_BACKREF)
+            if field
+            else None
+        )
+        if not any(
+            getattr(e, "allow_scoped", False)
+            for e in getattr(definition, "extensions", None) or ()
+        ):
             return False
     return True
 
@@ -254,9 +270,12 @@ class AuthentikateExtension(SchemaExtension):
 
                 reset_token = token_var.set(token)
                 if token:
-                    user, client, organization, membership = (
-                        await self.aexpand_token_context(token)
-                    )
+                    (
+                        user,
+                        client,
+                        organization,
+                        membership,
+                    ) = await self.aexpand_token_context(token)
                     reset_client = client_var.set(client)
                     reset_user = user_var.set(cast(UserModel, user))
                     reset_organization = organization_var.set(organization)
@@ -304,7 +323,10 @@ class AuthentikateExtension(SchemaExtension):
             if isinstance(original, (AuthentikateError, AuthentikatePermissionDenied)):
                 coded = to_graphql_error(original)
                 error.message = coded.message
-                error.extensions = {**(error.extensions or {}), **(coded.extensions or {})}
+                error.extensions = {
+                    **(error.extensions or {}),
+                    **(coded.extensions or {}),
+                }
 
     async def on_validate(self) -> AsyncIterator[None]:
         """Keep a scoped member's operation read-only.
@@ -328,11 +350,16 @@ class AuthentikateExtension(SchemaExtension):
             and token.is_scoped
             and operation_type != OperationType.QUERY
             and scoped_mode(self.get_settings()) == "enforce"
-            and (operation_type == OperationType.SUBSCRIPTION or not allows_scoped(self.execution_context))
+            and (
+                operation_type == OperationType.SUBSCRIPTION
+                or not allows_scoped(self.execution_context)
+            )
         ):
             operation = self.execution_context.operation_type.value
             self.execution_context.pre_execution_errors = [
-                to_graphql_error(ScopedReadOnly(f"{token.sub} sent a {operation} as a scoped member"))
+                to_graphql_error(
+                    ScopedReadOnly(f"{token.sub} sent a {operation} as a scoped member")
+                )
             ]
 
         yield

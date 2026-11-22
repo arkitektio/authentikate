@@ -1,7 +1,16 @@
-import strawberry
-from strawberry import UNSET
-from typing import Any
 from collections.abc import Awaitable, Callable, Sequence
+from typing import Any
+
+import strawberry
+from kante.types import Info
+from strawberry import UNSET
+from strawberry.extensions import FieldExtension
+from strawberry.schema_directive import Location
+from strawberry.types.field import StrawberryField
+
+from authentikate.base_models import JWTToken
+from authentikate.catch_alls import catch_alls
+from authentikate.settings import get_settings
 from authentikate.strawberry.errors import (
     FULL_MEMBERSHIP_REQUIRED,
     INSUFFICIENT_ORGANIZATION_ROLE,
@@ -11,13 +20,6 @@ from authentikate.strawberry.errors import (
     denied,
     unauthenticated,
 )
-from strawberry.schema_directive import Location
-from kante.types import Info
-from strawberry.extensions import FieldExtension
-from strawberry.types.field import StrawberryField
-from authentikate.base_models import JWTToken
-from authentikate.catch_alls import catch_alls
-from authentikate.settings import get_settings
 
 
 @strawberry.schema_directive(locations=[Location.FIELD_DEFINITION])
@@ -178,7 +180,9 @@ class _AuthChecks:
             )
 
         alls = catch_alls()
-        if get_settings().enforce_scopes and not (alls.scope and alls.scope in token.scopes):
+        if get_settings().enforce_scopes and not (
+            alls.scope and alls.scope in token.scopes
+        ):
             if self.scopes and not token.has_scopes(self.scopes):
                 raise denied(
                     f"User does not have the required scopes: {self.scopes}",
@@ -277,9 +281,9 @@ class AuthExtension(_AuthChecks, FieldExtension):
         Args:
             field (StrawberryField): The authentication field to which the directive will be applied.
         """
-        assert (
-            not field.is_subscription
-        ), "Auth directive cannot be applied to subscriptions use AuthSubscribeExtension instead."
+        assert not field.is_subscription, (
+            "Auth directive cannot be applied to subscriptions use AuthSubscribeExtension instead."
+        )
         field.directives.extend(self._directives())
 
     def resolve(
@@ -310,12 +314,12 @@ class AuthSubscribeExtension(_AuthChecks, FieldExtension):
         Args:
             field (StrawberryField): The authentication field to which the directive will be applied.
         """
-        assert (
-            field.is_subscription
-        ), "AuthSubscribeExtension can only be applied to subscription fields."
-        assert (
-            not self.allow_scoped
-        ), "A subscription streams the organization's events: it cannot be opened to scoped members."
+        assert field.is_subscription, (
+            "AuthSubscribeExtension can only be applied to subscription fields."
+        )
+        assert not self.allow_scoped, (
+            "A subscription streams the organization's events: it cannot be opened to scoped members."
+        )
         field.directives.extend(self._directives())
 
     def resolve(

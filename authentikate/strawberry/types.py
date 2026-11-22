@@ -1,7 +1,8 @@
-from authentikate import models
 import kante
 import strawberry
 import strawberry_django
+
+from authentikate import models
 
 
 @kante.django_type(models.Device)
@@ -34,7 +35,9 @@ class Organization:
     """An organization that users can be members of."""
 
     id: strawberry.ID
-    identifier: str = strawberry_django.field(description="The organization across issuers and services: `<issuer>#<org>`")
+    identifier: str = strawberry_django.field(
+        description="The organization across issuers and services: `<issuer>#<org>`"
+    )
 
 
 @kante.django_type(models.User)
@@ -44,13 +47,27 @@ class User:
     id: strawberry.ID
     sub: str
     preferred_username: str
-    name: str | None = strawberry_django.field(description="The full name, if the issuer sends one.")
-    given_name: str | None = strawberry_django.field(field_name="first_name", description="The given name, if the issuer sends one.")
-    family_name: str | None = strawberry_django.field(field_name="last_name", description="The family name, if the issuer sends one.")
-    nickname: str | None = strawberry_django.field(description="A casual name, if the issuer sends one.")
-    picture: str | None = strawberry_django.field(description="URL of the profile picture, if the issuer sends one.")
-    locale: str | None = strawberry_django.field(description="The user's locale (BCP47), if the issuer sends one.")
-    zoneinfo: str | None = strawberry_django.field(description="The user's IANA time zone, if the issuer sends one.")
+    name: str | None = strawberry_django.field(
+        description="The full name, if the issuer sends one."
+    )
+    given_name: str | None = strawberry_django.field(
+        field_name="first_name", description="The given name, if the issuer sends one."
+    )
+    family_name: str | None = strawberry_django.field(
+        field_name="last_name", description="The family name, if the issuer sends one."
+    )
+    nickname: str | None = strawberry_django.field(
+        description="A casual name, if the issuer sends one."
+    )
+    picture: str | None = strawberry_django.field(
+        description="URL of the profile picture, if the issuer sends one."
+    )
+    locale: str | None = strawberry_django.field(
+        description="The user's locale (BCP47), if the issuer sends one."
+    )
+    zoneinfo: str | None = strawberry_django.field(
+        description="The user's IANA time zone, if the issuer sends one."
+    )
     active_organization: Organization | None = None
 
 

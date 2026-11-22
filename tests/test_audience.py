@@ -9,9 +9,9 @@ essential claim, with `"*"` widening the check rather than dropping it.
 import datetime
 
 import pytest
-from pydantic import ValidationError
 from joserfc import jwt
 from joserfc.jwk import RSAKey
+from pydantic import ValidationError
 
 from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import decode_token
@@ -28,7 +28,7 @@ def _settings(public_key: str, audience: str) -> AuthentikateSettings:
 
 
 def _token(private_key: str, aud: object) -> str:
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     claims: dict[str, object] = {
         "sub": "1",
         "iss": ISS,

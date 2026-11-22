@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from authentikate.base_models import AuthentikateSettings, JWTToken, StaticToken
 from authentikate.errors import OrganizationNotAllowed
 from authentikate.expand import aexpand_organization_from_token
-from authentikate.models import Organization
 from authentikate.provenance.models import ProvenanceToken
 from authentikate.utils import authenticate_token
 
@@ -18,8 +17,8 @@ def make_token(**overrides) -> JWTToken:
     defaults = dict(
         sub="1",
         iss="https://lok.one",
-        exp=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1),
-        iat=datetime.datetime.now(datetime.timezone.utc),
+        exp=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1),
+        iat=datetime.datetime.now(datetime.UTC),
         preferred_username="tester",
         client_id="client",
         scope="read",
@@ -45,12 +44,25 @@ def test_an_issuer_with_a_fragment_is_refused() -> None:
 @pytest.mark.django_db
 @pytest.mark.asyncio
 async def test_two_issuers_with_the_same_org_id_are_two_organizations() -> None:
-    one = await aexpand_organization_from_token(make_token(iss="https://lok.one", org="1"))
-    two = await aexpand_organization_from_token(make_token(iss="https://lok.two", org="1"))
+    one = await aexpand_organization_from_token(
+        make_token(iss="https://lok.one", org="1")
+    )
+    two = await aexpand_organization_from_token(
+        make_token(iss="https://lok.two", org="1")
+    )
 
     assert one.pk != two.pk
-    assert (one.issuer, one.org, two.issuer, two.org) == ("https://lok.one", "1", "https://lok.two", "1")
-    assert (await aexpand_organization_from_token(make_token(iss="https://lok.one", org="1"))).pk == one.pk
+    assert (one.issuer, one.org, two.issuer, two.org) == (
+        "https://lok.one",
+        "1",
+        "https://lok.two",
+        "1",
+    )
+    assert (
+        await aexpand_organization_from_token(
+            make_token(iss="https://lok.one", org="1")
+        )
+    ).pk == one.pk
 
 
 def test_the_allow_list_names_the_issuer_too() -> None:
@@ -82,5 +94,8 @@ def test_a_provenance_token_carries_the_tasks_organization() -> None:
         aha="sha256-canonical-v1",
         raw="raw",
     )
-    assert ProvenanceToken.model_validate({**claims, "org": "https://lok.one#1"}).org == "https://lok.one#1"
+    assert (
+        ProvenanceToken.model_validate({**claims, "org": "https://lok.one#1"}).org
+        == "https://lok.one#1"
+    )
     assert ProvenanceToken.model_validate(claims).org is None

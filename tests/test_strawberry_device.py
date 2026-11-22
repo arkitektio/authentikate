@@ -1,12 +1,10 @@
 """Test that a Http request receives a broadcast from an HTTP mutation."""
 
 import pytest
-import asyncio
-from uuid import uuid4
+from django.conf import settings
+from kante.testing import GraphQLHttpTestClient
 
 from test_project.asgi import application
-from kante.testing import GraphQLHttpTestClient, GraphQLWebSocketTestClient
-from django.conf import settings
 
 
 @pytest.mark.asyncio
@@ -33,9 +31,9 @@ async def test_device_query(db, valid_auth_headers, key_pair_str) -> None:
     )
 
     assert answer["data"]["device"] is not None
-    assert (
-        answer["data"]["device"]["deviceId"] == "device_12345"
-    ), f"Expected 'device_12345', got {answer['data']['device']['deviceId']}"
+    assert answer["data"]["device"]["deviceId"] == "device_12345", (
+        f"Expected 'device_12345', got {answer['data']['device']['deviceId']}"
+    )
 
 
 @pytest.mark.asyncio
@@ -64,6 +62,6 @@ async def test_device_query_static(db, valid_auth_headers, key_pair_str) -> None
     )
 
     assert answer["data"]["device"] is not None
-    assert (
-        answer["data"]["device"]["deviceId"] == "static_device"
-    ), f"Expected 'static_device', got {answer['data']['device']['deviceId']}"
+    assert answer["data"]["device"]["deviceId"] == "static_device", (
+        f"Expected 'static_device', got {answer['data']['device']['deviceId']}"
+    )

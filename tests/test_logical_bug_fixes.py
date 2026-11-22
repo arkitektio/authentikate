@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 import strawberry
+from django.contrib.auth.models import Group
 from graphql import GraphQLError
 from joserfc import jwt
 from joserfc.jwk import RSAKey
@@ -10,8 +11,6 @@ from joserfc.jwk import RSAKey
 from authentikate.base_models import JWTToken
 from authentikate.decode import adecode_token, decode_token
 from authentikate.errors import AuthentikateTokenExpired, MalformedJwtTokenError
-from django.contrib.auth.models import Group
-
 from authentikate.expand import (
     aexpand_token_context,
     aexpand_user_from_token,
@@ -27,12 +26,8 @@ def expired_jwt(valid_claims, key_pair_str):
     key = RSAKey.import_key(key_pair_str.private_key)
     claims = {
         **valid_claims,
-        "iat": int(
-            (datetime.datetime.now() - datetime.timedelta(days=2)).timestamp()
-        ),
-        "exp": int(
-            (datetime.datetime.now() - datetime.timedelta(days=1)).timestamp()
-        ),
+        "iat": int((datetime.datetime.now() - datetime.timedelta(days=2)).timestamp()),
+        "exp": int((datetime.datetime.now() - datetime.timedelta(days=1)).timestamp()),
     }
     return jwt.encode({"alg": "RS256", "kid": "1"}, claims, key)
 
@@ -52,9 +47,8 @@ def make_token(**overrides) -> JWTToken:
     defaults = dict(
         sub="1",
         iss="test_issuer",
-        exp=datetime.datetime.now(datetime.timezone.utc)
-        + datetime.timedelta(days=1),
-        iat=datetime.datetime.now(datetime.timezone.utc),
+        exp=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1),
+        iat=datetime.datetime.now(datetime.UTC),
         preferred_username="tester",
         client_id="client",
         scope="read",
@@ -90,8 +84,8 @@ def test_jwt_timestamps_are_utc_aware():
         aud=["test-service"],
         raw="raw",
     )
-    assert token.exp.tzinfo == datetime.timezone.utc
-    assert token.iat.tzinfo == datetime.timezone.utc
+    assert token.exp.tzinfo == datetime.UTC
+    assert token.iat.tzinfo == datetime.UTC
 
 
 class FakeRequest:
@@ -104,9 +98,7 @@ class FakeRequest:
 
 
 def make_info(token: JWTToken) -> SimpleNamespace:
-    return SimpleNamespace(
-        context=SimpleNamespace(request=FakeRequest(token))
-    )
+    return SimpleNamespace(context=SimpleNamespace(request=FakeRequest(token)))
 
 
 def test_any_scope_of_checks_scopes_not_roles():
@@ -147,13 +139,19 @@ async def test_resolve_async_enforces_any_scope_and_any_role():
     )
 
 
-def test_sync_expand_user_links_organization_from_the_org_claim(db, valid_jwt, valid_settings):
+def test_sync_expand_user_links_organization_from_the_org_claim(
+    db, valid_jwt, valid_settings
+):
     token = decode_token(valid_jwt, valid_settings)
 
     user = expand_user_from_token(token)
 
     assert user.active_organization is not None
-    assert user.active_organization.identifier == token.org_identifier == f"{token.iss}#{token.org}"
+    assert (
+        user.active_organization.identifier
+        == token.org_identifier
+        == f"{token.iss}#{token.org}"
+    )
     assert Organization.objects.filter(identifier=token.org_identifier).count() == 1
 
 

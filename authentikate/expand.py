@@ -1,14 +1,16 @@
 import hashlib
+import logging
 import re
 from dataclasses import dataclass
-from django.db import IntegrityError
-from authentikate import base_models, models
-import logging
 from typing import cast
+
+from django.db import IntegrityError
+
+from authentikate import base_models, models
 from authentikate.errors import BlockedMembership, MissingActiveOrganization
 from authentikate.protocols import (
-    UserModel,
     OrganizationModel,
+    UserModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -126,7 +128,9 @@ async def aexpand_organization_from_token(
     if not token.org:
         raise MissingActiveOrganization("Token does not contain an active organization")
 
-    org, _ = await models.Organization.objects.aget_or_create(identifier=token.org_identifier)
+    org, _ = await models.Organization.objects.aget_or_create(
+        identifier=token.org_identifier
+    )
     return org
 
 

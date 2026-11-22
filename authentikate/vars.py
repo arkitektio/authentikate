@@ -1,8 +1,8 @@
 import contextvars
+
 from authentikate.base_models import JWTToken
 from authentikate.models import Client
-from authentikate.protocols import UserModel, OrganizationModel, MembershipModel
-
+from authentikate.protocols import MembershipModel, OrganizationModel, UserModel
 
 token_var: contextvars.ContextVar[JWTToken | None] = contextvars.ContextVar(
     "token_var", default=None

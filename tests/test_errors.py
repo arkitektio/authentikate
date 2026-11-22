@@ -1,22 +1,23 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from joserfc import jwt
+from joserfc.jwk import RSAKey
+
+from authentikate.base_models import AuthentikateSettings, JWKSUriIssuer
+from authentikate.decode import decode_token
 from authentikate.errors import (
-    NoAuthorizationHeader,
-    MalformedAuthorizationHeader,
-    JwksError,
-    MalformedJwtTokenError,
     InvalidJwtTokenError,
+    JwksError,
+    MalformedAuthorizationHeader,
+    MalformedJwtTokenError,
+    NoAuthorizationHeader,
 )
 from authentikate.utils import (
     authenticate_header,
     authenticate_header_or_none,
     authenticate_token_or_none,
 )
-from authentikate.base_models import AuthentikateSettings, JWKSUriIssuer
-from authentikate.decode import decode_token
-from joserfc import jwt
-from joserfc.jwk import RSAKey
-import datetime
 
 
 def _build_mock_session(*responses_or_exceptions):
@@ -88,7 +89,6 @@ async def test_authenticate_token_or_none_reraises_unexpected_errors():
 def test_jwks_fetch_error():
     session = _build_mock_session(Exception("Failed"))
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
-
         issuer = JWKSUriIssuer(
             kind="jwks_uri", iss="http://test", jwks_uri="http://test/jwks"
         )
@@ -145,7 +145,7 @@ def test_key_not_found(key_pair_str):
                     iss="http://test",
                     jwks_uri="http://test/jwks",
                 )
-            ]
+            ],
         )
 
         with pytest.raises(InvalidJwtTokenError):

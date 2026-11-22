@@ -1,20 +1,19 @@
+import dataclasses
+import datetime
+import uuid
+
+import pytest
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend
-from pytest_django.fixtures import SettingsWrapper
-import dataclasses
-import pytest
-import datetime
 from joserfc import jwt
-import uuid
 from joserfc.jwk import RSAKey
+
 from authentikate.base_models import (
     AuthentikateSettings,
-    Issuer,
-    RSAKeyIssuer,
     JWKIssuer,
+    RSAKeyIssuer,
 )
-
 
 # Generate a private key
 

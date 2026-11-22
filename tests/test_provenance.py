@@ -173,7 +173,7 @@ def test_not_configured(ed_key):
                 "kind": "jwks_dict",
                 "jwks": {"keys": [ed_key.as_dict(private=False, kid=PROV_KID)]},
             }
-        ]
+        ],
     )
     token = _sign(ed_key, _provenance_claims())
     with pytest.raises(errors.ProvenanceNotConfiguredError):
@@ -200,7 +200,7 @@ def test_malformed_payload(ed_key, settings):
 
 
 def _auth_token(sub: str, client_id: str) -> JWTToken:
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     return JWTToken(
         sub=sub,
         iss="lok",
@@ -238,7 +238,7 @@ def test_verify_actor_cid_mismatch(ed_key, settings):
 def test_canonicalization_byte_form():
     # The canonical form is the contract: sorted keys, no whitespace, UTF-8.
     assert canonicalize_v1({"b": 2, "a": 1}) == b'{"a":1,"b":2}'
-    assert canonicalize_v1({"name": "café"}) == '{"name":"café"}'.encode("utf-8")
+    assert canonicalize_v1({"name": "café"}) == '{"name":"café"}'.encode()
 
 
 def test_args_hash_matches_sha256_of_canonical():
@@ -365,7 +365,9 @@ async def test_or_none_malformed_logs_and_returns_none(ed_key, settings, caplog)
 
 
 @pytest.mark.asyncio
-async def test_or_none_audience_mismatch_logs_and_returns_none(ed_key, settings, caplog):
+async def test_or_none_audience_mismatch_logs_and_returns_none(
+    ed_key, settings, caplog
+):
     token = _sign(ed_key, _provenance_claims(aud=["someone-else"]))
     with caplog.at_level(logging.WARNING, logger="authentikate.provenance.verify"):
         result = await aauthenticate_provenance_header_or_none(
@@ -376,7 +378,9 @@ async def test_or_none_audience_mismatch_logs_and_returns_none(ed_key, settings,
 
 
 @pytest.mark.asyncio
-async def test_or_none_not_configured_logs_and_returns_none(ed_key, bare_settings, caplog):
+async def test_or_none_not_configured_logs_and_returns_none(
+    ed_key, bare_settings, caplog
+):
     token = _sign(ed_key, _provenance_claims())
     with caplog.at_level(logging.WARNING, logger="authentikate.provenance.verify"):
         result = await aauthenticate_provenance_header_or_none(
@@ -468,7 +472,9 @@ def test_default_algorithm_is_eddsa(ed_key):
         audience="*",
         issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
         provenance={
-            "issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
+            "issuers": [
+                {"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}
+            ],
             "audience": "mikro",
         },
     )
@@ -476,7 +482,9 @@ def test_default_algorithm_is_eddsa(ed_key):
     assert settings.provenance.algorithms == ["Ed25519"]
 
 
-@pytest.mark.parametrize("bad", [["none"], ["NONE"], [" none "], ["Ed25519", "none"], []])
+@pytest.mark.parametrize(
+    "bad", [["none"], ["NONE"], [" none "], ["Ed25519", "none"], []]
+)
 def test_rejects_unsafe_algorithm_config(ed_key, bad):
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     with pytest.raises(ValidationError):
@@ -484,7 +492,9 @@ def test_rejects_unsafe_algorithm_config(ed_key, bad):
             audience="*",
             issuers=[{"iss": "lok", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
             provenance={
-                "issuers": [{"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}],
+                "issuers": [
+                    {"iss": "rekuest", "kind": "jwks_dict", "jwks": {"keys": [pub]}}
+                ],
                 "audience": "mikro",
                 "algorithms": bad,
             },
@@ -553,7 +563,7 @@ def test_wildcard_audience_accepts_any_service(ed_key, any_audience_settings):
 
 
 def test_wildcard_audience_still_requires_the_claim(ed_key, any_audience_settings):
-    """"*" means "any service", not "no service": `aud` is still a required claim."""
+    """ "*" means "any service", not "no service": `aud` is still a required claim."""
     claims = _provenance_claims()
     claims.pop("aud")
     token = _sign(ed_key, claims)

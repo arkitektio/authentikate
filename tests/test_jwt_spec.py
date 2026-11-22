@@ -1,8 +1,9 @@
-from authentikate.base_models import JWTToken
 import datetime
 
 import pytest
 from pydantic import ValidationError
+
+from authentikate.base_models import JWTToken
 
 
 def test_jwt_token():

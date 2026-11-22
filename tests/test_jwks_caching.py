@@ -1,6 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
-from authentikate.base_models import JWKSUriIssuer
+
 from joserfc.jwk import RSAKey
+
+from authentikate.base_models import JWKSUriIssuer
 
 
 def _build_mock_session(*payloads):
@@ -27,7 +29,6 @@ def test_jwks_uri_caching_logic(key_pair_str):
     session = _build_mock_session(jwks, jwks)
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
-
         issuer = JWKSUriIssuer(
             kind="jwks_uri",
             iss="http://test-issuer",
@@ -49,10 +50,12 @@ def test_jwks_uri_caching_logic(key_pair_str):
         assert session.get.call_count == 2
 
 
+import datetime
+
+from joserfc import jwt
+
 from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import decode_token
-from joserfc import jwt
-import datetime
 
 
 def test_jwks_uri_refresh_on_missing_kid(key_pair_str):
@@ -69,7 +72,6 @@ def test_jwks_uri_refresh_on_missing_kid(key_pair_str):
     session = _build_mock_session(jwks1, jwks2)
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
-
         settings = AuthentikateSettings(
             audience="*",
             issuers=[
@@ -78,14 +80,14 @@ def test_jwks_uri_refresh_on_missing_kid(key_pair_str):
                     "iss": "http://test-issuer",
                     "jwks_uri": "http://test-issuer/jwks",
                 }
-            ]
+            ],
         )
 
         # 1. First token with kid="1"
         # We need a token that is valid otherwise so we can reach the key loading part
 
         private_key_obj = RSAKey.import_key(key_pair_str.private_key)
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         claims = {
             "sub": "user",
             "iss": "http://test-issuer",

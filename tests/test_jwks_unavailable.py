@@ -120,7 +120,9 @@ def test_a_successful_load_clears_the_failure(monkeypatch) -> None:
 
 def test_the_request_timeout_is_stated_explicitly() -> None:
     """The bound on an auth-path network call must not be a dependency default."""
-    issuer = JWKSUriIssuer(iss="https://idp.example", jwks_uri="https://idp.example/jwks")
+    issuer = JWKSUriIssuer(
+        iss="https://idp.example", jwks_uri="https://idp.example/jwks"
+    )
     assert issuer.request_timeout == 5.0
 
     configured = JWKSUriIssuer(

@@ -1,5 +1,6 @@
 from django.contrib import admin
-from authentikate.models import Client, User, Membership
+
+from authentikate.models import Client, Membership, User
 
 # Register your models here.
 

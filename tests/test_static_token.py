@@ -1,9 +1,8 @@
+import asyncio
+
+from authentikate.base_models import AuthentikateSettings, StaticToken
 from authentikate.models import User
 from authentikate.utils import authenticate_header
-from authentikate.base_models import AuthentikateSettings
-from guardian.shortcuts import assign_perm
-from authentikate.base_models import StaticToken
-import asyncio
 
 
 def test_static_token(db, key_pair_str):

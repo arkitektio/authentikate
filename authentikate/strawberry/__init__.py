@@ -1,20 +1,19 @@
-""" Strawberry extension for Authentikate """
+"""Strawberry extension for Authentikate"""
 
-from .extension import AuthentikateExtension
-from .errors import (
-    AuthentikateGraphQLError,
-    to_graphql_error,
-)
 from .directives import (
-    AuthExtension,
     Auth,
-    all_directives,
+    AuthExtension,
     AuthSubscribeExtension,
+    all_directives,
     get_org_roles,
     has_org_role,
     has_role,
 )
-
+from .errors import (
+    AuthentikateGraphQLError,
+    to_graphql_error,
+)
+from .extension import AuthentikateExtension
 
 __all__ = [
     "AuthentikateExtension",

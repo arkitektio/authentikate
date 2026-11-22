@@ -1,16 +1,18 @@
-from kante.types import Info
-import kante
-from typing import cast
 from collections.abc import AsyncGenerator
-from authentikate.vars import get_user, get_client
+from typing import cast
+
+import kante
+from kante.types import Info
+
 from authentikate import models
-from authentikate.strawberry.extension import AuthentikateExtension
-from authentikate.strawberry.types import App, Device, User, Client, Organization
 from authentikate.strawberry.directives import (
     AuthExtension,
-    all_directives,
     AuthSubscribeExtension,
+    all_directives,
 )
+from authentikate.strawberry.extension import AuthentikateExtension
+from authentikate.strawberry.types import App, Client, Device, Organization, User
+from authentikate.vars import get_client, get_user
 
 
 @kante.type
@@ -53,7 +55,10 @@ class Query:
 
         token = get_token()
         here = token.collabs_here(current_instance(get_settings())) if token else {}
-        return [f"{collaboration}:{','.join(roles)}" for collaboration, roles in sorted(here.items())]
+        return [
+            f"{collaboration}:{','.join(roles)}"
+            for collaboration, roles in sorted(here.items())
+        ]
 
     @kante.django_field
     def device(self, info: Info) -> Device | None:
@@ -93,7 +98,9 @@ class Mutation:
         """A read-like mutation a scoped member may call."""
         return "signed"
 
-    @kante.django_mutation(extensions=[AuthExtension(any_role_of=["editor"], allow_scoped=True)])
+    @kante.django_mutation(
+        extensions=[AuthExtension(any_role_of=["editor"], allow_scoped=True)]
+    )
     def annotate(self, info: Info) -> str:
         """A write a collaboration can permit: editors, and guests who are editors in one of their collaborations."""
         return "annotated"

@@ -33,7 +33,10 @@ def _settings(**options: Any) -> AuthentikateSettings:
     return AuthentikateSettings(
         **{"audience": "*", **options},
         issuers=[],
-        static_tokens={"scoped": _token(collabs=COLLABS), "full": StaticToken(sub="member")},
+        static_tokens={
+            "scoped": _token(collabs=COLLABS),
+            "full": StaticToken(sub="member"),
+        },
     )
 
 
@@ -58,7 +61,9 @@ def test_collaborations_are_read_for_one_instance_with_their_roles() -> None:
     assert token.collabs_here(None) == {}
 
 
-@pytest.mark.parametrize("claim", [["5"], {"12": ["5"]}, {"12": {"5": "editor"}}, {"12": {"5": [1]}}])
+@pytest.mark.parametrize(
+    "claim", [["5"], {"12": ["5"]}, {"12": {"5": "editor"}}, {"12": {"5": [1]}}]
+)
 def test_a_collabs_claim_of_another_shape_is_refused(claim: Any) -> None:
     with pytest.raises(ValueError):
         _token(collabs=claim)
@@ -90,12 +95,18 @@ def test_held_without_an_instance_is_rejected() -> None:
 def test_reject_rejects_even_where_held() -> None:
     scoped.enforce_scoped()
     with pytest.raises(ScopedTokenUnsupported):
-        asyncio.run(authenticate_token("scoped", _settings(audience="12", scoped_tokens="reject")))
+        asyncio.run(
+            authenticate_token(
+                "scoped", _settings(audience="12", scoped_tokens="reject")
+            )
+        )
 
 
 def test_self_accepts_without_an_enforcer_or_instance() -> None:
     assert scoped.scoped_mode(_settings(scoped_tokens="self")) == "self"
-    assert asyncio.run(authenticate_token("scoped", _settings(scoped_tokens="self"))).is_scoped
+    assert asyncio.run(
+        authenticate_token("scoped", _settings(scoped_tokens="self"))
+    ).is_scoped
 
 
 def test_require_full_member() -> None:
@@ -116,10 +127,27 @@ def scoped_service(db):
     settings.AUTHENTIKATE = copy.deepcopy(original)
     settings.AUTHENTIKATE["AUDIENCE"] = "12"
     settings.AUTHENTIKATE["STATIC_TOKENS"] = {
-        "scoped": {"sub": "guest", "iss": "lok", "roles": [], "collabs": COLLABS, "scope": "read write"},
-        "viewer": {"sub": "guest", "iss": "lok", "roles": [], "collabs": {"12": {"9": []}, "13": {"1": ["editor"]}}, "scope": "read write"},
+        "scoped": {
+            "sub": "guest",
+            "iss": "lok",
+            "roles": [],
+            "collabs": COLLABS,
+            "scope": "read write",
+        },
+        "viewer": {
+            "sub": "guest",
+            "iss": "lok",
+            "roles": [],
+            "collabs": {"12": {"9": []}, "13": {"1": ["editor"]}},
+            "scope": "read write",
+        },
         "full": {"sub": "member", "iss": "lok", "scope": "read write"},
-        "editor": {"sub": "editor", "iss": "lok", "roles": ["editor"], "scope": "read write"},
+        "editor": {
+            "sub": "editor",
+            "iss": "lok",
+            "roles": ["editor"],
+            "scope": "read write",
+        },
     }
     scoped.enforce_scoped()
     yield
@@ -127,7 +155,9 @@ def scoped_service(db):
 
 
 async def _run(token: str, query: str) -> dict[str, Any]:
-    client = GraphQLHttpTestClient(application=application, headers={"Authorization": f"Bearer {token}"})
+    client = GraphQLHttpTestClient(
+        application=application, headers={"Authorization": f"Bearer {token}"}
+    )
     return await client.execute(query=query)
 
 
@@ -171,13 +201,18 @@ async def test_an_opted_in_mutation_passes(scoped_service) -> None:
 async def test_opting_in_is_per_root_field_through_fragments(scoped_service) -> None:
     mixed = await _run("scoped", "mutation { presign requireRead }")
     assert _reason(mixed) == "SCOPED_READ_ONLY"
-    spread = await _run("scoped", "mutation { ...M } fragment M on Mutation { presign ... on Mutation { requireRead } }")
+    spread = await _run(
+        "scoped",
+        "mutation { ...M } fragment M on Mutation { presign ... on Mutation { requireRead } }",
+    )
     assert _reason(spread) == "SCOPED_READ_ONLY"
 
 
 @pytest.mark.asyncio
 async def test_a_named_operation_is_judged_by_itself(scoped_service) -> None:
-    client = GraphQLHttpTestClient(application=application, headers={"Authorization": "Bearer scoped"})
+    client = GraphQLHttpTestClient(
+        application=application, headers={"Authorization": "Bearer scoped"}
+    )
     document = "mutation A { presign } mutation B { requireRead }"
     passed = await client.execute(query=document, operation_name="A")
     assert passed["data"]["presign"] == "signed"
@@ -187,7 +222,9 @@ async def test_a_named_operation_is_judged_by_itself(scoped_service) -> None:
 
 @pytest.mark.asyncio
 async def test_a_role_field_requires_full_membership(scoped_service) -> None:
-    settings.AUTHENTIKATE["SCOPED_TOKENS"] = "self"  # no write gate: the field's own check answers
+    settings.AUTHENTIKATE["SCOPED_TOKENS"] = (
+        "self"  # no write gate: the field's own check answers
+    )
     answer = await _run("scoped", "mutation { administrate }")
     assert _reason(answer) == "FULL_MEMBERSHIP_REQUIRED"
 
@@ -203,16 +240,25 @@ async def _subscribe(token: str, query: str) -> list[dict[str, Any]]:
     """Every frame a subscription answers with, errors included (the test client drops those)."""
     import json
 
-    client = GraphQLWebSocketTestClient(application=application, connection_params={"token": token})
+    client = GraphQLWebSocketTestClient(
+        application=application, connection_params={"token": token}
+    )
     await client.connect()
     await client.communicator.send_input(
-        {"type": "websocket.receive", "text": json.dumps({"id": "1", "type": "start", "payload": {"query": query}})}
+        {
+            "type": "websocket.receive",
+            "text": json.dumps(
+                {"id": "1", "type": "start", "payload": {"query": query}}
+            ),
+        }
     )
     frames: list[dict[str, Any]] = []
     while True:
         try:
-            message = await asyncio.wait_for(client.communicator.receive_output(), timeout=2)
-        except asyncio.TimeoutError:
+            message = await asyncio.wait_for(
+                client.communicator.receive_output(), timeout=2
+            )
+        except TimeoutError:
             break
         if message["type"] != "websocket.send":
             continue
@@ -233,9 +279,13 @@ async def test_a_scoped_member_may_not_subscribe(scoped_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_no_subscription_is_open_to_a_scoped_member(scoped_service, monkeypatch) -> None:
+async def test_no_subscription_is_open_to_a_scoped_member(
+    scoped_service, monkeypatch
+) -> None:
     # Even one whose every root field claims to opt in.
-    monkeypatch.setattr("authentikate.strawberry.extension.allows_scoped", lambda context: True)
+    monkeypatch.setattr(
+        "authentikate.strawberry.extension.allows_scoped", lambda context: True
+    )
     frames = await _subscribe("scoped", "subscription { yieldOpen }")
     assert "SCOPED_READ_ONLY" in json_of(frames)
     assert '"event"' not in json_of(frames)
@@ -283,18 +333,21 @@ async def test_full_members_only_view(scoped_service) -> None:
         await upload(factory.get("/", HTTP_AUTHORIZATION="Bearer scoped"))
 
 
-
 # --- roles that hold inside a collaboration -------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_a_role_a_collaboration_holds_opens_the_field(scoped_service) -> None:
     answer = await _run("scoped", "mutation { annotate }")
-    assert answer["data"]["annotate"] == "annotated"  # editor in collaboration 5; the resolver checks the target's collaboration
+    assert (
+        answer["data"]["annotate"] == "annotated"
+    )  # editor in collaboration 5; the resolver checks the target's collaboration
 
 
 @pytest.mark.asyncio
-async def test_a_role_held_only_in_another_instances_collaboration_does_not(scoped_service) -> None:
+async def test_a_role_held_only_in_another_instances_collaboration_does_not(
+    scoped_service,
+) -> None:
     answer = await _run("viewer", "mutation { annotate }")
     assert _reason(answer) == "INSUFFICIENT_ROLE"
 
@@ -302,22 +355,37 @@ async def test_a_role_held_only_in_another_instances_collaboration_does_not(scop
 @pytest.mark.asyncio
 async def test_a_member_still_needs_the_role(scoped_service) -> None:
     assert _reason(await _run("full", "mutation { annotate }")) == "INSUFFICIENT_ROLE"
-    assert (await _run("editor", "mutation { annotate }"))["data"]["annotate"] == "annotated"
+    assert (await _run("editor", "mutation { annotate }"))["data"][
+        "annotate"
+    ] == "annotated"
 
 
 def test_the_schema_says_who_may() -> None:
     from test_project.schema import schema
 
     sdl = str(schema)
-    lines = {line.strip().split(":")[0]: line.strip() for line in sdl.splitlines() if line.startswith("  ")}
-    assert lines["annotate"] == 'annotate: String! @auth(any_role_of: ["editor"], allow_scoped: true)'
-    assert lines["yieldOpen"] == "yieldOpen: String! @auth"  # only what a field requires is said
+    lines = {
+        line.strip().split(":")[0]: line.strip()
+        for line in sdl.splitlines()
+        if line.startswith("  ")
+    }
+    assert (
+        lines["annotate"]
+        == 'annotate: String! @auth(any_role_of: ["editor"], allow_scoped: true)'
+    )
+    assert (
+        lines["yieldOpen"] == "yieldOpen: String! @auth"
+    )  # only what a field requires is said
 
 
 @pytest.mark.asyncio
-async def test_a_resolvers_refusal_reaches_the_client_with_its_code(scoped_service) -> None:
+async def test_a_resolvers_refusal_reaches_the_client_with_its_code(
+    scoped_service,
+) -> None:
     answer = await _run("scoped", "mutation { refuse }")
     (error,) = answer["errors"]
     assert error["extensions"]["code"] == "PERMISSION_DENIED"
     assert error["extensions"]["reason"] == "SHARE_INSUFFICIENT"
-    assert error["message"] == "What was shared with you does not permit this."  # the detail stays in the log
+    assert (
+        error["message"] == "What was shared with you does not permit this."
+    )  # the detail stays in the log

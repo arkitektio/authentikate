@@ -42,7 +42,9 @@ schema = strawberry.Schema(query=Query, extensions=[DjangoOptimizerExtension])
 
 def _seed() -> None:
     org = models.Organization.objects.create(identifier="iss#acme")
-    user = models.User.objects.create(username="u-1", sub="1", iss="iss", preferred_username="alice")
+    user = models.User.objects.create(
+        username="u-1", sub="1", iss="iss", preferred_username="alice"
+    )
     models.Membership.objects.create(user=user, organization=org)
 
 
@@ -56,7 +58,9 @@ def test_model_exposes_preferred_username(db):
 async def test_narrow_type_resolves_preferred_username_under_the_optimizer():
     await sync_to_async(_seed)()
 
-    result = await schema.execute("{ users { preferredUsername } memberships { user { preferredUsername } } }")
+    result = await schema.execute(
+        "{ users { preferredUsername } memberships { user { preferredUsername } } }"
+    )
 
     assert result.errors is None, result.errors
     assert {"preferredUsername": "alice"} in result.data["users"]
@@ -97,13 +101,37 @@ def test_profile_claims_are_mirrored_and_cleared(db):
     )
     user = _expand_user(full)
     user.refresh_from_db()
-    assert (user.preferred_username, user.name, user.first_name, user.last_name, user.nickname) == ("alice", "Alice Liddell", "Alice", "Liddell", "al")
-    assert (user.email, user.email_verified, user.picture, user.locale, user.zoneinfo) == ("alice@example.test", True, "https://example.test/alice.png", "de-AT", "Europe/Vienna")
+    assert (
+        user.preferred_username,
+        user.name,
+        user.first_name,
+        user.last_name,
+        user.nickname,
+    ) == ("alice", "Alice Liddell", "Alice", "Liddell", "al")
+    assert (
+        user.email,
+        user.email_verified,
+        user.picture,
+        user.locale,
+        user.zoneinfo,
+    ) == (
+        "alice@example.test",
+        True,
+        "https://example.test/alice.png",
+        "de-AT",
+        "Europe/Vienna",
+    )
 
     # The issuer stops sending the optional claims (e.g. a narrower scope): they are cleared.
     user = _expand_user(_token(preferred_username="alice2"))
     user.refresh_from_db()
-    assert (user.preferred_username, user.name, user.first_name, user.email, user.picture) == ("alice2", None, "", "", None)
+    assert (
+        user.preferred_username,
+        user.name,
+        user.first_name,
+        user.email,
+        user.picture,
+    ) == ("alice2", None, "", "", None)
 
 
 def test_profile_changes_alone_trigger_a_resync():
@@ -116,15 +144,26 @@ def test_migration_moves_the_username_off_first_name():
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor
 
-    before, after = [("authentikate", "0006_alter_app_identifier_alter_release_unique_together")], [("authentikate", "0007_user_profile")]
+    before, after = (
+        [("authentikate", "0006_alter_app_identifier_alter_release_unique_together")],
+        [("authentikate", "0007_user_profile")],
+    )
     executor = MigrationExecutor(connection)
     executor.migrate(before)
-    OldUser = executor.loader.project_state(before).apps.get_model("authentikate", "User")
-    OldUser.objects.create(username="legacy", sub="9", iss="iss", first_name="jhnnsrs", changed_hash="old")
+    OldUser = executor.loader.project_state(before).apps.get_model(
+        "authentikate", "User"
+    )
+    OldUser.objects.create(
+        username="legacy", sub="9", iss="iss", first_name="jhnnsrs", changed_hash="old"
+    )
 
     executor = MigrationExecutor(connection)
     executor.loader.build_graph()
     executor.migrate(after)
 
     user = models.User.objects.get(sub="9")
-    assert (user.preferred_username, user.first_name, user.changed_hash) == ("jhnnsrs", "", None)
+    assert (user.preferred_username, user.first_name, user.changed_hash) == (
+        "jhnnsrs",
+        "",
+        None,
+    )

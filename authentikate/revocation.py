@@ -37,8 +37,12 @@ def _parse_revoked(payload: Any) -> frozenset[str]:
     if isinstance(payload, dict):
         payload = payload.get("revoked")
 
-    if not isinstance(payload, list) or not all(isinstance(jti, str) for jti in payload):
-        raise ValueError("Revocation list must be a list of jti strings, or an object with a 'revoked' list")
+    if not isinstance(payload, list) or not all(
+        isinstance(jti, str) for jti in payload
+    ):
+        raise ValueError(
+            "Revocation list must be a list of jti strings, or an object with a 'revoked' list"
+        )
 
     return frozenset(payload)
 
@@ -54,7 +58,9 @@ class RevocationList:
     failure modes are logged as warnings.
     """
 
-    def __init__(self, uri: str, refresh_interval: float, request_timeout: float) -> None:
+    def __init__(
+        self, uri: str, refresh_interval: float, request_timeout: float
+    ) -> None:
         """Create a list for ``uri``, refreshed at most once per ``refresh_interval`` seconds."""
 
         self.uri = uri
@@ -74,7 +80,10 @@ class RevocationList:
     def _is_due(self) -> bool:
         """Whether the cached copy is older than ``refresh_interval`` (or missing)."""
 
-        return self._last_attempt is None or time.monotonic() - self._last_attempt >= self.refresh_interval
+        return (
+            self._last_attempt is None
+            or time.monotonic() - self._last_attempt >= self.refresh_interval
+        )
 
     async def ais_revoked(self, jti: str) -> bool:
         """Report whether ``jti`` is revoked, refreshing the list first when it is due."""
@@ -97,7 +106,9 @@ class RevocationList:
         except RuntimeError:
             return asyncio.run(self.ais_revoked(jti))
 
-        raise RuntimeError("Cannot check revocation synchronously while an event loop is running; use ais_revoked instead")
+        raise RuntimeError(
+            "Cannot check revocation synchronously while an event loop is running; use ais_revoked instead"
+        )
 
     async def _refresh(self) -> None:
         """Fetch the list once, recording the attempt whether or not it succeeds."""
@@ -105,7 +116,9 @@ class RevocationList:
         self._last_attempt = time.monotonic()
 
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(self.request_timeout)) as client:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(self.request_timeout)
+            ) as client:
                 response = await client.get(self.uri)
                 response.raise_for_status()
                 revoked = _parse_revoked(response.json())

@@ -32,7 +32,7 @@ def _issuers(ed_key: OKPKey) -> list[dict]:
 
 
 def _provenance_token(ed_key: OKPKey, aud: list[str]) -> str:
-    now = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+    now = int(datetime.datetime.now(datetime.UTC).timestamp())
     claims = {
         "iss": "rekuest",
         "aud": aud,

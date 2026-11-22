@@ -7,9 +7,9 @@ from typing import Any
 import pytest
 from django.conf import settings
 from kante.testing import GraphQLHttpTestClient
-from test_project.asgi import application
 
 from authentikate.catch_alls import declare_catch_alls
+from test_project.asgi import application
 
 
 @pytest.fixture
@@ -23,8 +23,19 @@ def service(transactional_db):
         "reader": {"sub": "reader", "iss": "lok", "scope": "openid read"},
         "all": {"sub": "all", "iss": "lok", "scope": "openid everything"},
         "boss": {"sub": "boss", "iss": "lok", "roles": ["boss"], "scope": "openid"},
-        "member": {"sub": "member", "iss": "lok", "roles": ["editor"], "scope": "openid"},
-        "guest": {"sub": "guest", "iss": "lok", "roles": ["boss"], "collabs": {"12": {"5": ["boss"]}}, "scope": "openid"},
+        "member": {
+            "sub": "member",
+            "iss": "lok",
+            "roles": ["editor"],
+            "scope": "openid",
+        },
+        "guest": {
+            "sub": "guest",
+            "iss": "lok",
+            "roles": ["boss"],
+            "collabs": {"12": {"5": ["boss"]}},
+            "scope": "openid",
+        },
     }
     declare_catch_alls(scope="everything", role="boss")
     yield
@@ -33,7 +44,9 @@ def service(transactional_db):
 
 
 async def _run(token: str, query: str) -> dict[str, Any]:
-    client = GraphQLHttpTestClient(application=application, headers={"Authorization": f"Bearer {token}"})
+    client = GraphQLHttpTestClient(
+        application=application, headers={"Authorization": f"Bearer {token}"}
+    )
     return await client.execute(query=query)
 
 

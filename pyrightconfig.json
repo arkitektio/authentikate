@@ -1,0 +1,18 @@
+{
+  "extends": "./pyright.shared.json",
+  "include": [
+    "."
+  ],
+  "exclude": [
+    "**/migrations",
+    "**/__pycache__",
+    "**/node_modules",
+    ".venv",
+    "build",
+    "dist"
+  ],
+  // Pydantic models narrow inherited fields on purpose (a discriminator
+  // `kind: str` -> `Literal[...]`, an optional base field made required in a
+  // subclass); pyright flags those because mutable attributes are invariant.
+  "reportIncompatibleVariableOverride": false
+}

@@ -1,1 +1,1 @@
-" A django app for authentication and authorization."
+"A django app for authentication and authorization."

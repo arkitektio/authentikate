@@ -1,27 +1,27 @@
+import asyncio
+import datetime
 import hashlib
 import json
 import logging
 import time
-import asyncio
-from typing import Literal, Annotated, cast
 from collections.abc import Callable, Coroutine
+from typing import Annotated, Any, Literal, cast
+
 import httpx
+from joserfc.jwk import KeySet, RSAKey
 from pydantic import (
-    BaseModel,
-    Field,
-    ConfigDict,
-    field_validator,
     AliasChoices,
+    BaseModel,
+    ConfigDict,
     Discriminator,
+    Field,
     FilePath,
     PrivateAttr,
+    field_validator,
 )
-import datetime
-from typing import Any
-from joserfc.jwk import KeySet, RSAKey
-from authentikate.errors import JwksError, InvalidJwtTokenError
-from authentikate.revocation import RevocationList
 
+from authentikate.errors import InvalidJwtTokenError, JwksError
+from authentikate.revocation import RevocationList
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,9 @@ def coerce_aud_to_list(v: str | list[str] | None) -> list[str] | None:
     return v
 
 
-def coerce_unix_to_datetime(v: int | datetime.datetime | None) -> datetime.datetime | None:
+def coerce_unix_to_datetime(
+    v: int | datetime.datetime | None,
+) -> datetime.datetime | None:
     """Coerce a unix-seconds timestamp claim into a tz-aware datetime."""
     if v is None:
         return None
@@ -181,10 +183,17 @@ class JWTToken(BaseModel):
         if not isinstance(v, dict) or not all(
             isinstance(instance, str)
             and isinstance(collaborations, dict)
-            and all(isinstance(collaboration, str) and isinstance(roles, list) and all(isinstance(r, str) for r in roles) for collaboration, roles in collaborations.items())
+            and all(
+                isinstance(collaboration, str)
+                and isinstance(roles, list)
+                and all(isinstance(r, str) for r in roles)
+                for collaboration, roles in collaborations.items()
+            )
             for instance, collaborations in v.items()
         ):
-            raise ValueError("collaborations must map service instances to collaborations to lists of roles")
+            raise ValueError(
+                "collaborations must map service instances to collaborations to lists of roles"
+            )
         return v
 
     @field_validator("aud", mode="before")
@@ -243,7 +252,13 @@ class JWTToken(BaseModel):
         # named "a|b" produce the same fingerprint as the roles ["a", "b"],
         # which could suppress the update that propagates a role change.
         fingerprint = json.dumps(
-            [self.sub, self.preferred_username, sorted(self.roles), self.org, self.profile],
+            [
+                self.sub,
+                self.preferred_username,
+                sorted(self.roles),
+                self.org,
+                self.profile,
+            ],
             separators=(",", ":"),
         )
         return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
@@ -260,7 +275,12 @@ class JWTToken(BaseModel):
         """
         if instance is None:
             return {}
-        return {collaboration: tuple(roles) for collaboration, roles in (self.collabs or {}).get(str(instance), {}).items()}
+        return {
+            collaboration: tuple(roles)
+            for collaboration, roles in (self.collabs or {})
+            .get(str(instance), {})
+            .items()
+        }
 
     @property
     def profile(self) -> dict[str, str | bool | None]:
@@ -317,8 +337,9 @@ class StaticToken(JWTToken):
     )
     """The issued at time of the token (defaults to now, UTC)"""
     exp: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.UTC)
-        + datetime.timedelta(days=1)
+        default_factory=lambda: (
+            datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1)
+        )
     )
     """The expiration time of the token (defaults to one day from now, UTC)"""
     client_id: str = "static"
@@ -566,9 +587,7 @@ class JWKSUriIssuer(Issuer):
     """The url of the remote JWKS endpoint (e.g. .../.well-known/jwks.json)"""
     min_refresh_interval: float = Field(
         default=10.0,
-        validation_alias=AliasChoices(
-            "min_refresh_interval", "MIN_REFRESH_INTERVAL"
-        ),
+        validation_alias=AliasChoices("min_refresh_interval", "MIN_REFRESH_INTERVAL"),
     )
     """Minimum seconds between two JWKS retrievals that would repeat work.
 
@@ -717,7 +736,9 @@ IssuerUnion = Annotated[
 ]
 
 
-def _index_issuer_keys(iss: str, keys: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def _index_issuer_keys(
+    iss: str, keys: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
     """Validate and index a *single* issuer's keys by ``kid``.
 
     ``kid``s only need to be unique within one issuer: a token is verified
@@ -1036,9 +1057,7 @@ class AuthentikateSettings(BaseModel):
     """
     allowed_organizations: list[str] | None = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "allowed_organizations", "ALLOWED_ORGANIZATIONS"
-        ),
+        validation_alias=AliasChoices("allowed_organizations", "ALLOWED_ORGANIZATIONS"),
     )
     """Organizations this service accepts, or None to accept whatever the token names.
 
@@ -1077,12 +1096,9 @@ class AuthentikateSettings(BaseModel):
     ask for their scopes yet keep working while their clients catch up.
     """
 
-
     @field_validator("algorithms")
     @classmethod
-    def check_algorithms(
-        cls, v: list[str]
-    ) -> list[str]:
+    def check_algorithms(cls, v: list[str]) -> list[str]:
         """Reject an empty allow-list or the ``none`` alg (RFC 8725)."""
         return reject_unsafe_algorithms(v)
 

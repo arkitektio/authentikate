@@ -30,8 +30,8 @@ applies its own rules to scoped members (lok). ``reject`` always rejects it.
 
 import asyncio
 import functools
-from typing import Any, Literal
 from collections.abc import Callable
+from typing import Any, Literal
 
 from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings, JWTToken
 from authentikate.errors import FullMembershipRequired, ScopedTokenUnsupported
@@ -122,7 +122,9 @@ def full_members_only(view: Callable[..., Any]) -> Callable[..., Any]:
     async def wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
         from authentikate.vars import token_var
 
-        token = require_full_member(await authenticate_header(dict(request.headers), get_settings()))
+        token = require_full_member(
+            await authenticate_header(dict(request.headers), get_settings())
+        )
         reset = token_var.set(token)
         try:
             return await call(request, *args, **kwargs)

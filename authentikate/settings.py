@@ -1,8 +1,10 @@
 import logging
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings
 from pydantic import ValidationError
+
+from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings
 
 logger = logging.getLogger(__name__)
 

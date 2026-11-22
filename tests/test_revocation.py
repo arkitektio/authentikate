@@ -7,7 +7,7 @@ import asyncio
 import datetime
 import logging
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from joserfc import jwt
@@ -31,7 +31,7 @@ def _settings(public_key: str, **issuer_extra: Any) -> AuthentikateSettings:
 
 
 def _token(private_key: str, jti: str | None = "jti-1") -> str:
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     claims: dict[str, object] = {
         "sub": "1",
         "iss": ISS,
@@ -46,7 +46,9 @@ def _token(private_key: str, jti: str | None = "jti-1") -> str:
     if jti is not None:
         claims["jti"] = jti
 
-    return jwt.encode({"alg": "RS256", "kid": "1"}, claims, RSAKey.import_key(private_key))
+    return jwt.encode(
+        {"alg": "RS256", "kid": "1"}, claims, RSAKey.import_key(private_key)
+    )
 
 
 class _FakeClient:
@@ -72,7 +74,9 @@ class _FakeClient:
             raise ConnectionError("issuer unreachable")
         response = MagicMock()
         response.raise_for_status.return_value = None
-        response.json.return_value = self.payloads.pop(0) if len(self.payloads) > 1 else self.payloads[0]
+        response.json.return_value = (
+            self.payloads.pop(0) if len(self.payloads) > 1 else self.payloads[0]
+        )
         return response
 
 
@@ -89,10 +93,14 @@ async def test_revoked_token_is_refused_and_live_token_accepted(key_pair_str) ->
     client = _FakeClient({"revoked": ["jti-revoked"]})
 
     with _patch_client(client):
-        assert (await adecode_token(_token(key_pair_str.private_key, "jti-live"), settings)).jti == "jti-live"
+        assert (
+            await adecode_token(_token(key_pair_str.private_key, "jti-live"), settings)
+        ).jti == "jti-live"
 
         with pytest.raises(TokenRevokedError) as excinfo:
-            await adecode_token(_token(key_pair_str.private_key, "jti-revoked"), settings)
+            await adecode_token(
+                _token(key_pair_str.private_key, "jti-revoked"), settings
+            )
 
     assert excinfo.value.reason == "TOKEN_REVOKED"
     assert excinfo.value.code == "UNAUTHENTICATED"
@@ -103,13 +111,18 @@ def test_sync_decode_path_checks_revocation(key_pair_str) -> None:
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
 
     with _patch_client(_FakeClient(["jti-revoked"])):
-        assert decode_token(_token(key_pair_str.private_key, "jti-live"), settings).jti == "jti-live"
+        assert (
+            decode_token(_token(key_pair_str.private_key, "jti-live"), settings).jti
+            == "jti-live"
+        )
         with pytest.raises(TokenRevokedError):
             decode_token(_token(key_pair_str.private_key, "jti-revoked"), settings)
 
 
 @pytest.mark.asyncio
-async def test_token_without_jti_is_refused_when_revocation_is_configured(key_pair_str) -> None:
+async def test_token_without_jti_is_refused_when_revocation_is_configured(
+    key_pair_str,
+) -> None:
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
 
     with _patch_client(_FakeClient({"revoked": []})):
@@ -118,27 +131,37 @@ async def test_token_without_jti_is_refused_when_revocation_is_configured(key_pa
 
 
 @pytest.mark.asyncio
-async def test_unconfigured_issuer_never_fetches_and_accepts_tokens_without_jti(key_pair_str) -> None:
+async def test_unconfigured_issuer_never_fetches_and_accepts_tokens_without_jti(
+    key_pair_str,
+) -> None:
     settings = _settings(key_pair_str.public_key)
     client = _FakeClient({"revoked": ["jti-1"]})
 
     with _patch_client(client):
         # Even a jti that *would* be on the list is accepted: nothing is consulted.
-        assert (await adecode_token(_token(key_pair_str.private_key, "jti-1"), settings)).jti == "jti-1"
-        assert (await adecode_token(_token(key_pair_str.private_key, jti=None), settings)).jti is None
+        assert (
+            await adecode_token(_token(key_pair_str.private_key, "jti-1"), settings)
+        ).jti == "jti-1"
+        assert (
+            await adecode_token(_token(key_pair_str.private_key, jti=None), settings)
+        ).jti is None
 
     assert client.calls == []
 
 
 @pytest.mark.asyncio
-async def test_revocation_is_checked_only_after_the_signature(key_pair_str, private_key) -> None:
+async def test_revocation_is_checked_only_after_the_signature(
+    key_pair_str, private_key
+) -> None:
     """A forged token must not be able to trigger a fetch or a revocation error."""
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
 
     other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     other_pem = other.private_bytes(
-        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
     ).decode()
 
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
@@ -157,7 +180,11 @@ async def test_revocation_is_checked_only_after_the_signature(key_pair_str, priv
 
 @pytest.mark.asyncio
 async def test_many_checks_within_the_interval_cost_one_fetch(key_pair_str) -> None:
-    settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI, revocation_refresh_interval=60.0)
+    settings = _settings(
+        key_pair_str.public_key,
+        revocation_uri=REVOCATION_URI,
+        revocation_refresh_interval=60.0,
+    )
     client = _FakeClient({"revoked": []})
 
     with _patch_client(client):
@@ -185,7 +212,10 @@ async def test_list_is_refetched_once_the_interval_has_elapsed() -> None:
     client = _FakeClient({"revoked": []}, {"revoked": ["late"]})
     clock = {"now": 1000.0}
 
-    with _patch_client(client), patch.object(revocation.time, "monotonic", lambda: clock["now"]):
+    with (
+        _patch_client(client),
+        patch.object(revocation.time, "monotonic", lambda: clock["now"]),
+    ):
         assert await revoked.ais_revoked("late") is False
         clock["now"] += 59.0
         assert await revoked.ais_revoked("late") is False  # still cached
@@ -219,19 +249,28 @@ def test_interval_is_configurable_with_uppercase_aliases(key_pair_str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_failed_refresh_keeps_the_stale_list_and_waits_for_the_interval(caplog) -> None:
+async def test_failed_refresh_keeps_the_stale_list_and_waits_for_the_interval(
+    caplog,
+) -> None:
     revoked = RevocationList(REVOCATION_URI, refresh_interval=60.0, request_timeout=5.0)
     client = _FakeClient({"revoked": ["stale"]})
     clock = {"now": 0.0}
 
-    with _patch_client(client), patch.object(revocation.time, "monotonic", lambda: clock["now"]):
+    with (
+        _patch_client(client),
+        patch.object(revocation.time, "monotonic", lambda: clock["now"]),
+    ):
         assert await revoked.ais_revoked("stale") is True
 
         client.fail = True
         clock["now"] += 60.0
         with caplog.at_level(logging.WARNING, logger="authentikate.revocation"):
-            assert await revoked.ais_revoked("stale") is True  # stale copy still answers
-            assert await revoked.ais_revoked("stale") is True  # and no retry before the interval
+            assert (
+                await revoked.ais_revoked("stale") is True
+            )  # stale copy still answers
+            assert (
+                await revoked.ais_revoked("stale") is True
+            )  # and no retry before the interval
 
     assert len(client.calls) == 2
     assert any("keeping the copy" in record.getMessage() for record in caplog.records)
@@ -242,11 +281,17 @@ async def test_unreachable_list_fails_open_until_it_loads(key_pair_str, caplog) 
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
     client = _FakeClient({"revoked": ["jti-1"]}, fail=True)
 
-    with _patch_client(client), caplog.at_level(logging.WARNING, logger="authentikate.revocation"):
+    with (
+        _patch_client(client),
+        caplog.at_level(logging.WARNING, logger="authentikate.revocation"),
+    ):
         token = await adecode_token(_token(key_pair_str.private_key, "jti-1"), settings)
 
     assert token.jti == "jti-1"
-    assert any("no token is treated as revoked" in record.getMessage() for record in caplog.records)
+    assert any(
+        "no token is treated as revoked" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 @pytest.mark.asyncio

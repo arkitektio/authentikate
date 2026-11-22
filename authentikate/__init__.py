@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         AuthentikatePermissionDenied,
         AuthentikateTokenExpired,
         BlockedMembership,
+        FullMembershipRequired,
         InvalidJwtTokenError,
         JwksError,
         JwtTokenError,
@@ -61,21 +62,20 @@ if TYPE_CHECKING:
         MissingActiveOrganization,
         NoAuthorizationHeader,
         OrganizationNotAllowed,
-        FullMembershipRequired,
         ScopedReadOnly,
         ScopedTokenUnsupported,
         ShareInsufficient,
         TokenRevokedError,
     )
-    from authentikate.scoped import (
-        enforce_scoped,
-        full_members_only,
-        require_full_member,
-    )
     from authentikate.expand import (
         ExpandedTokenContext,
         aexpand_token_context,
         expand_token_context,
+    )
+    from authentikate.scoped import (
+        enforce_scoped,
+        full_members_only,
+        require_full_member,
     )
     from authentikate.settings import get_settings
     from authentikate.utils import (
@@ -189,9 +189,7 @@ def __getattr__(name: str) -> Any:
     try:
         module = _EXPORTS[name]
     except KeyError:
-        raise AttributeError(
-            f"module {__name__!r} has no attribute {name!r}"
-        ) from None
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
 
     return getattr(importlib.import_module(module), name)
 

@@ -1,9 +1,10 @@
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from authentikate.decode import decode_token
 from authentikate.expand import aexpand_token_context
-from authentikate.models import Membership, Organization, User
-import pytest
+from authentikate.models import Membership, Organization
 
 
 def test_authenticate_token(db, valid_jwt, valid_settings):

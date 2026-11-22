@@ -61,8 +61,9 @@ async def test_aexpand_user_recovers_from_concurrent_create(valid_jwt, valid_set
     async def losing_asave(self, *args, **kwargs):
         raise IntegrityError("UNIQUE constraint failed: authentikate_user.sub")
 
-    with patch.object(User.objects, "aget", side_effect=flaky_aget), patch.object(
-        User, "asave", new=losing_asave
+    with (
+        patch.object(User.objects, "aget", side_effect=flaky_aget),
+        patch.object(User, "asave", new=losing_asave),
     ):
         second = await aexpand_user_from_token(token)
 
@@ -91,8 +92,9 @@ def test_expand_user_recovers_from_concurrent_create(db, valid_jwt, valid_settin
     def losing_save(self, *args, **kwargs):
         raise IntegrityError("UNIQUE constraint failed: authentikate_user.sub")
 
-    with patch.object(User.objects, "get", side_effect=flaky_get), patch.object(
-        User, "save", new=losing_save
+    with (
+        patch.object(User.objects, "get", side_effect=flaky_get),
+        patch.object(User, "save", new=losing_save),
     ):
         second = expand_user_from_token(token)
 

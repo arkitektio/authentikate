@@ -18,7 +18,7 @@ Authentikate is a Django app and ships a custom user model. Add it to
 ```python
 INSTALLED_APPS = [
     # ...
-    "guardian",          # required for object-level permissions
+    "guardian",  # required for object-level permissions
     "authentikate",
 ]
 
@@ -46,9 +46,10 @@ The common names are available from the package root:
 
 ```python
 from authentikate import (
-    authenticate_header,     # authenticate a request's headers
-    JWTToken,                # the decoded token
-    get_user, get_membership,  # the current principal, within a request
+    authenticate_header,  # authenticate a request's headers
+    JWTToken,  # the decoded token
+    get_user,
+    get_membership,  # the current principal, within a request
     AuthentikatePermissionDenied,
 )
 ```
@@ -103,7 +104,7 @@ alone cannot tell you is *which service* a token was meant for: without
 ```python
 AUTHENTIKATE = {
     "ISSUERS": [...],
-    "AUDIENCE": "mikro",   # this service's identifier
+    "AUDIENCE": "mikro",  # this service's identifier
 }
 ```
 
@@ -167,7 +168,7 @@ every distinct value the issuer emits creates rows:
 ```python
 AUTHENTIKATE = {
     "ISSUERS": [...],
-    "ALLOWED_ORGANIZATIONS": ["42", "137"],   # organization ids, as strings
+    "ALLOWED_ORGANIZATIONS": ["42", "137"],  # organization ids, as strings
 }
 ```
 
@@ -216,8 +217,8 @@ event loop.
     "kind": "jwks_uri",
     "iss": "https://lok.my-org.com",
     "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
-    "min_refresh_interval": 10.0,   # optional, seconds
-    "request_timeout": 5.0,         # optional, seconds
+    "min_refresh_interval": 10.0,  # optional, seconds
+    "request_timeout": 5.0,  # optional, seconds
 }
 ```
 
@@ -241,7 +242,7 @@ at runtime.
 {
     "kind": "jwks_dict",
     "iss": "https://lok.my-org.com",
-    "jwks": {"keys": [ { "kid": "1", "kty": "RSA", "n": "...", "e": "AQAB" } ]},
+    "jwks": {"keys": [{"kid": "1", "kty": "RSA", "n": "...", "e": "AQAB"}]},
 }
 ```
 
@@ -254,7 +255,7 @@ A single PEM-encoded RSA public key, exposed as a one-key JWKS under `key_id`.
     "kind": "rsa",
     "iss": "lok",
     "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
-    "key_id": "1",   # optional, defaults to "1" (aliases: key_id, kid)
+    "key_id": "1",  # optional, defaults to "1" (aliases: key_id, kid)
 }
 ```
 
@@ -268,7 +269,7 @@ requested. The path must exist at startup (validated as a `FilePath`).
     "kind": "rsa_file",
     "iss": "lok",
     "public_key_pem_file": "public_key.pem",
-    "key_id": "1",   # optional
+    "key_id": "1",  # optional
 }
 ```
 
@@ -287,8 +288,8 @@ and is off unless set.
     "iss": "https://lok.my-org.com",
     "jwks_uri": "https://lok.my-org.com/.well-known/jwks.json",
     "revocation_uri": "https://lok.my-org.com/o/revoked/",
-    "revocation_refresh_interval": 60.0,   # optional, seconds
-    "revocation_request_timeout": 5.0,     # optional, seconds
+    "revocation_refresh_interval": 60.0,  # optional, seconds
+    "revocation_request_timeout": 5.0,  # optional, seconds
 }
 ```
 
@@ -407,22 +408,23 @@ default, pull settings from Django via `get_settings()`.
 
 ```python
 from authentikate.utils import (
-    authenticate_header,          # raises on failure
+    authenticate_header,  # raises on failure
     authenticate_header_or_none,  # returns None on AuthentikatePermissionDenied
-    authenticate_token,           # authenticate a raw token string
+    authenticate_token,  # authenticate a raw token string
     authenticate_token_or_none,
 )
+
 
 async def my_view(request):
     token = await authenticate_header_or_none(dict(request.headers))
     if token:
-        token.sub                 # subject (user id, unique per issuer)
+        token.sub  # subject (user id, unique per issuer)
         token.preferred_username  # username
-        token.client_id           # OAuth2 client that requested the token
-        token.scopes              # list[str], split from the space-separated `scope`
-        token.roles               # list[str]
-        token.aud                 # list[str], the services the token is minted for
-        token.org                 # active organization id, as a string (or None)
+        token.client_id  # OAuth2 client that requested the token
+        token.scopes  # list[str], split from the space-separated `scope`
+        token.roles  # list[str]
+        token.aud  # list[str], the services the token is minted for
+        token.org  # active organization id, as a string (or None)
 ```
 
 `authenticate_header` walks `AUTHORIZATION_HEADERS` in order, extracts the
@@ -453,10 +455,10 @@ A verified token can be materialized into database records via
 from authentikate.expand import aexpand_token_context
 
 ctx = await aexpand_token_context(token)
-ctx.user          # authentikate.User    (get-or-created from sub + iss)
-ctx.client        # authentikate.Client  (OAuth2 client, with release/device)
+ctx.user  # authentikate.User    (get-or-created from sub + iss)
+ctx.client  # authentikate.Client  (OAuth2 client, with release/device)
 ctx.organization  # authentikate.Organization (from the `org` claim)
-ctx.membership    # authentikate.Membership   (user ⇄ org, mirrors roles)
+ctx.membership  # authentikate.Membership   (user ⇄ org, mirrors roles)
 ```
 
 Individual expanders are also available:
@@ -485,7 +487,11 @@ Authentikate ships a Strawberry schema extension (it expects the
 
 ```python
 import strawberry
-from authentikate.strawberry import AuthentikateExtension, AuthExtension, AuthSubscribeExtension
+from authentikate.strawberry import (
+    AuthentikateExtension,
+    AuthExtension,
+    AuthSubscribeExtension,
+)
 
 schema = strawberry.Schema(
     query=Query,
@@ -514,6 +520,7 @@ from `connection_params` under the same names as the HTTP header.
 ```python
 import strawberry
 from authentikate.strawberry import AuthExtension
+
 
 @strawberry.type
 class Query:
@@ -570,7 +577,7 @@ from authentikate.vars import (
     get_user,
     get_client,
     get_organization,
-    get_membership,   # carries the roles held within the active organization
+    get_membership,  # carries the roles held within the active organization
 )
 ```
 
@@ -583,16 +590,16 @@ audience side:
 
 ```python
 from authentikate.provenance import (
-    adecode_provenance_token,   # decode + verify signature, expiry, audience
-    verify_actor,               # bind the token's actor to the auth token
-    verify_args,                # recompute the args hash against cleartext args
-    aauthenticate_provenance_header,          # extract from headers; raises the specific error
-    aauthenticate_provenance_header_or_raise, # fail-closed: None if absent, ProvenanceValidationError if present-but-invalid
+    adecode_provenance_token,  # decode + verify signature, expiry, audience
+    verify_actor,  # bind the token's actor to the auth token
+    verify_args,  # recompute the args hash against cleartext args
+    aauthenticate_provenance_header,  # extract from headers; raises the specific error
+    aauthenticate_provenance_header_or_raise,  # fail-closed: None if absent, ProvenanceValidationError if present-but-invalid
     aauthenticate_provenance_header_or_none,  # graceful: None on absent OR invalid (logs the reason)
 )
 
 provenance = await adecode_provenance_token(raw_token, settings)
-verify_actor(provenance, auth_token)   # act.sub/act.cid must match the auth token
+verify_actor(provenance, auth_token)  # act.sub/act.cid must match the auth token
 verify_args(provenance, cleartext_args)  # SHA-256 of canonical args must equal `ahs`
 ```
 
@@ -686,8 +693,10 @@ so non-GraphQL callers can read them too:
 
 ```python
 from authentikate.errors import AuthentikateTokenExpired
-AuthentikateTokenExpired.reason        # "TOKEN_EXPIRED"
+
+AuthentikateTokenExpired.reason  # "TOKEN_EXPIRED"
 
 from authentikate.strawberry import to_graphql_error
-raise to_graphql_error(exc)            # -> coded GraphQL error
+
+raise to_graphql_error(exc)  # -> coded GraphQL error
 ```

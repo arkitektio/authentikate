@@ -1,18 +1,19 @@
-from authentikate.decode import adecode_token
-from authentikate.scoped import check_scoped_token
-from authentikate.settings import get_settings
+import datetime
+import logging
+import re
+
 from authentikate.base_models import AuthentikateSettings, JWTToken
+from authentikate.decode import adecode_token
 from authentikate.errors import (
     AuthentikatePermissionDenied,
     AuthentikateTokenExpired,
     JwksError,
-    NoAuthorizationHeader,
     MalformedAuthorizationHeader,
+    NoAuthorizationHeader,
     OrganizationNotAllowed,
 )
-import datetime
-import re
-import logging
+from authentikate.scoped import check_scoped_token
+from authentikate.settings import get_settings
 
 logger = logging.getLogger(__name__)  #
 

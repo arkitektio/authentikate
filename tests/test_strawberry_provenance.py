@@ -20,10 +20,9 @@ from joserfc import jwt
 from joserfc.jwk import OKPKey
 from kante.context import HttpContext
 
-from authentikate import errors
-from authentikate.strawberry.errors import AuthentikateGraphQLError
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.provenance import CANONICALIZATION_VERSION
+from authentikate.strawberry.errors import AuthentikateGraphQLError
 from authentikate.strawberry.extension import AuthentikateExtension
 from authentikate.vars import get_client, get_organization, get_token, get_user
 

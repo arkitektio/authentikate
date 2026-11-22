@@ -1,10 +1,11 @@
-import json
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-from authentikate.base_models import JWKSUriIssuer, AuthentikateSettings
-from authentikate.decode import decode_token
-from joserfc.jwk import RSAKey
+
 from joserfc import jwt
+from joserfc.jwk import RSAKey
+
+from authentikate.base_models import AuthentikateSettings, JWKSUriIssuer
+from authentikate.decode import decode_token
 
 
 def _build_mock_session(*payloads):
@@ -33,7 +34,6 @@ def test_jwks_uri_issuer_fetching(key_pair_str):
     session = _build_mock_session(jwks)
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
-
         issuer = JWKSUriIssuer(
             kind="jwks_uri",
             iss="http://test-issuer",
@@ -56,7 +56,6 @@ def test_jwks_uri_integration(key_pair_str):
     session = _build_mock_session(jwks)
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
-
         settings = AuthentikateSettings(
             audience="*",
             issuers=[
@@ -65,7 +64,7 @@ def test_jwks_uri_integration(key_pair_str):
                     "iss": "http://test-issuer",
                     "jwks_uri": "http://test-issuer/jwks",
                 }
-            ]
+            ],
         )
 
         fetched_keys = settings.get_jwks()
@@ -85,7 +84,7 @@ def test_jwks_uri_decoding(key_pair_str):
     private_key_obj = RSAKey.import_key(key_pair_str.private_key)
 
     header = {"kid": "test-kid", "alg": "RS256"}
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     claims = {
         "sub": "user1",
         "iss": "http://test-issuer",
@@ -106,7 +105,6 @@ def test_jwks_uri_decoding(key_pair_str):
     session = _build_mock_session(jwks)
 
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
-
         settings = AuthentikateSettings(
             audience="*",
             issuers=[
@@ -115,7 +113,7 @@ def test_jwks_uri_decoding(key_pair_str):
                     "iss": "http://test-issuer",
                     "jwks_uri": "http://test-issuer/jwks",
                 }
-            ]
+            ],
         )
 
         decoded_token = decode_token(token, settings)

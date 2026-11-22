@@ -40,7 +40,7 @@ def _keypair() -> tuple[RSAKey, str]:
 
 
 def _claims(iss: str, **overrides: object) -> dict[str, object]:
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     claims: dict[str, object] = {
         "sub": "victim",
         "iss": iss,
@@ -68,7 +68,7 @@ def two_issuers() -> tuple[AuthentikateSettings, RSAKey, RSAKey]:
         issuers=[
             {"kind": "rsa", "iss": ISS_A, "public_key": pub_a},
             {"kind": "rsa", "iss": ISS_B, "public_key": pub_b},
-        ]
+        ],
     )
     return settings, key_a, key_b
 
@@ -77,9 +77,7 @@ def test_issuer_cannot_mint_a_token_for_another_issuer(two_issuers) -> None:
     """Issuer A signing a token that claims `iss: B` must be rejected."""
     settings, key_a, _ = two_issuers
 
-    forged = jwt.encode(
-        {"alg": "RS256", "kid": "1"}, _claims(ISS_B), key_a
-    )
+    forged = jwt.encode({"alg": "RS256", "kid": "1"}, _claims(ISS_B), key_a)
 
     with pytest.raises(InvalidJwtTokenError):
         decode_token(forged, settings)
@@ -164,7 +162,7 @@ async def test_unconfigured_issuer_triggers_no_jwks_fetch() -> None:
                     "iss": ISS_A,
                     "jwks_uri": "http://idp-a.example/jwks",
                 }
-            ]
+            ],
         )
         token = jwt.encode(
             {"alg": "RS256", "kid": "1"}, _claims("https://evil.example"), key

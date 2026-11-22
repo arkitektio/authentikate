@@ -1,4 +1,3 @@
-from authentikate.models import User
 from authentikate.decode import decode_token
 
 

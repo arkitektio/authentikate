@@ -1,5 +1,6 @@
-import pytest
 from typing import cast
+
+import pytest
 
 from authentikate.base_models import JWTToken
 from authentikate.errors import BlockedMembership, MissingActiveOrganization
@@ -34,7 +35,9 @@ async def test_aexpand_organization_requires_the_org_claim() -> None:
 
 @pytest.mark.asyncio
 async def test_aexpand_membership_rejects_blocked_membership(db) -> None:
-    organization, _ = await Organization.objects.aget_or_create(identifier="test-issuer#org-1")
+    organization, _ = await Organization.objects.aget_or_create(
+        identifier="test-issuer#org-1"
+    )
     user, _ = await User.objects.aget_or_create(
         username="user-1",
         sub="1",

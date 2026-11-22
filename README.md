@@ -115,10 +115,9 @@ def my_view(request: HttpRequest) -> None:
     auth = authenticate_header_or_none(request.headers)
 
     if auth:
-        auth.user # This is the user that is authenticated
-        auth.app # This is the app that is authenticated
-        auth.scopes # These are the scopes that are authenticated
-
+        auth.user  # This is the user that is authenticated
+        auth.app  # This is the app that is authenticated
+        auth.scopes  # These are the scopes that are authenticated
 ```
 
 
@@ -137,7 +136,6 @@ schema = strawberry.Schema(query=Query, extensions=[AuthentikateExtension])
 
 @strawberry.type
 class Query:
-
     @strawberry.field(extensions=[AuthExtension()])
     def me(self, info: Info) -> User:
         return info.context.request.user
@@ -145,7 +143,6 @@ class Query:
     @strawberry.field(extensions=[AuthExtension(scopes=["read:users"])])
     def users(self, info: Info) -> List[User]:
         return User.objects.all()
-
 ```
 
 `AuthExtension` accepts `scopes`, `roles`, `any_scope_of` and `any_role_of`. Use
@@ -194,7 +191,9 @@ such a collaboration (`arkitekt_service.collaborations.require_in_collaboration`
 `SHARE_INSUFFICIENT`). Full members are checked against their roles as before.
 
 ```python
-@kante.django_mutation(extensions=[AuthExtension(any_role_of=["admin", "editor"], allow_scoped=True)])
+@kante.django_mutation(
+    extensions=[AuthExtension(any_role_of=["admin", "editor"], allow_scoped=True)]
+)
 def create_annotation(self, info: Info, input: CreateAnnotationInput) -> Annotation: ...
 ```
 
@@ -214,7 +213,6 @@ Static Tokens are tokens that are hard coded into the settings. They are useful 
 not be used in production.
 
 ```python
-
 AUTHENTIKATE = {
     "ISSUERS": [
         {
@@ -233,8 +231,7 @@ AUTHENTIKATE = {
             "scope": "read:users",
             "roles": ["reader"],
         }
-    }
+    },
 }
-
 ```
 

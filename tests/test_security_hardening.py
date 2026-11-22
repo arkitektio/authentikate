@@ -34,7 +34,7 @@ from authentikate.utils import authenticate_token
 
 def test_expired_static_token_is_rejected() -> None:
     """A static token's `exp` must be honoured, not merely decorative."""
-    past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
+    past = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=1)
     settings = AuthentikateSettings(
         audience="*",
         issuers=[],
@@ -112,7 +112,9 @@ def test_organization_outside_the_allowlist_is_rejected() -> None:
 
 
 def test_organization_inside_the_allowlist_is_accepted() -> None:
-    settings = _static_settings(allowed_organizations=["static_issuer#acme", "static_issuer#other"])
+    settings = _static_settings(
+        allowed_organizations=["static_issuer#acme", "static_issuer#other"]
+    )
 
     assert asyncio.run(authenticate_token("tok", settings)).org == "acme"
 
@@ -154,7 +156,7 @@ def test_unknown_kids_do_not_drive_unbounded_jwks_fetches(key_pair_str) -> None:
                     "iss": "http://issuer",
                     "jwks_uri": "http://issuer/jwks",
                 }
-            ]
+            ],
         )
         issuer = settings.issuers[0]
 
@@ -219,9 +221,9 @@ async def test_async_expand_rejects_blocked_membership(db) -> None:
     user = await aexpand_user_from_token(token)
 
     organization = await Organization.objects.aget(identifier="test-issuer#org-async")
-    await Membership.objects.filter(
-        user=user, organization=organization
-    ).aupdate(blocked=True)
+    await Membership.objects.filter(user=user, organization=organization).aupdate(
+        blocked=True
+    )
 
     with pytest.raises(BlockedMembership):
         await aexpand_user_from_token(token)
@@ -238,9 +240,9 @@ async def test_extension_user_expansion_rejects_blocked_membership(db) -> None:
     user = await extension.aexpand_user_from_token(token)
 
     organization = await Organization.objects.aget(identifier="test-issuer#org-ext")
-    await Membership.objects.filter(
-        user=user, organization=organization
-    ).aupdate(blocked=True)
+    await Membership.objects.filter(user=user, organization=organization).aupdate(
+        blocked=True
+    )
 
     with pytest.raises(BlockedMembership):
         await extension.aexpand_user_from_token(token)
@@ -283,7 +285,9 @@ class _FakeRequest:
 
 
 def _info(roles: list[str] | None) -> Any:
-    return SimpleNamespace(context=SimpleNamespace(request=_FakeRequest(_token(), roles)))
+    return SimpleNamespace(
+        context=SimpleNamespace(request=_FakeRequest(_token(), roles))
+    )
 
 
 def _resolve(extension: AuthExtension, roles: list[str] | None) -> Any:
@@ -298,7 +302,9 @@ def test_org_role_is_required_from_the_membership() -> None:
 
 
 def test_any_org_role_of() -> None:
-    assert _resolve(AuthExtension(any_org_role_of=["admin", "owner"]), ["owner"]) == "ok"
+    assert (
+        _resolve(AuthExtension(any_org_role_of=["admin", "owner"]), ["owner"]) == "ok"
+    )
 
     with pytest.raises(GraphQLError, match="organization roles"):
         _resolve(AuthExtension(any_org_role_of=["admin", "owner"]), ["member"])

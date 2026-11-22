@@ -1,12 +1,10 @@
 """Test that a Http request receives a broadcast from an HTTP mutation."""
 
 import pytest
-import asyncio
-from uuid import uuid4
+from django.conf import settings
+from kante.testing import GraphQLHttpTestClient
 
 from test_project.asgi import application
-from kante.testing import GraphQLHttpTestClient, GraphQLWebSocketTestClient
-from django.conf import settings
 
 
 @pytest.mark.asyncio
@@ -33,9 +31,9 @@ async def test_app_query(db, valid_auth_headers, key_pair_str) -> None:
     )
 
     assert answer["data"]["app"] is not None
-    assert (
-        answer["data"]["app"]["identifier"] == "my_app"
-    ), f"Expected 'my_app', got {answer['data']['app']['identifier']}"
+    assert answer["data"]["app"]["identifier"] == "my_app", (
+        f"Expected 'my_app', got {answer['data']['app']['identifier']}"
+    )
 
 
 @pytest.mark.asyncio
@@ -64,6 +62,6 @@ async def test_app_query_static(db, valid_auth_headers, key_pair_str) -> None:
     )
 
     assert answer["data"]["organization"] is not None
-    assert (
-        answer["data"]["organization"]["identifier"] == "lok#static_org"
-    ), f"Expected 'kkk', got {answer['data']['organization']['identifier']}"
+    assert answer["data"]["organization"]["identifier"] == "lok#static_org", (
+        f"Expected 'kkk', got {answer['data']['organization']['identifier']}"
+    )

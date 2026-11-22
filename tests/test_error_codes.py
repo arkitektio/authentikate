@@ -139,7 +139,7 @@ class _FakeRequest:
 
 
 def _token(scope: str = "read", roles: list[str] | None = None) -> JWTToken:
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     return JWTToken.model_validate(
         {
             "sub": "1",
@@ -178,14 +178,24 @@ def test_unauthenticated_field_access() -> None:
 @pytest.mark.parametrize(
     "extension,reason,detail_key,detail",
     [
-        (AuthExtension(scopes=["admin"]), "INSUFFICIENT_SCOPE", "requiredScopes", ["admin"]),
+        (
+            AuthExtension(scopes=["admin"]),
+            "INSUFFICIENT_SCOPE",
+            "requiredScopes",
+            ["admin"],
+        ),
         (
             AuthExtension(any_scope_of=["a", "b"]),
             "INSUFFICIENT_SCOPE",
             "requiredAnyScopeOf",
             ["a", "b"],
         ),
-        (AuthExtension(roles=["admin"]), "INSUFFICIENT_ROLE", "requiredRoles", ["admin"]),
+        (
+            AuthExtension(roles=["admin"]),
+            "INSUFFICIENT_ROLE",
+            "requiredRoles",
+            ["admin"],
+        ),
         (
             AuthExtension(any_role_of=["x", "y"]),
             "INSUFFICIENT_ROLE",
@@ -226,10 +236,9 @@ async def test_expired_token_reports_token_expired_end_to_end() -> None:
     """What a client actually receives for the most common recoverable failure."""
     from authentikate.utils import authenticate_token
 
-    past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
+    past = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=1)
     settings = AuthentikateSettings(
-        audience="*",
-        issuers=[], static_tokens={"tok": StaticToken(sub="u", exp=past)}
+        audience="*", issuers=[], static_tokens={"tok": StaticToken(sub="u", exp=past)}
     )
 
     with pytest.raises(errors.AuthentikateTokenExpired) as exc_info:

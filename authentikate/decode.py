@@ -1,9 +1,11 @@
 import base64
 import json
 from typing import Any
+
 from joserfc import jwt
 from joserfc.errors import ExpiredTokenError
 from pydantic import ValidationError
+
 from authentikate import base_models, errors
 
 
