@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import decode_token
 from authentikate.errors import InvalidJwtTokenError
+from tests.conftest import KeyPairStr
 
 ISS = "https://idp.example"
 
@@ -47,7 +48,7 @@ def _token(private_key: str, aud: object) -> str:
     )
 
 
-def test_token_for_another_service_is_rejected(key_pair_str) -> None:
+def test_token_for_another_service_is_rejected(key_pair_str: KeyPairStr) -> None:
     settings = _settings(key_pair_str.public_key, audience="mikro")
     token = _token(key_pair_str.private_key, ["fluss"])
 
@@ -55,14 +56,14 @@ def test_token_for_another_service_is_rejected(key_pair_str) -> None:
         decode_token(token, settings)
 
 
-def test_token_for_this_service_is_accepted(key_pair_str) -> None:
+def test_token_for_this_service_is_accepted(key_pair_str: KeyPairStr) -> None:
     settings = _settings(key_pair_str.public_key, audience="mikro")
     token = _token(key_pair_str.private_key, ["mikro"])
 
     assert decode_token(token, settings).aud == ["mikro"]
 
 
-def test_list_valued_aud_matches_on_membership(key_pair_str) -> None:
+def test_list_valued_aud_matches_on_membership(key_pair_str: KeyPairStr) -> None:
     """A token scoped to several services is valid at each of them."""
     settings = _settings(key_pair_str.public_key, audience="mikro")
     token = _token(key_pair_str.private_key, ["fluss", "mikro"])
@@ -70,14 +71,16 @@ def test_list_valued_aud_matches_on_membership(key_pair_str) -> None:
     assert decode_token(token, settings).aud == ["fluss", "mikro"]
 
 
-def test_scalar_aud_is_accepted(key_pair_str) -> None:
+def test_scalar_aud_is_accepted(key_pair_str: KeyPairStr) -> None:
     settings = _settings(key_pair_str.public_key, audience="mikro")
     token = _token(key_pair_str.private_key, "mikro")
 
     assert decode_token(token, settings).aud == ["mikro"]
 
 
-def test_missing_aud_is_rejected_when_audience_configured(key_pair_str) -> None:
+def test_missing_aud_is_rejected_when_audience_configured(
+    key_pair_str: KeyPairStr,
+) -> None:
     """Configuring an audience makes the claim essential, not merely checked."""
     settings = _settings(key_pair_str.public_key, audience="mikro")
     token = _token(key_pair_str.private_key, None)
@@ -117,7 +120,7 @@ def test_default_algorithms_exclude_symmetric_and_none() -> None:
     assert "RS256" in settings.algorithms
 
 
-def test_algorithm_outside_the_allowlist_is_rejected(key_pair_str) -> None:
+def test_algorithm_outside_the_allowlist_is_rejected(key_pair_str: KeyPairStr) -> None:
     """A token signed with an algorithm this service does not accept fails."""
     settings = AuthentikateSettings(
         audience="mikro",
@@ -143,7 +146,7 @@ def test_unsafe_algorithm_config_is_rejected(bad: list[str]) -> None:
 # --- the "*" wildcard --------------------------------------------------------
 
 
-def test_wildcard_accepts_a_token_for_another_service(key_pair_str) -> None:
+def test_wildcard_accepts_a_token_for_another_service(key_pair_str: KeyPairStr) -> None:
     """`AUDIENCE = "*"` is how a service says it accepts any audience."""
     settings = _settings(key_pair_str.public_key, audience="*")
     token = _token(key_pair_str.private_key, ["some-other-service"])
@@ -151,7 +154,7 @@ def test_wildcard_accepts_a_token_for_another_service(key_pair_str) -> None:
     assert decode_token(token, settings).aud == ["some-other-service"]
 
 
-def test_wildcard_still_requires_the_aud_claim(key_pair_str) -> None:
+def test_wildcard_still_requires_the_aud_claim(key_pair_str: KeyPairStr) -> None:
     """`"*"` widens the check, it does not drop it.
 
     A token that names no audience is scoped to no service, so there is nothing
@@ -164,7 +167,7 @@ def test_wildcard_still_requires_the_aud_claim(key_pair_str) -> None:
         decode_token(token, settings)
 
 
-def test_wildcard_is_config_side_not_token_side(key_pair_str) -> None:
+def test_wildcard_is_config_side_not_token_side(key_pair_str: KeyPairStr) -> None:
     """A token cannot award *itself* a wildcard.
 
     This is the security pin for the whole feature. If `"*"` were honoured in the
@@ -178,7 +181,9 @@ def test_wildcard_is_config_side_not_token_side(key_pair_str) -> None:
         decode_token(token, settings)
 
 
-def test_a_literal_audience_is_unaffected_by_the_wildcard_support(key_pair_str) -> None:
+def test_a_literal_audience_is_unaffected_by_the_wildcard_support(
+    key_pair_str: KeyPairStr,
+) -> None:
     """Regression guard: configuring a real audience still enforces it."""
     settings = _settings(key_pair_str.public_key, audience="mikro")
 

@@ -7,7 +7,6 @@ verification entrypoint.
 """
 
 import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -109,7 +108,7 @@ class ProvenanceToken(BaseModel):
         """Whether ``service`` is one of the token's target audiences."""
         return service in self.aud
 
-    def verify_args(self, args: Any) -> bool:
+    def verify_args(self, args: object) -> bool:
         """Whether ``args`` canonically hash to this token's ``ahs``.
 
         Recomputes the hash using the canonicalization named by ``aha``.

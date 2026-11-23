@@ -3,7 +3,7 @@ from authentikate.expand import expand_client_from_token
 from authentikate.models import Client
 
 
-def test_expand_client_allows_same_client_id_for_different_issuers(db):
+def test_expand_client_allows_same_client_id_for_different_issuers(db: None) -> None:
     first_client = expand_client_from_token(
         StaticToken(sub="user-1", iss="issuer-one", client_id="shared-client")
     )

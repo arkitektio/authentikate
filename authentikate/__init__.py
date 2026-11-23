@@ -22,7 +22,7 @@ Everything else is an implementation detail and may move between releases.
 """
 
 import importlib
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 # --- IMPORTANT: these imports are lazy on purpose. -------------------------
 #
@@ -184,7 +184,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(name: str) -> object:
     """Resolve a public name to its defining module on first access (PEP 562)."""
     try:
         module = _EXPORTS[name]

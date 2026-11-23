@@ -30,7 +30,9 @@ class _CountingFailingTransport(httpx.AsyncBaseTransport):
 
 
 @pytest.fixture
-def failing_issuer(monkeypatch):
+def failing_issuer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[JWKSUriIssuer, _CountingFailingTransport]:
     transport = _CountingFailingTransport()
     # Bind the real class first: the patched name would otherwise resolve back
     # to this lambda when it is called.
@@ -46,7 +48,9 @@ def failing_issuer(monkeypatch):
     return issuer, transport
 
 
-def test_a_dead_issuer_is_contacted_once_per_interval(failing_issuer) -> None:
+def test_a_dead_issuer_is_contacted_once_per_interval(
+    failing_issuer: tuple[JWKSUriIssuer, _CountingFailingTransport],
+) -> None:
     issuer, transport = failing_issuer
 
     async def scenario() -> None:
@@ -64,7 +68,9 @@ def test_a_dead_issuer_is_contacted_once_per_interval(failing_issuer) -> None:
     )
 
 
-def test_the_cooldown_expires_so_the_issuer_can_recover(failing_issuer) -> None:
+def test_the_cooldown_expires_so_the_issuer_can_recover(
+    failing_issuer: tuple[JWKSUriIssuer, _CountingFailingTransport],
+) -> None:
     issuer, transport = failing_issuer
     # A short interval keeps the test fast; the production default is 10s.
     issuer.min_refresh_interval = 0.0
@@ -79,7 +85,7 @@ def test_the_cooldown_expires_so_the_issuer_can_recover(failing_issuer) -> None:
     assert transport.calls == 3
 
 
-def test_a_successful_load_clears_the_failure(monkeypatch) -> None:
+def test_a_successful_load_clears_the_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Once the issuer answers, the cooldown must not linger and block it."""
     from joserfc.jwk import OKPKey
 

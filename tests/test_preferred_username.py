@@ -8,6 +8,8 @@ column would otherwise need a synchronous query — and that the optional OIDC p
 are mirrored (and cleared when no longer sent).
 """
 
+from typing import Any
+
 import pytest
 import strawberry
 import strawberry_django
@@ -15,6 +17,7 @@ from asgiref.sync import sync_to_async
 from strawberry_django.optimizer import DjangoOptimizerExtension
 
 from authentikate import models
+from authentikate.base_models import JWTToken
 
 
 @strawberry_django.type(models.User)
@@ -48,14 +51,14 @@ def _seed() -> None:
     models.Membership.objects.create(user=user, organization=org)
 
 
-def test_model_exposes_preferred_username(db):
+def test_model_exposes_preferred_username(db: None) -> None:
     user = models.User(username="u-1", preferred_username="alice")
     assert user.preferred_username == "alice"
 
 
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
-async def test_narrow_type_resolves_preferred_username_under_the_optimizer():
+async def test_narrow_type_resolves_preferred_username_under_the_optimizer() -> None:
     await sync_to_async(_seed)()
 
     result = await schema.execute(
@@ -67,9 +70,7 @@ async def test_narrow_type_resolves_preferred_username_under_the_optimizer():
     assert result.data["memberships"] == [{"user": {"preferredUsername": "alice"}}]
 
 
-def _token(**claims):
-    from authentikate.base_models import JWTToken
-
+def _token(**claims: Any) -> JWTToken:
     base = {
         "sub": "7",
         "iss": "https://issuer.test",
@@ -85,7 +86,7 @@ def _token(**claims):
     return JWTToken(**{**base, **claims})
 
 
-def test_profile_claims_are_mirrored_and_cleared(db):
+def test_profile_claims_are_mirrored_and_cleared(db: None) -> None:
     from authentikate.expand import _expand_user
 
     full = _token(
@@ -134,13 +135,13 @@ def test_profile_claims_are_mirrored_and_cleared(db):
     ) == ("alice2", None, "", "", None)
 
 
-def test_profile_changes_alone_trigger_a_resync():
+def test_profile_changes_alone_trigger_a_resync() -> None:
     assert _token().changed_hash != _token(name="Alice").changed_hash
     assert _token(name="Alice").changed_hash == _token(name="Alice").changed_hash
 
 
 @pytest.mark.django_db(transaction=True)
-def test_migration_moves_the_username_off_first_name():
+def test_migration_moves_the_username_off_first_name() -> None:
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor
 

@@ -2,6 +2,7 @@
 passes on a role this way; ``enforce_scopes`` off lets missing scopes through."""
 
 import copy
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -13,7 +14,7 @@ from test_project.asgi import application
 
 
 @pytest.fixture
-def service(transactional_db):
+def service(transactional_db: None) -> Iterator[None]:
     """The test project with `everything` / `boss` as its catch-alls, and the static tokens below."""
     original = settings.AUTHENTIKATE
     settings.AUTHENTIKATE = copy.deepcopy(original)
@@ -56,13 +57,13 @@ def _reason(answer: dict[str, Any]) -> str | None:
 
 
 @pytest.mark.asyncio
-async def test_a_specific_scope_is_not_another(service) -> None:
+async def test_a_specific_scope_is_not_another(service: None) -> None:
     answer = await _run("reader", "mutation { requireWrite }")
     assert _reason(answer) == "INSUFFICIENT_SCOPE"
 
 
 @pytest.mark.asyncio
-async def test_the_all_scope_passes_any_scope(service) -> None:
+async def test_the_all_scope_passes_any_scope(service: None) -> None:
     write = await _run("all", "mutation { requireWrite }")
     read = await _run("all", "mutation { requireRead }")
     assert write["data"]["requireWrite"] is not None, write
@@ -70,19 +71,19 @@ async def test_the_all_scope_passes_any_scope(service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_the_admin_role_passes_any_role(service) -> None:
+async def test_the_admin_role_passes_any_role(service: None) -> None:
     answer = await _run("boss", "mutation { administrate }")
     assert answer["data"]["administrate"] == "done", answer
 
 
 @pytest.mark.asyncio
-async def test_another_role_does_not(service) -> None:
+async def test_another_role_does_not(service: None) -> None:
     answer = await _run("member", "mutation { administrate }")
     assert _reason(answer) == "INSUFFICIENT_ROLE"
 
 
 @pytest.mark.asyncio
-async def test_a_guest_does_not_pass_on_the_admin_role(service) -> None:
+async def test_a_guest_does_not_pass_on_the_admin_role(service: None) -> None:
     refused = await _run("guest", "mutation { administrate }")
     assert _reason(refused) == "FULL_MEMBERSHIP_REQUIRED"
     # Even where guests may write, a collaboration granting the admin role is not one granting `editor`.
@@ -91,7 +92,7 @@ async def test_a_guest_does_not_pass_on_the_admin_role(service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_without_enforcement_a_missing_scope_passes(service) -> None:
+async def test_without_enforcement_a_missing_scope_passes(service: None) -> None:
     settings.AUTHENTIKATE["ENFORCE_SCOPES"] = False
     answer = await _run("reader", "mutation { requireWrite }")
     assert answer["data"]["requireWrite"] is not None, answer

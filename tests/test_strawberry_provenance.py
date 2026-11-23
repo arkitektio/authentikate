@@ -22,6 +22,7 @@ from kante.context import HttpContext
 
 from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.provenance import CANONICALIZATION_VERSION
+from authentikate.provenance.models import ProvenanceToken
 from authentikate.strawberry.errors import AuthentikateGraphQLError
 from authentikate.strawberry.extension import AuthentikateExtension
 from authentikate.vars import get_client, get_organization, get_token, get_user
@@ -33,32 +34,32 @@ class _FakeRequest:
     """Records what the extension attaches; mirrors kante's UniversalRequest setters."""
 
     def __init__(self) -> None:
-        self._extensions: dict[str, Any] = {}
-        self._provenance: Any = None
-        self._user: Any = None
-        self._client: Any = None
-        self._membership: Any = None
-        self._organization: Any = None
+        self._extensions: dict[str, object] = {}
+        self._provenance: ProvenanceToken | None = None
+        self._user: object = None
+        self._client: object = None
+        self._membership: object = None
+        self._organization: object = None
 
-    def set_user(self, user: Any) -> None:
+    def set_user(self, user: object) -> None:
         self._user = user
 
-    def set_client(self, client: Any) -> None:
+    def set_client(self, client: object) -> None:
         self._client = client
 
-    def set_membership(self, membership: Any) -> None:
+    def set_membership(self, membership: object) -> None:
         self._membership = membership
 
-    def set_organization(self, organization: Any) -> None:
+    def set_organization(self, organization: object) -> None:
         self._organization = organization
 
-    def set_provenance(self, provenance: Any) -> None:
+    def set_provenance(self, provenance: ProvenanceToken) -> None:
         self._provenance = provenance
 
-    def set_extension(self, name: str, value: Any) -> None:
+    def set_extension(self, name: str, value: object) -> None:
         self._extensions[name] = value
 
-    def get_extension(self, name: str) -> Any:
+    def get_extension(self, name: str) -> object:
         if name not in self._extensions:
             raise ValueError(f"Extension {name} is not set in the request.")
         return self._extensions[name]
@@ -117,7 +118,7 @@ def _provenance_token(ed_key: OKPKey, act: dict[str, Any] | None = None) -> str:
     ``act`` defaults to the agent described by the ``token`` fixture, since the
     extension binds the provenance actor to the auth token presenting it.
     """
-    now = int(datetime.datetime.now().timestamp())
+    now = int(datetime.datetime.now(datetime.UTC).timestamp())
     claims = {
         "iss": "rekuest",
         "aud": ["mikro"],
@@ -190,7 +191,9 @@ async def test_attaches_provenance_from_rekuest_task_header(
     assert request._provenance is not None
     assert request._provenance.sub == "user-42"
     assert request._provenance.act.sub == "1"
-    assert request.get_extension("provenance").tsk == "9b1a"
+    provenance = request.get_extension("provenance")
+    assert isinstance(provenance, ProvenanceToken)
+    assert provenance.tsk == "9b1a"
 
 
 @pytest.mark.asyncio

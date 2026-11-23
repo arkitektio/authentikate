@@ -17,11 +17,13 @@ lookup is forced to miss, and ``save`` is forced to raise ``IntegrityError``
 This directly exercises the recovery branch the fix adds.
 """
 
+from typing import Any, NoReturn
 from unittest.mock import patch
 
 import pytest
 from django.db import IntegrityError, transaction
 
+from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import decode_token
 from authentikate.expand import (
     aexpand_token_context,
@@ -33,7 +35,9 @@ from authentikate.models import App, Client, Membership, Organization, Release, 
 
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
-async def test_aexpand_user_recovers_from_concurrent_create(valid_jwt, valid_settings):
+async def test_aexpand_user_recovers_from_concurrent_create(
+    valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     """A lost create race must re-fetch the existing user, not raise.
 
     Uses ``transaction=True`` because async ORM writes run on a connection
@@ -52,13 +56,13 @@ async def test_aexpand_user_recovers_from_concurrent_create(valid_jwt, valid_set
     real_aget = User.objects.aget
     aget_calls = {"n": 0}
 
-    async def flaky_aget(*args, **kwargs):
+    async def flaky_aget(*args: Any, **kwargs: Any) -> User:
         aget_calls["n"] += 1
         if aget_calls["n"] == 1:
             raise User.DoesNotExist
         return await real_aget(*args, **kwargs)
 
-    async def losing_asave(self, *args, **kwargs):
+    async def losing_asave(self: User, *args: Any, **kwargs: Any) -> NoReturn:
         raise IntegrityError("UNIQUE constraint failed: authentikate_user.sub")
 
     with (
@@ -74,7 +78,9 @@ async def test_aexpand_user_recovers_from_concurrent_create(valid_jwt, valid_set
     assert await User.objects.filter(sub=token.sub, iss=token.iss).acount() == 1
 
 
-def test_expand_user_recovers_from_concurrent_create(db, valid_jwt, valid_settings):
+def test_expand_user_recovers_from_concurrent_create(
+    db: None, valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     """Sync mirror of the recovery test."""
     token = decode_token(valid_jwt, valid_settings)
 
@@ -83,13 +89,13 @@ def test_expand_user_recovers_from_concurrent_create(db, valid_jwt, valid_settin
     real_get = User.objects.get
     get_calls = {"n": 0}
 
-    def flaky_get(*args, **kwargs):
+    def flaky_get(*args: Any, **kwargs: Any) -> User:
         get_calls["n"] += 1
         if get_calls["n"] == 1:
             raise User.DoesNotExist
         return real_get(*args, **kwargs)
 
-    def losing_save(self, *args, **kwargs):
+    def losing_save(self: User, *args: Any, **kwargs: Any) -> NoReturn:
         raise IntegrityError("UNIQUE constraint failed: authentikate_user.sub")
 
     with (
@@ -105,7 +111,9 @@ def test_expand_user_recovers_from_concurrent_create(db, valid_jwt, valid_settin
 
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
-async def test_repeated_token_expansion_is_idempotent(valid_jwt, valid_settings):
+async def test_repeated_token_expansion_is_idempotent(
+    valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     """Re-authenticating the same token must not duplicate any related rows.
 
     This guards the ``get_or_create`` / ``update_or_create`` paths for the
@@ -131,7 +139,7 @@ async def test_repeated_token_expansion_is_idempotent(valid_jwt, valid_settings)
     assert await Release.objects.acount() == 1
 
 
-def test_app_identifier_is_unique(db):
+def test_app_identifier_is_unique(db: None) -> None:
     """App.identifier must be unique so concurrent get_or_create cannot duplicate."""
     App.objects.create(identifier="my_app")
     # Wrap the expected failure in atomic() so the broken statement is rolled
@@ -140,7 +148,7 @@ def test_app_identifier_is_unique(db):
         App.objects.create(identifier="my_app")
 
 
-def test_release_app_version_is_unique(db):
+def test_release_app_version_is_unique(db: None) -> None:
     """Release must be unique per (app, version)."""
     app = App.objects.create(identifier="my_app")
     Release.objects.create(app=app, version="v1.0.0")

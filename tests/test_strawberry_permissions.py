@@ -5,10 +5,13 @@ from django.conf import settings
 from kante.testing import GraphQLHttpTestClient
 
 from test_project.asgi import application
+from tests.conftest import KeyPairStr
 
 
 @pytest.mark.asyncio
-async def test_write_should_fail(db, valid_auth_headers, key_pair_str) -> None:
+async def test_write_should_fail(
+    db: None, valid_auth_headers: dict[str, str], key_pair_str: KeyPairStr
+) -> None:
     """Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
     # Initialize both clients
 
@@ -33,7 +36,9 @@ async def test_write_should_fail(db, valid_auth_headers, key_pair_str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_write_read_should_pass(db, valid_auth_headers, key_pair_str) -> None:
+async def test_write_read_should_pass(
+    db: None, valid_auth_headers: dict[str, str], key_pair_str: KeyPairStr
+) -> None:
     """Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
     # Initialize both clients
 

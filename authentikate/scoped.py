@@ -33,6 +33,9 @@ import functools
 from collections.abc import Callable
 from typing import Any, Literal
 
+from django.http import HttpRequest
+from django.http.response import HttpResponseBase
+
 from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings, JWTToken
 from authentikate.errors import FullMembershipRequired, ScopedTokenUnsupported
 
@@ -119,7 +122,9 @@ def full_members_only(view: Callable[..., Any]) -> Callable[..., Any]:
     call = view if asyncio.iscoroutinefunction(view) else sync_to_async(view)
 
     @functools.wraps(view)
-    async def wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
+    async def wrapper(
+        request: HttpRequest, *args: Any, **kwargs: Any
+    ) -> HttpResponseBase:
         from authentikate.vars import token_var
 
         token = require_full_member(

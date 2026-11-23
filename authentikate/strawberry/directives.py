@@ -163,10 +163,10 @@ class _AuthChecks:
             # which is what makes an unauthenticated request fail here.
             _ = info.context.request.user
             token: JWTToken = info.context.request.get_extension("token")
-        except (KeyError, ValueError):
+        except (KeyError, ValueError) as err:
             # kante raises ValueError when nothing has populated the request;
             # either way the request is not authenticated.
-            raise unauthenticated("Authentication required", NOT_AUTHENTICATED)
+            raise unauthenticated("Authentication required", NOT_AUTHENTICATED) from err
 
         requires_roles = bool(
             self.roles or self.any_role_of or self.org_roles or self.any_org_role_of
@@ -287,8 +287,8 @@ class AuthExtension(_AuthChecks, FieldExtension):
         field.directives.extend(self._directives())
 
     def resolve(
-        self, next_: Callable[..., Any], source: Any, info: Info, **kwargs: Any
-    ) -> Any:
+        self, next_: Callable[..., Any], source: object, info: Info, **kwargs: Any
+    ) -> object:
         """Resolve the field with authentication checks."""
         self.check(info)
         return next_(source, info, **kwargs)
@@ -296,10 +296,10 @@ class AuthExtension(_AuthChecks, FieldExtension):
     async def resolve_async(
         self,
         next_: Callable[..., Awaitable[Any]],
-        source: Any,
+        source: object,
         info: Info,
         **kwargs: Any,
-    ) -> Any:
+    ) -> object:
         """Resolve the field with authentication checks."""
         self.check(info)
         return await next_(source, info, **kwargs)
@@ -323,8 +323,8 @@ class AuthSubscribeExtension(_AuthChecks, FieldExtension):
         field.directives.extend(self._directives())
 
     def resolve(
-        self, next_: Callable[..., Any], source: Any, info: Info, **kwargs: Any
-    ) -> Any:
+        self, next_: Callable[..., Any], source: object, info: Info, **kwargs: Any
+    ) -> object:
         """Resolve the field with authentication checks."""
         self.check(info)
         return next_(source, info, **kwargs)
@@ -332,10 +332,10 @@ class AuthSubscribeExtension(_AuthChecks, FieldExtension):
     async def resolve_async(
         self,
         next_: Callable[..., Awaitable[Any]],
-        source: Any,
+        source: object,
         info: Info,
         **kwargs: Any,
-    ) -> Any:
+    ) -> object:
         """Resolve the field with authentication checks."""
         self.check(info)
         # this is a workaround for the fact that strawberry does not support async resolvers for subscriptions

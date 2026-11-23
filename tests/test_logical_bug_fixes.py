@@ -1,5 +1,6 @@
 import datetime
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 import strawberry
@@ -7,8 +8,9 @@ from django.contrib.auth.models import Group
 from graphql import GraphQLError
 from joserfc import jwt
 from joserfc.jwk import RSAKey
+from kante.types import Info
 
-from authentikate.base_models import JWTToken
+from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.decode import adecode_token, decode_token
 from authentikate.errors import AuthentikateTokenExpired, MalformedJwtTokenError
 from authentikate.expand import (
@@ -19,31 +21,44 @@ from authentikate.expand import (
 from authentikate.models import Organization, User
 from authentikate.strawberry.directives import AuthExtension
 from authentikate.strawberry.types import User as UserType
+from tests.conftest import KeyPairStr
 
 
 @pytest.fixture(scope="session")
-def expired_jwt(valid_claims, key_pair_str):
+def expired_jwt(valid_claims: dict[str, object], key_pair_str: KeyPairStr) -> str:
     key = RSAKey.import_key(key_pair_str.private_key)
     claims = {
         **valid_claims,
-        "iat": int((datetime.datetime.now() - datetime.timedelta(days=2)).timestamp()),
-        "exp": int((datetime.datetime.now() - datetime.timedelta(days=1)).timestamp()),
+        "iat": int(
+            (
+                datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=2)
+            ).timestamp()
+        ),
+        "exp": int(
+            (
+                datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=1)
+            ).timestamp()
+        ),
     }
     return jwt.encode({"alg": "RS256", "kid": "1"}, claims, key)
 
 
-def test_decode_token_rejects_expired(expired_jwt, valid_settings):
+def test_decode_token_rejects_expired(
+    expired_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     with pytest.raises(AuthentikateTokenExpired):
         decode_token(expired_jwt, valid_settings)
 
 
 @pytest.mark.asyncio
-async def test_adecode_token_rejects_expired(expired_jwt, valid_settings):
+async def test_adecode_token_rejects_expired(
+    expired_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     with pytest.raises(AuthentikateTokenExpired):
         await adecode_token(expired_jwt, valid_settings)
 
 
-def make_token(**overrides) -> JWTToken:
+def make_token(**overrides: Any) -> JWTToken:
     defaults = dict(
         sub="1",
         iss="test_issuer",
@@ -61,7 +76,7 @@ def make_token(**overrides) -> JWTToken:
     return JWTToken(**defaults)
 
 
-def test_changed_hash_is_stable_and_sensitive():
+def test_changed_hash_is_stable_and_sensitive() -> None:
     token = make_token()
     same = make_token()
     assert token.changed_hash == same.changed_hash
@@ -71,7 +86,7 @@ def test_changed_hash_is_stable_and_sensitive():
     assert token.changed_hash != make_token(org="other").changed_hash
 
 
-def test_jwt_timestamps_are_utc_aware():
+def test_jwt_timestamps_are_utc_aware() -> None:
     token = JWTToken(
         sub="1",
         iss="test_issuer",
@@ -93,7 +108,7 @@ class FakeRequest:
         self.user = object()
         self._extensions = {"token": token}
 
-    def get_extension(self, name: str):
+    def get_extension(self, name: str) -> JWTToken:
         return self._extensions[name]
 
 
@@ -101,7 +116,7 @@ def make_info(token: JWTToken) -> SimpleNamespace:
     return SimpleNamespace(context=SimpleNamespace(request=FakeRequest(token)))
 
 
-def test_any_scope_of_checks_scopes_not_roles():
+def test_any_scope_of_checks_scopes_not_roles() -> None:
     # The token has "special" as a role but not as a scope, so a scope
     # requirement of "special" must fail.
     token = make_token(scope="read", roles=["special"])
@@ -115,10 +130,10 @@ def test_any_scope_of_checks_scopes_not_roles():
 
 
 @pytest.mark.asyncio
-async def test_resolve_async_enforces_any_scope_and_any_role():
+async def test_resolve_async_enforces_any_scope_and_any_role() -> None:
     token = make_token(scope="read", roles=["special"])
 
-    async def next_(source, info):
+    async def next_(source: object, info: Info) -> str:
         return "ok"
 
     with pytest.raises(GraphQLError, match="scopes"):
@@ -140,8 +155,8 @@ async def test_resolve_async_enforces_any_scope_and_any_role():
 
 
 def test_sync_expand_user_links_organization_from_the_org_claim(
-    db, valid_jwt, valid_settings
-):
+    db: None, valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     token = decode_token(valid_jwt, valid_settings)
 
     user = expand_user_from_token(token)
@@ -156,7 +171,9 @@ def test_sync_expand_user_links_organization_from_the_org_claim(
 
 
 @pytest.mark.asyncio
-async def test_token_roles_do_not_become_django_groups(db, valid_jwt, valid_settings):
+async def test_token_roles_do_not_become_django_groups(
+    db: None, valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     """Token roles must never be mirrored into Django's permission system.
 
     Mirroring them meant any IdP role name that happened to match a locally
@@ -174,27 +191,31 @@ async def test_token_roles_do_not_become_django_groups(db, valid_jwt, valid_sett
 
 
 @pytest.fixture(scope="session")
-def malformed_claims_jwt(valid_claims, key_pair_str):
+def malformed_claims_jwt(
+    valid_claims: dict[str, object], key_pair_str: KeyPairStr
+) -> str:
     key = RSAKey.import_key(key_pair_str.private_key)
     claims = {k: v for k, v in valid_claims.items() if k != "client_id"}
     return jwt.encode({"alg": "RS256", "kid": "1"}, claims, key)
 
 
-def test_decode_token_rejects_malformed_claims(malformed_claims_jwt, valid_settings):
+def test_decode_token_rejects_malformed_claims(
+    malformed_claims_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     with pytest.raises(MalformedJwtTokenError):
         decode_token(malformed_claims_jwt, valid_settings)
 
 
 @pytest.mark.asyncio
 async def test_adecode_token_rejects_malformed_claims(
-    malformed_claims_jwt, valid_settings
-):
+    malformed_claims_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     with pytest.raises(MalformedJwtTokenError):
         await adecode_token(malformed_claims_jwt, valid_settings)
 
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
-def test_preferred_username_resolves_from_its_own_field():
+def test_preferred_username_resolves_from_its_own_field() -> None:
     @strawberry.type
     class Query:
         @strawberry.field
@@ -209,7 +230,9 @@ def test_preferred_username_resolves_from_its_own_field():
 
 
 @pytest.mark.asyncio
-async def test_roles_are_tracked_on_the_membership(db, valid_jwt, valid_settings):
+async def test_roles_are_tracked_on_the_membership(
+    db: None, valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     """Role changes are reflected on the org-scoped Membership, not on Groups."""
     token = decode_token(valid_jwt, valid_settings)
     first = token.model_copy(update={"roles": ["a", "b"]})

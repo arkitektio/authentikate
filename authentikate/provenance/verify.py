@@ -8,7 +8,6 @@ provenance store need a database and remain the host application's job; the
 """
 
 import logging
-from typing import Any
 
 from authentikate import errors
 from authentikate.base_models import AuthentikateSettings, JWTToken
@@ -56,7 +55,7 @@ def verify_actor(provenance: ProvenanceToken, auth_token: JWTToken) -> None:
         )
 
 
-def verify_args(provenance: ProvenanceToken, args: Any) -> None:
+def verify_args(provenance: ProvenanceToken, args: object) -> None:
     """Confirm the cleartext args match the token's args hash.
 
     Raises

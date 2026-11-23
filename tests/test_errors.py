@@ -18,9 +18,10 @@ from authentikate.utils import (
     authenticate_header_or_none,
     authenticate_token_or_none,
 )
+from tests.conftest import KeyPairStr
 
 
-def _build_mock_session(*responses_or_exceptions):
+def _build_mock_session(*responses_or_exceptions: object) -> AsyncMock:
     session = AsyncMock()
     session.__aenter__.return_value = session
     session.__aexit__.return_value = False
@@ -41,7 +42,7 @@ def _build_mock_session(*responses_or_exceptions):
 
 
 @pytest.mark.asyncio
-async def test_no_authorization_header():
+async def test_no_authorization_header() -> None:
     settings = AuthentikateSettings(audience="*", issuers=[])
     headers = {"Content-Type": "application/json"}
 
@@ -50,7 +51,7 @@ async def test_no_authorization_header():
 
 
 @pytest.mark.asyncio
-async def test_malformed_authorization_header():
+async def test_malformed_authorization_header() -> None:
     settings = AuthentikateSettings(audience="*", issuers=[])
     headers = {"Authorization": "Basic 123456"}
 
@@ -59,7 +60,7 @@ async def test_malformed_authorization_header():
 
 
 @pytest.mark.asyncio
-async def test_authenticate_header_or_none_returns_none_for_auth_failure():
+async def test_authenticate_header_or_none_returns_none_for_auth_failure() -> None:
     settings = AuthentikateSettings(audience="*", issuers=[])
     headers = {"Content-Type": "application/json"}
 
@@ -67,7 +68,7 @@ async def test_authenticate_header_or_none_returns_none_for_auth_failure():
 
 
 @pytest.mark.asyncio
-async def test_authenticate_header_or_none_reraises_unexpected_errors():
+async def test_authenticate_header_or_none_reraises_unexpected_errors() -> None:
     with patch(
         "authentikate.utils.authenticate_header",
         new=AsyncMock(side_effect=RuntimeError("boom")),
@@ -77,7 +78,7 @@ async def test_authenticate_header_or_none_reraises_unexpected_errors():
 
 
 @pytest.mark.asyncio
-async def test_authenticate_token_or_none_reraises_unexpected_errors():
+async def test_authenticate_token_or_none_reraises_unexpected_errors() -> None:
     with patch(
         "authentikate.utils.authenticate_token",
         new=AsyncMock(side_effect=RuntimeError("boom")),
@@ -86,7 +87,7 @@ async def test_authenticate_token_or_none_reraises_unexpected_errors():
             await authenticate_token_or_none("token", None)
 
 
-def test_jwks_fetch_error():
+def test_jwks_fetch_error() -> None:
     session = _build_mock_session(Exception("Failed"))
     with patch("authentikate.base_models.httpx.AsyncClient", return_value=session):
         issuer = JWKSUriIssuer(
@@ -99,7 +100,7 @@ def test_jwks_fetch_error():
         assert "Error fetching jwks" in str(excinfo.value)
 
 
-def test_missing_kid_in_header(key_pair_str):
+def test_missing_kid_in_header(key_pair_str: KeyPairStr) -> None:
     # Create a token without kid
     rsa_key = RSAKey.import_key(key_pair_str.private_key)
     header = {"alg": "RS256"}  # No kid
@@ -122,7 +123,7 @@ def test_missing_kid_in_header(key_pair_str):
         decode_token(token, settings)
 
 
-def test_key_not_found(key_pair_str):
+def test_key_not_found(key_pair_str: KeyPairStr) -> None:
     # Token signed with key "1"
     private_key_obj = RSAKey.import_key(key_pair_str.private_key)
     header = {"kid": "1", "alg": "RS256"}

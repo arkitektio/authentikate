@@ -73,7 +73,9 @@ def two_issuers() -> tuple[AuthentikateSettings, RSAKey, RSAKey]:
     return settings, key_a, key_b
 
 
-def test_issuer_cannot_mint_a_token_for_another_issuer(two_issuers) -> None:
+def test_issuer_cannot_mint_a_token_for_another_issuer(
+    two_issuers: tuple[AuthentikateSettings, RSAKey, RSAKey],
+) -> None:
     """Issuer A signing a token that claims `iss: B` must be rejected."""
     settings, key_a, _ = two_issuers
 
@@ -85,7 +87,7 @@ def test_issuer_cannot_mint_a_token_for_another_issuer(two_issuers) -> None:
 
 @pytest.mark.asyncio
 async def test_issuer_cannot_mint_a_token_for_another_issuer_async(
-    two_issuers,
+    two_issuers: tuple[AuthentikateSettings, RSAKey, RSAKey],
 ) -> None:
     """The async path must bind `iss` to the signing key just as the sync one does."""
     settings, key_a, _ = two_issuers
@@ -96,7 +98,9 @@ async def test_issuer_cannot_mint_a_token_for_another_issuer_async(
         await adecode_token(forged, settings)
 
 
-def test_each_issuer_still_authenticates_its_own_users(two_issuers) -> None:
+def test_each_issuer_still_authenticates_its_own_users(
+    two_issuers: tuple[AuthentikateSettings, RSAKey, RSAKey],
+) -> None:
     """The fix must not break legitimate multi-issuer operation.
 
     Both issuers here use the default ``key_id`` of "1". Before the fix that
@@ -112,7 +116,9 @@ def test_each_issuer_still_authenticates_its_own_users(two_issuers) -> None:
     assert decode_token(token_b, settings).iss == ISS_B
 
 
-def test_unconfigured_issuer_is_rejected(two_issuers) -> None:
+def test_unconfigured_issuer_is_rejected(
+    two_issuers: tuple[AuthentikateSettings, RSAKey, RSAKey],
+) -> None:
     """A token naming an unknown issuer is rejected outright."""
     settings, key_a, _ = two_issuers
 
@@ -124,7 +130,9 @@ def test_unconfigured_issuer_is_rejected(two_issuers) -> None:
         decode_token(token, settings)
 
 
-def test_token_without_iss_is_rejected(two_issuers) -> None:
+def test_token_without_iss_is_rejected(
+    two_issuers: tuple[AuthentikateSettings, RSAKey, RSAKey],
+) -> None:
     """A token with no `iss` claim cannot select a trust anchor."""
     settings, key_a, _ = two_issuers
 

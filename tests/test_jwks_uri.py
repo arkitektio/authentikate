@@ -6,9 +6,10 @@ from joserfc.jwk import RSAKey
 
 from authentikate.base_models import AuthentikateSettings, JWKSUriIssuer
 from authentikate.decode import decode_token
+from tests.conftest import KeyPairStr
 
 
-def _build_mock_session(*payloads):
+def _build_mock_session(*payloads: object) -> AsyncMock:
     session = AsyncMock()
     session.__aenter__.return_value = session
     session.__aexit__.return_value = False
@@ -24,7 +25,7 @@ def _build_mock_session(*payloads):
     return session
 
 
-def test_jwks_uri_issuer_fetching(key_pair_str):
+def test_jwks_uri_issuer_fetching(key_pair_str: KeyPairStr) -> None:
 
     # helper to make a strict jwk
     rsa_key = RSAKey.import_key(key_pair_str.public_key)
@@ -47,7 +48,7 @@ def test_jwks_uri_issuer_fetching(key_pair_str):
         session.get.assert_called_with("http://test-issuer/.well-known/jwks.json")
 
 
-def test_jwks_uri_integration(key_pair_str):
+def test_jwks_uri_integration(key_pair_str: KeyPairStr) -> None:
     # Test valid decoding using the settings
     rsa_key = RSAKey.import_key(key_pair_str.public_key)
     jwk_dict = rsa_key.as_dict(kid="test-kid")
@@ -72,7 +73,7 @@ def test_jwks_uri_integration(key_pair_str):
         assert fetched_keys[0]["kid"] == "test-kid"
 
 
-def test_jwks_uri_decoding(key_pair_str):
+def test_jwks_uri_decoding(key_pair_str: KeyPairStr) -> None:
     # Test full decoding flow
     rsa_key = RSAKey.import_key(key_pair_str.public_key)
     # We need the private key to sign

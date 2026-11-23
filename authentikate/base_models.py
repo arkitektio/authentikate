@@ -176,7 +176,7 @@ class JWTToken(BaseModel):
 
     @field_validator("collabs", mode="before")
     @classmethod
-    def collabs_are_roles_by_collaboration_by_instance(cls, v: Any) -> Any:
+    def collabs_are_roles_by_collaboration_by_instance(cls, v: object) -> object:
         """Refuse a ``collabs`` claim of any other shape: it would grant who knows what."""
         if v is None:
             return v

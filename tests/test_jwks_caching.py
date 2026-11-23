@@ -3,9 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from joserfc.jwk import RSAKey
 
 from authentikate.base_models import JWKSUriIssuer
+from tests.conftest import KeyPairStr
 
 
-def _build_mock_session(*payloads):
+def _build_mock_session(*payloads: object) -> AsyncMock:
     session = AsyncMock()
     session.__aenter__.return_value = session
     session.__aexit__.return_value = False
@@ -21,7 +22,7 @@ def _build_mock_session(*payloads):
     return session
 
 
-def test_jwks_uri_caching_logic(key_pair_str):
+def test_jwks_uri_caching_logic(key_pair_str: KeyPairStr) -> None:
     rsa_key = RSAKey.import_key(key_pair_str.public_key)
     jwk_dict = rsa_key.as_dict(kid="1")
     jwks = {"keys": [jwk_dict]}
@@ -58,7 +59,7 @@ from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import decode_token
 
 
-def test_jwks_uri_refresh_on_missing_kid(key_pair_str):
+def test_jwks_uri_refresh_on_missing_kid(key_pair_str: KeyPairStr) -> None:
     rsa_key = RSAKey.import_key(key_pair_str.public_key)
 
     # Key 1

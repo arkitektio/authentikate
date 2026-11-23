@@ -5,11 +5,12 @@ from django.conf import settings
 from kante.testing import GraphQLWebSocketTestClient
 
 from test_project.asgi import application
+from tests.conftest import KeyPairStr
 
 
 @pytest.mark.asyncio
 async def test_str_channel_subscription_receives_broadcast_from_ws(
-    db, valid_jwt, key_pair_str
+    db: None, valid_jwt: str, key_pair_str: KeyPairStr
 ) -> None:
     """Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
     # Initialize both clients
@@ -39,7 +40,7 @@ async def test_str_channel_subscription_receives_broadcast_from_ws(
 
 @pytest.mark.asyncio
 async def test_an_errored_subscription_closes_cleanly(
-    db, valid_jwt, key_pair_str
+    db: None, valid_jwt: str, key_pair_str: KeyPairStr
 ) -> None:
     """A subscription that fails, then a disconnect, tears down without an error.
 

@@ -9,11 +9,12 @@ the specific one.
 import datetime
 import inspect
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from graphql import GraphQLError
 from kante.errors import KanteError
+from kante.types import Info
 
 from authentikate import errors
 from authentikate.base_models import AuthentikateSettings, JWTToken, StaticToken
@@ -95,7 +96,9 @@ def test_to_graphql_error_carries_code_and_reason() -> None:
     assert err.extensions["reason"] == "TOKEN_EXPIRED"
 
 
-def test_authentication_errors_do_not_reflect_input_back(caplog: Any) -> None:
+def test_authentication_errors_do_not_reflect_input_back(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """The rejected value is attacker-supplied; it belongs in the log, not the wire.
 
     Otherwise the error surface becomes a probe for what this service trusts.
@@ -121,18 +124,18 @@ class _FakeRequest:
         self._roles = roles
 
     @property
-    def user(self) -> Any:
+    def user(self) -> SimpleNamespace:
         if self._token is None:
             raise ValueError("User is not set in the request.")
         return SimpleNamespace(id=1)
 
     @property
-    def membership(self) -> Any:
+    def membership(self) -> SimpleNamespace:
         if self._roles is None:
             raise ValueError("Membership is not set in the request.")
         return SimpleNamespace(roles=self._roles)
 
-    def get_extension(self, name: str) -> Any:
+    def get_extension(self, name: str) -> JWTToken:
         if self._token is None or name != "token":
             raise ValueError(f"Extension {name} is not set in the request.")
         return self._token
@@ -156,13 +159,17 @@ def _token(scope: str = "read", roles: list[str] | None = None) -> JWTToken:
     )
 
 
-def _info(token: JWTToken | None, org_roles: list[str] | None = None) -> Any:
-    return SimpleNamespace(
-        context=SimpleNamespace(request=_FakeRequest(token, org_roles))
+def _info(token: JWTToken | None, org_roles: list[str] | None = None) -> Info:
+    """A stand-in for the resolver's Info, typed as that Info."""
+    return cast(
+        Info,
+        SimpleNamespace(
+            context=SimpleNamespace(request=_FakeRequest(token, org_roles))
+        ),
     )
 
 
-def _raises(extension: AuthExtension, info: Any) -> AuthentikateGraphQLError:
+def _raises(extension: AuthExtension, info: Info) -> AuthentikateGraphQLError:
     with pytest.raises(AuthentikateGraphQLError) as exc_info:
         extension.resolve(lambda source, info: "ok", None, info)
     return exc_info.value
@@ -264,7 +271,9 @@ async def test_missing_authorization_header_reports_its_own_reason() -> None:
 # --- on the wire -------------------------------------------------------------
 
 
-async def _execute(headers: dict[str, str], query: str = "query { me { sub } }") -> Any:
+async def _execute(
+    headers: dict[str, str], query: str = "query { me { sub } }"
+) -> dict[str, Any]:
     from kante.testing import GraphQLHttpTestClient
 
     from test_project.asgi import application
@@ -274,7 +283,7 @@ async def _execute(headers: dict[str, str], query: str = "query { me { sub } }")
 
 
 @pytest.mark.asyncio
-async def test_codes_reach_the_response_body(db: Any) -> None:
+async def test_codes_reach_the_response_body(db: None) -> None:
     """The whole point: a client can branch on this without parsing English."""
     answer = await _execute({"Authorization": "Bearer not-a-jwt"})
 
@@ -285,7 +294,7 @@ async def test_codes_reach_the_response_body(db: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_missing_header_reaches_the_wire_with_its_own_reason(db: Any) -> None:
+async def test_missing_header_reaches_the_wire_with_its_own_reason(db: None) -> None:
     answer = await _execute({})
 
     extensions = answer["errors"][0]["extensions"]
@@ -294,7 +303,7 @@ async def test_missing_header_reaches_the_wire_with_its_own_reason(db: Any) -> N
 
 
 @pytest.mark.asyncio
-async def test_wire_message_does_not_echo_the_rejected_token(db: Any) -> None:
+async def test_wire_message_does_not_echo_the_rejected_token(db: None) -> None:
     """A bad credential must not be reflected back in the response."""
     answer = await _execute({"Authorization": "Bearer probe-value-12345"})
 

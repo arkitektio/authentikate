@@ -9,10 +9,13 @@ from kante.testing import GraphQLHttpTestClient
 from authentikate.expand import ExpandedTokenContext
 from authentikate.models import Client, Membership, Organization, User
 from test_project.asgi import application
+from tests.conftest import KeyPairStr
 
 
 @pytest.mark.asyncio
-async def test_user_query(db, valid_auth_headers, key_pair_str) -> None:
+async def test_user_query(
+    db: None, valid_auth_headers: dict[str, str], key_pair_str: KeyPairStr
+) -> None:
     """Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
     # Initialize both clients
 
@@ -51,7 +54,9 @@ async def test_user_query(db, valid_auth_headers, key_pair_str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_client_query(db, valid_auth_headers, key_pair_str) -> None:
+async def test_client_query(
+    db: None, valid_auth_headers: dict[str, str], key_pair_str: KeyPairStr
+) -> None:
     """Test that a WebSocket subscription receives a broadcast from an HTTP mutation."""
     # Initialize both clients
 
@@ -83,7 +88,7 @@ async def test_client_query(db, valid_auth_headers, key_pair_str) -> None:
 
 @pytest.mark.asyncio
 async def test_http_query_uses_bundled_token_expansion(
-    db, valid_auth_headers, key_pair_str
+    db: None, valid_auth_headers: dict[str, str], key_pair_str: KeyPairStr
 ) -> None:
     settings.AUTHENTIKATE["ISSUERS"][0]["public_key"] = key_pair_str.public_key
 

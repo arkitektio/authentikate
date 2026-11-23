@@ -66,8 +66,8 @@ def prepare_settings() -> AuthentikateSettings:
 
     try:
         group = settings.AUTHENTIKATE
-    except AttributeError:
-        raise ImproperlyConfigured("Missing setting AUTHENTIKATE")
+    except AttributeError as err:
+        raise ImproperlyConfigured("Missing setting AUTHENTIKATE") from err
 
     try:
         parsed = AuthentikateSettings(**group)

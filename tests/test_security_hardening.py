@@ -8,13 +8,15 @@ used to skip.
 import asyncio
 import datetime
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from graphql import GraphQLError
 from joserfc.jwk import RSAKey
+from kante.types import Info
+from pytest_django.fixtures import SettingsWrapper
 
 import authentikate.settings as authentikate_settings
 from authentikate.base_models import AuthentikateSettings, JWTToken, StaticToken
@@ -28,6 +30,7 @@ from authentikate.models import Membership, Organization, User
 from authentikate.settings import prepare_settings
 from authentikate.strawberry.directives import AuthExtension
 from authentikate.utils import authenticate_token
+from tests.conftest import KeyPairStr
 
 # --- static tokens -----------------------------------------------------------
 
@@ -59,7 +62,7 @@ def _reset_settings_cache() -> None:
     authentikate_settings.cached_settings = None
 
 
-def test_static_tokens_are_refused_when_debug_is_off(settings: Any) -> None:
+def test_static_tokens_are_refused_when_debug_is_off(settings: SettingsWrapper) -> None:
     """Static tokens skip signature verification, so they must not ship to prod."""
     settings.DEBUG = False
     settings.AUTHENTIKATE = {
@@ -76,7 +79,9 @@ def test_static_tokens_are_refused_when_debug_is_off(settings: Any) -> None:
         _reset_settings_cache()
 
 
-def test_static_tokens_allowed_with_explicit_escape_hatch(settings: Any) -> None:
+def test_static_tokens_allowed_with_explicit_escape_hatch(
+    settings: SettingsWrapper,
+) -> None:
     settings.DEBUG = False
     settings.AUTHENTIKATE = {
         "ISSUERS": [],
@@ -138,7 +143,9 @@ def _jwks_session(jwk: dict[str, Any]) -> AsyncMock:
     return session
 
 
-def test_unknown_kids_do_not_drive_unbounded_jwks_fetches(key_pair_str) -> None:
+def test_unknown_kids_do_not_drive_unbounded_jwks_fetches(
+    key_pair_str: KeyPairStr,
+) -> None:
     """A stream of made-up `kid`s must not become a stream of issuer requests.
 
     The first refresh is always allowed so a rotated key is picked up promptly;
@@ -195,7 +202,7 @@ def _token(sub: str = "1", org: str = "org-1") -> JWTToken:
     )
 
 
-def test_sync_expand_rejects_blocked_membership(db) -> None:
+def test_sync_expand_rejects_blocked_membership(db: None) -> None:
     """The sync path used to skip the membership check entirely."""
     # Distinct sub/org per test: async tests elsewhere are not rolled back
     # cleanly by pytest-django, so shared identifiers leak between files.
@@ -212,7 +219,7 @@ def test_sync_expand_rejects_blocked_membership(db) -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_expand_rejects_blocked_membership(db) -> None:
+async def test_async_expand_rejects_blocked_membership(db: None) -> None:
     """The module-level async expander must match its sync twin."""
     from authentikate.expand import aexpand_user_from_token
 
@@ -230,7 +237,7 @@ async def test_async_expand_rejects_blocked_membership(db) -> None:
 
 
 @pytest.mark.asyncio
-async def test_extension_user_expansion_rejects_blocked_membership(db) -> None:
+async def test_extension_user_expansion_rejects_blocked_membership(db: None) -> None:
     """`AuthentikateExtension.aexpand_user_from_token` skipped it too."""
     from authentikate.strawberry.extension import AuthentikateExtension
 
@@ -248,7 +255,7 @@ async def test_extension_user_expansion_rejects_blocked_membership(db) -> None:
         await extension.aexpand_user_from_token(token)
 
 
-def test_token_roles_create_no_groups(db) -> None:
+def test_token_roles_create_no_groups(db: None) -> None:
     """Belt and braces: expansion must not touch Django's permission system."""
     from django.contrib.auth.models import Group
 
@@ -269,28 +276,30 @@ class _FakeRequest:
         self._roles = roles
 
     @property
-    def user(self) -> Any:
+    def user(self) -> SimpleNamespace:
         return SimpleNamespace(id=1)
 
     @property
-    def membership(self) -> Any:
+    def membership(self) -> SimpleNamespace:
         if self._roles is None:
             raise ValueError("Membership is not set in the request.")
         return SimpleNamespace(roles=self._roles)
 
-    def get_extension(self, name: str) -> Any:
+    def get_extension(self, name: str) -> JWTToken:
         if name != "token":
             raise ValueError(f"Extension {name} is not set in the request.")
         return self._token
 
 
-def _info(roles: list[str] | None) -> Any:
-    return SimpleNamespace(
-        context=SimpleNamespace(request=_FakeRequest(_token(), roles))
+def _info(roles: list[str] | None) -> Info:
+    """A stand-in for the resolver's Info, typed as that Info."""
+    return cast(
+        Info,
+        SimpleNamespace(context=SimpleNamespace(request=_FakeRequest(_token(), roles))),
     )
 
 
-def _resolve(extension: AuthExtension, roles: list[str] | None) -> Any:
+def _resolve(extension: AuthExtension, roles: list[str] | None) -> object:
     return extension.resolve(lambda source, info: "ok", None, _info(roles))
 
 
@@ -397,7 +406,7 @@ def test_usernames_differ_when_sanitization_collides() -> None:
     assert a != b
 
 
-def test_provisioned_user_passes_full_clean(db) -> None:
+def test_provisioned_user_passes_full_clean(db: None) -> None:
     """A user created from a URL-issuer token must be editable in the admin.
 
     `admin.py` registers User with a plain ModelAdmin, whose form runs
@@ -412,7 +421,9 @@ def test_provisioned_user_passes_full_clean(db) -> None:
     user.full_clean(exclude=["password"])
 
 
-def test_wildcard_audience_still_warns(settings: Any, caplog: Any) -> None:
+def test_wildcard_audience_still_warns(
+    settings: SettingsWrapper, caplog: pytest.LogCaptureFixture
+) -> None:
     """`"*"` is deliberate, but it still accepts another service's token.
 
     An operator reading the logs should be able to see that.
@@ -428,7 +439,7 @@ def test_wildcard_audience_still_warns(settings: Any, caplog: Any) -> None:
     assert "'*'" in caplog.text and "not matched" in caplog.text
 
 
-def test_missing_audience_is_refused_at_startup(settings: Any) -> None:
+def test_missing_audience_is_refused_at_startup(settings: SettingsWrapper) -> None:
     """The most likely 4.0 upgrade failure must name what is missing."""
     settings.DEBUG = True
     settings.AUTHENTIKATE = {"ISSUERS": []}
@@ -441,7 +452,9 @@ def test_missing_audience_is_refused_at_startup(settings: Any) -> None:
         _reset_settings_cache()
 
 
-def test_configured_audience_does_not_warn(settings: Any, caplog: Any) -> None:
+def test_configured_audience_does_not_warn(
+    settings: SettingsWrapper, caplog: pytest.LogCaptureFixture
+) -> None:
     settings.DEBUG = True
     settings.AUTHENTIKATE = {"ISSUERS": [], "AUDIENCE": "mikro"}
     _reset_settings_cache()

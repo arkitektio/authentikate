@@ -105,7 +105,7 @@ def to_graphql_error(
         exc.code,
         exc.reason,
         exc,
-        exc_info=True,
+        exc_info=exc,
     )
 
     return AuthentikateGraphQLError(

@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -13,7 +14,7 @@ from authentikate.provenance.models import ProvenanceToken
 from authentikate.utils import authenticate_token
 
 
-def make_token(**overrides) -> JWTToken:
+def make_token(**overrides: Any) -> JWTToken:
     defaults = dict(
         sub="1",
         iss="https://lok.one",

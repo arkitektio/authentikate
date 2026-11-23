@@ -34,8 +34,8 @@ from authentikate.provenance.verify import (
 PROV_KID = "prov-1"
 
 
-def _provenance_claims(**overrides):
-    now = int(datetime.datetime.now().timestamp())
+def _provenance_claims(**overrides: object) -> dict[str, object]:
+    now = int(datetime.datetime.now(datetime.UTC).timestamp())
     claims = {
         "iss": "rekuest",
         "aud": ["mikro"],
@@ -89,7 +89,9 @@ def settings(ed_key: OKPKey) -> AuthentikateSettings:
 # --- decode / happy path -----------------------------------------------------
 
 
-def test_decode_provenance_token(ed_key, settings):
+def test_decode_provenance_token(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims())
     decoded = decode_provenance_token(token, settings)
 
@@ -106,14 +108,18 @@ def test_decode_provenance_token(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_adecode_provenance_token(ed_key, settings):
+async def test_adecode_provenance_token(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims())
     decoded = await adecode_provenance_token(token, settings)
     assert decoded.sub == "user-42"
     assert decoded.is_root is True
 
 
-def test_sub_assignment_is_not_root(ed_key, settings):
+def test_sub_assignment_is_not_root(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims(ptk="parent", rtk="root", sub="agent-7"))
     decoded = decode_provenance_token(token, settings)
     assert decoded.is_root is False
@@ -124,7 +130,7 @@ def test_sub_assignment_is_not_root(ed_key, settings):
 # --- algorithm pinning (the key security property) ---------------------------
 
 
-def test_rejects_rs256(settings):
+def test_rejects_rs256(settings: AuthentikateSettings) -> None:
     rsa_key = RSAKey.generate_key(2048)
     token = jwt.encode(
         {"alg": "RS256", "kid": PROV_KID},
@@ -136,7 +142,7 @@ def test_rejects_rs256(settings):
         decode_provenance_token(token, settings)
 
 
-def test_rejects_alg_none(settings):
+def test_rejects_alg_none(settings: AuthentikateSettings) -> None:
     header = base64.urlsafe_b64encode(
         json.dumps({"alg": "none", "kid": PROV_KID}).encode()
     ).rstrip(b"=")
@@ -148,7 +154,9 @@ def test_rejects_alg_none(settings):
         decode_provenance_token(token, settings)
 
 
-def test_rejects_wrong_signing_key(other_ed_key, settings):
+def test_rejects_wrong_signing_key(
+    other_ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(other_ed_key, _provenance_claims())
     with pytest.raises(errors.InvalidProvenanceTokenError):
         decode_provenance_token(token, settings)
@@ -157,14 +165,14 @@ def test_rejects_wrong_signing_key(other_ed_key, settings):
 # --- claims / config validation ----------------------------------------------
 
 
-def test_expired_token(ed_key, settings):
-    now = int(datetime.datetime.now().timestamp())
+def test_expired_token(ed_key: OKPKey, settings: AuthentikateSettings) -> None:
+    now = int(datetime.datetime.now(datetime.UTC).timestamp())
     token = _sign(ed_key, _provenance_claims(iat=now - 7200, exp=now - 3600))
     with pytest.raises(errors.AuthentikateTokenExpired):
         decode_provenance_token(token, settings)
 
 
-def test_not_configured(ed_key):
+def test_not_configured(ed_key: OKPKey) -> None:
     bare = AuthentikateSettings(
         audience="*",
         issuers=[
@@ -180,13 +188,13 @@ def test_not_configured(ed_key):
         decode_provenance_token(token, bare)
 
 
-def test_audience_mismatch(ed_key, settings):
+def test_audience_mismatch(ed_key: OKPKey, settings: AuthentikateSettings) -> None:
     token = _sign(ed_key, _provenance_claims(aud=["someone-else"]))
     with pytest.raises(errors.ProvenanceAudienceError):
         decode_provenance_token(token, settings)
 
 
-def test_malformed_payload(ed_key, settings):
+def test_malformed_payload(ed_key: OKPKey, settings: AuthentikateSettings) -> None:
     # Valid registered claims (passes the exp/claims check) but missing a
     # required provenance claim, so the model build is what fails.
     claims = _provenance_claims()
@@ -215,18 +223,22 @@ def _auth_token(sub: str, client_id: str) -> JWTToken:
     )
 
 
-def test_verify_actor_ok(ed_key, settings):
+def test_verify_actor_ok(ed_key: OKPKey, settings: AuthentikateSettings) -> None:
     decoded = decode_provenance_token(_sign(ed_key, _provenance_claims()), settings)
     verify_actor(decoded, _auth_token("agent-7", "imagej-app"))
 
 
-def test_verify_actor_sub_mismatch(ed_key, settings):
+def test_verify_actor_sub_mismatch(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     decoded = decode_provenance_token(_sign(ed_key, _provenance_claims()), settings)
     with pytest.raises(errors.ProvenanceActorMismatchError):
         verify_actor(decoded, _auth_token("someone-else", "imagej-app"))
 
 
-def test_verify_actor_cid_mismatch(ed_key, settings):
+def test_verify_actor_cid_mismatch(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     decoded = decode_provenance_token(_sign(ed_key, _provenance_claims()), settings)
     with pytest.raises(errors.ProvenanceActorMismatchError):
         verify_actor(decoded, _auth_token("agent-7", "other-app"))
@@ -235,38 +247,40 @@ def test_verify_actor_cid_mismatch(ed_key, settings):
 # --- args hash ---------------------------------------------------------------
 
 
-def test_canonicalization_byte_form():
+def test_canonicalization_byte_form() -> None:
     # The canonical form is the contract: sorted keys, no whitespace, UTF-8.
     assert canonicalize_v1({"b": 2, "a": 1}) == b'{"a":1,"b":2}'
     assert canonicalize_v1({"name": "café"}) == '{"name":"café"}'.encode()
 
 
-def test_args_hash_matches_sha256_of_canonical():
+def test_args_hash_matches_sha256_of_canonical() -> None:
     args = {"b": 2, "a": 1}
     expected = hashlib.sha256(b'{"a":1,"b":2}').hexdigest()
     assert args_hash(args) == expected
 
 
-def test_args_hash_unsupported_version():
+def test_args_hash_unsupported_version() -> None:
     with pytest.raises(errors.UnsupportedCanonicalizationError):
         args_hash({"a": 1}, version="sha256-canonical-v2")
 
 
-def test_verify_args_ok(ed_key, settings):
+def test_verify_args_ok(ed_key: OKPKey, settings: AuthentikateSettings) -> None:
     args = {"b": 2, "a": 1}
     token = _sign(ed_key, _provenance_claims(ahs=args_hash(args)))
     decoded = decode_provenance_token(token, settings)
     verify_args(decoded, args)  # no raise
 
 
-def test_verify_args_tampered(ed_key, settings):
+def test_verify_args_tampered(ed_key: OKPKey, settings: AuthentikateSettings) -> None:
     token = _sign(ed_key, _provenance_claims(ahs=args_hash({"a": 1})))
     decoded = decode_provenance_token(token, settings)
     with pytest.raises(errors.ProvenanceArgsMismatchError):
         verify_args(decoded, {"a": 999})
 
 
-def test_verify_args_unsupported_aha(ed_key, settings):
+def test_verify_args_unsupported_aha(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims(aha="sha256-canonical-v2"))
     decoded = decode_provenance_token(token, settings)
     with pytest.raises(errors.UnsupportedCanonicalizationError):
@@ -277,7 +291,9 @@ def test_verify_args_unsupported_aha(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_authenticate_provenance_header(ed_key, settings):
+async def test_authenticate_provenance_header(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims())
     decoded = await aauthenticate_provenance_header(
         {"x-provenance-token": token}, settings
@@ -287,7 +303,9 @@ async def test_authenticate_provenance_header(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_authenticate_provenance_header_absent(settings):
+async def test_authenticate_provenance_header_absent(
+    settings: AuthentikateSettings,
+) -> None:
     assert await aauthenticate_provenance_header({}, settings) is None
 
 
@@ -305,7 +323,9 @@ def bare_settings(ed_key: OKPKey) -> AuthentikateSettings:
 
 
 @pytest.mark.asyncio
-async def test_or_none_returns_token_when_valid(ed_key, settings):
+async def test_or_none_returns_token_when_valid(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims())
     decoded = await aauthenticate_provenance_header_or_none(
         {"rekuest-task": token}, settings
@@ -315,7 +335,9 @@ async def test_or_none_returns_token_when_valid(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_or_none_absent_returns_none_without_logging(settings, caplog):
+async def test_or_none_absent_returns_none_without_logging(
+    settings: AuthentikateSettings, caplog: pytest.LogCaptureFixture
+) -> None:
     with caplog.at_level(logging.WARNING, logger="authentikate.provenance.verify"):
         assert await aauthenticate_provenance_header_or_none({}, settings) is None
     assert caplog.records == []
@@ -323,8 +345,10 @@ async def test_or_none_absent_returns_none_without_logging(settings, caplog):
 
 @pytest.mark.asyncio
 async def test_or_none_invalid_signature_logs_and_returns_none(
-    other_ed_key, settings, caplog
-):
+    other_ed_key: OKPKey,
+    settings: AuthentikateSettings,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     token = _sign(other_ed_key, _provenance_claims())
     with caplog.at_level(logging.WARNING, logger="authentikate.provenance.verify"):
         result = await aauthenticate_provenance_header_or_none(
@@ -340,8 +364,10 @@ async def test_or_none_invalid_signature_logs_and_returns_none(
 
 
 @pytest.mark.asyncio
-async def test_or_none_expired_logs_and_returns_none(ed_key, settings, caplog):
-    now = int(datetime.datetime.now().timestamp())
+async def test_or_none_expired_logs_and_returns_none(
+    ed_key: OKPKey, settings: AuthentikateSettings, caplog: pytest.LogCaptureFixture
+) -> None:
+    now = int(datetime.datetime.now(datetime.UTC).timestamp())
     token = _sign(ed_key, _provenance_claims(iat=now - 7200, exp=now - 3600))
     with caplog.at_level(logging.WARNING, logger="authentikate.provenance.verify"):
         result = await aauthenticate_provenance_header_or_none(
@@ -352,7 +378,9 @@ async def test_or_none_expired_logs_and_returns_none(ed_key, settings, caplog):
 
 
 @pytest.mark.asyncio
-async def test_or_none_malformed_logs_and_returns_none(ed_key, settings, caplog):
+async def test_or_none_malformed_logs_and_returns_none(
+    ed_key: OKPKey, settings: AuthentikateSettings, caplog: pytest.LogCaptureFixture
+) -> None:
     claims = _provenance_claims()
     claims.pop("tsk")
     token = _sign(ed_key, claims)
@@ -366,8 +394,8 @@ async def test_or_none_malformed_logs_and_returns_none(ed_key, settings, caplog)
 
 @pytest.mark.asyncio
 async def test_or_none_audience_mismatch_logs_and_returns_none(
-    ed_key, settings, caplog
-):
+    ed_key: OKPKey, settings: AuthentikateSettings, caplog: pytest.LogCaptureFixture
+) -> None:
     token = _sign(ed_key, _provenance_claims(aud=["someone-else"]))
     with caplog.at_level(logging.WARNING, logger="authentikate.provenance.verify"):
         result = await aauthenticate_provenance_header_or_none(
@@ -379,8 +407,10 @@ async def test_or_none_audience_mismatch_logs_and_returns_none(
 
 @pytest.mark.asyncio
 async def test_or_none_not_configured_logs_and_returns_none(
-    ed_key, bare_settings, caplog
-):
+    ed_key: OKPKey,
+    bare_settings: AuthentikateSettings,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     token = _sign(ed_key, _provenance_claims())
     with caplog.at_level(logging.WARNING, logger="authentikate.provenance.verify"):
         result = await aauthenticate_provenance_header_or_none(
@@ -394,7 +424,9 @@ async def test_or_none_not_configured_logs_and_returns_none(
 
 
 @pytest.mark.asyncio
-async def test_or_raise_returns_token_when_valid(ed_key, settings):
+async def test_or_raise_returns_token_when_valid(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims())
     decoded = await aauthenticate_provenance_header_or_raise(
         {"rekuest-task": token}, settings
@@ -404,13 +436,15 @@ async def test_or_raise_returns_token_when_valid(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_or_raise_absent_returns_none(settings):
+async def test_or_raise_absent_returns_none(settings: AuthentikateSettings) -> None:
     # No provenance header present at all -> proceed unprovenanced.
     assert await aauthenticate_provenance_header_or_raise({}, settings) is None
 
 
 @pytest.mark.asyncio
-async def test_or_raise_invalid_signature_raises(other_ed_key, settings):
+async def test_or_raise_invalid_signature_raises(
+    other_ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(other_ed_key, _provenance_claims())
     with pytest.raises(errors.ProvenanceValidationError) as exc_info:
         await aauthenticate_provenance_header_or_raise(
@@ -421,8 +455,10 @@ async def test_or_raise_invalid_signature_raises(other_ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_or_raise_expired_raises(ed_key, settings):
-    now = int(datetime.datetime.now().timestamp())
+async def test_or_raise_expired_raises(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
+    now = int(datetime.datetime.now(datetime.UTC).timestamp())
     token = _sign(ed_key, _provenance_claims(iat=now - 7200, exp=now - 3600))
     with pytest.raises(errors.ProvenanceValidationError) as exc_info:
         await aauthenticate_provenance_header_or_raise(
@@ -432,7 +468,9 @@ async def test_or_raise_expired_raises(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_or_raise_malformed_raises(ed_key, settings):
+async def test_or_raise_malformed_raises(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     claims = _provenance_claims()
     claims.pop("tsk")
     token = _sign(ed_key, claims)
@@ -444,7 +482,9 @@ async def test_or_raise_malformed_raises(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_or_raise_audience_mismatch_raises(ed_key, settings):
+async def test_or_raise_audience_mismatch_raises(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims(aud=["someone-else"]))
     with pytest.raises(errors.ProvenanceValidationError) as exc_info:
         await aauthenticate_provenance_header_or_raise(
@@ -454,7 +494,9 @@ async def test_or_raise_audience_mismatch_raises(ed_key, settings):
 
 
 @pytest.mark.asyncio
-async def test_or_raise_not_configured_raises(ed_key, bare_settings):
+async def test_or_raise_not_configured_raises(
+    ed_key: OKPKey, bare_settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims())
     with pytest.raises(errors.ProvenanceValidationError) as exc_info:
         await aauthenticate_provenance_header_or_raise(
@@ -466,7 +508,7 @@ async def test_or_raise_not_configured_raises(ed_key, bare_settings):
 # --- algorithm pinning at config time (RFC 8725) -----------------------------
 
 
-def test_default_algorithm_is_eddsa(ed_key):
+def test_default_algorithm_is_eddsa(ed_key: OKPKey) -> None:
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     settings = AuthentikateSettings(
         audience="*",
@@ -485,7 +527,7 @@ def test_default_algorithm_is_eddsa(ed_key):
 @pytest.mark.parametrize(
     "bad", [["none"], ["NONE"], [" none "], ["Ed25519", "none"], []]
 )
-def test_rejects_unsafe_algorithm_config(ed_key, bad):
+def test_rejects_unsafe_algorithm_config(ed_key: OKPKey, bad: list[str]) -> None:
     pub = ed_key.as_dict(private=False, kid=PROV_KID)
     with pytest.raises(ValidationError):
         AuthentikateSettings(
@@ -504,7 +546,9 @@ def test_rejects_unsafe_algorithm_config(ed_key, bad):
 # --- raw is authoritative, not spoofable via a claim -------------------------
 
 
-def test_raw_claim_cannot_override_actual_token(ed_key, settings):
+def test_raw_claim_cannot_override_actual_token(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims(raw="spoofed-raw-value"))
     decoded = decode_provenance_token(token, settings)
     assert decoded.raw == token
@@ -514,7 +558,9 @@ def test_raw_claim_cannot_override_actual_token(ed_key, settings):
 # --- issuer binding (the provenance twin of the auth-token fix) --------------
 
 
-def test_provenance_token_claiming_the_auth_issuer_is_rejected(ed_key, settings):
+def test_provenance_token_claiming_the_auth_issuer_is_rejected(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     """A provenance token must not be verifiable against an *auth* issuer.
 
     The fixture deliberately signs both trust domains with the same key, so the
@@ -528,7 +574,9 @@ def test_provenance_token_claiming_the_auth_issuer_is_rejected(ed_key, settings)
         decode_provenance_token(token, settings)
 
 
-def test_provenance_token_from_an_unconfigured_issuer_is_rejected(ed_key, settings):
+def test_provenance_token_from_an_unconfigured_issuer_is_rejected(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims(iss="not-rekuest"))
 
     with pytest.raises(errors.InvalidJwtTokenError, match="Untrusted issuer"):
@@ -554,7 +602,9 @@ def any_audience_settings(ed_key: OKPKey) -> AuthentikateSettings:
     )
 
 
-def test_wildcard_audience_accepts_any_service(ed_key, any_audience_settings):
+def test_wildcard_audience_accepts_any_service(
+    ed_key: OKPKey, any_audience_settings: AuthentikateSettings
+) -> None:
     token = _sign(ed_key, _provenance_claims(aud=["someone-else"]))
 
     decoded = decode_provenance_token(token, any_audience_settings)
@@ -562,7 +612,9 @@ def test_wildcard_audience_accepts_any_service(ed_key, any_audience_settings):
     assert decoded.aud == ["someone-else"]
 
 
-def test_wildcard_audience_still_requires_the_claim(ed_key, any_audience_settings):
+def test_wildcard_audience_still_requires_the_claim(
+    ed_key: OKPKey, any_audience_settings: AuthentikateSettings
+) -> None:
     """ "*" means "any service", not "no service": `aud` is still a required claim."""
     claims = _provenance_claims()
     claims.pop("aud")
@@ -572,7 +624,9 @@ def test_wildcard_audience_still_requires_the_claim(ed_key, any_audience_setting
         decode_provenance_token(token, any_audience_settings)
 
 
-def test_provenance_wildcard_is_config_side_not_token_side(ed_key, settings):
+def test_provenance_wildcard_is_config_side_not_token_side(
+    ed_key: OKPKey, settings: AuthentikateSettings
+) -> None:
     """A provenance token cannot award itself a wildcard audience either."""
     token = _sign(ed_key, _provenance_claims(aud=["*"]))
 

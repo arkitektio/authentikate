@@ -24,14 +24,13 @@ list tokens that are both revoked and unexpired, so the document stays small.
 import asyncio
 import logging
 import time
-from typing import Any
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_revoked(payload: Any) -> frozenset[str]:
+def _parse_revoked(payload: object) -> frozenset[str]:
     """Extract the set of revoked ``jti``s from a revocation-list document."""
 
     if isinstance(payload, dict):

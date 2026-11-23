@@ -6,10 +6,12 @@ however many tokens are checked in between.
 import asyncio
 import datetime
 import logging
+from contextlib import AbstractContextManager
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from joserfc import jwt
 from joserfc.jwk import RSAKey
 
@@ -18,6 +20,7 @@ from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import adecode_token, decode_token
 from authentikate.errors import MalformedJwtTokenError, TokenRevokedError
 from authentikate.revocation import RevocationList
+from tests.conftest import KeyPairStr
 
 ISS = "https://lok.example"
 REVOCATION_URI = "https://lok.example/o/revoked/"
@@ -80,7 +83,7 @@ class _FakeClient:
         return response
 
 
-def _patch_client(client: _FakeClient) -> Any:
+def _patch_client(client: _FakeClient) -> AbstractContextManager[_FakeClient]:
     return patch.object(revocation.httpx, "AsyncClient", client)
 
 
@@ -88,7 +91,9 @@ def _patch_client(client: _FakeClient) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_revoked_token_is_refused_and_live_token_accepted(key_pair_str) -> None:
+async def test_revoked_token_is_refused_and_live_token_accepted(
+    key_pair_str: KeyPairStr,
+) -> None:
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
     client = _FakeClient({"revoked": ["jti-revoked"]})
 
@@ -107,7 +112,7 @@ async def test_revoked_token_is_refused_and_live_token_accepted(key_pair_str) ->
     assert client.calls == [REVOCATION_URI]
 
 
-def test_sync_decode_path_checks_revocation(key_pair_str) -> None:
+def test_sync_decode_path_checks_revocation(key_pair_str: KeyPairStr) -> None:
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
 
     with _patch_client(_FakeClient(["jti-revoked"])):
@@ -121,7 +126,7 @@ def test_sync_decode_path_checks_revocation(key_pair_str) -> None:
 
 @pytest.mark.asyncio
 async def test_token_without_jti_is_refused_when_revocation_is_configured(
-    key_pair_str,
+    key_pair_str: KeyPairStr,
 ) -> None:
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
 
@@ -132,7 +137,7 @@ async def test_token_without_jti_is_refused_when_revocation_is_configured(
 
 @pytest.mark.asyncio
 async def test_unconfigured_issuer_never_fetches_and_accepts_tokens_without_jti(
-    key_pair_str,
+    key_pair_str: KeyPairStr,
 ) -> None:
     settings = _settings(key_pair_str.public_key)
     client = _FakeClient({"revoked": ["jti-1"]})
@@ -151,7 +156,7 @@ async def test_unconfigured_issuer_never_fetches_and_accepts_tokens_without_jti(
 
 @pytest.mark.asyncio
 async def test_revocation_is_checked_only_after_the_signature(
-    key_pair_str, private_key
+    key_pair_str: KeyPairStr, private_key: rsa.RSAPrivateKey
 ) -> None:
     """A forged token must not be able to trigger a fetch or a revocation error."""
     from cryptography.hazmat.primitives import serialization
@@ -179,7 +184,9 @@ async def test_revocation_is_checked_only_after_the_signature(
 
 
 @pytest.mark.asyncio
-async def test_many_checks_within_the_interval_cost_one_fetch(key_pair_str) -> None:
+async def test_many_checks_within_the_interval_cost_one_fetch(
+    key_pair_str: KeyPairStr,
+) -> None:
     settings = _settings(
         key_pair_str.public_key,
         revocation_uri=REVOCATION_URI,
@@ -225,7 +232,9 @@ async def test_list_is_refetched_once_the_interval_has_elapsed() -> None:
     assert len(client.calls) == 2
 
 
-def test_interval_is_configurable_with_uppercase_aliases(key_pair_str) -> None:
+def test_interval_is_configurable_with_uppercase_aliases(
+    key_pair_str: KeyPairStr,
+) -> None:
     settings = AuthentikateSettings(
         ISSUERS=[
             {
@@ -250,7 +259,7 @@ def test_interval_is_configurable_with_uppercase_aliases(key_pair_str) -> None:
 
 @pytest.mark.asyncio
 async def test_failed_refresh_keeps_the_stale_list_and_waits_for_the_interval(
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     revoked = RevocationList(REVOCATION_URI, refresh_interval=60.0, request_timeout=5.0)
     client = _FakeClient({"revoked": ["stale"]})
@@ -277,7 +286,9 @@ async def test_failed_refresh_keeps_the_stale_list_and_waits_for_the_interval(
 
 
 @pytest.mark.asyncio
-async def test_unreachable_list_fails_open_until_it_loads(key_pair_str, caplog) -> None:
+async def test_unreachable_list_fails_open_until_it_loads(
+    key_pair_str: KeyPairStr, caplog: pytest.LogCaptureFixture
+) -> None:
     settings = _settings(key_pair_str.public_key, revocation_uri=REVOCATION_URI)
     client = _FakeClient({"revoked": ["jti-1"]}, fail=True)
 

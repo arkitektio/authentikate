@@ -1,13 +1,17 @@
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import decode_token
 from authentikate.expand import aexpand_token_context
 from authentikate.models import Membership, Organization
 
 
-def test_authenticate_token(db, valid_jwt, valid_settings):
+def test_authenticate_token(
+    db: None, valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     token = decode_token(valid_jwt, valid_settings)
     assert token.sub == "1", "User ID should be 1"
     assert token.client_id == "XXXX", "Client ID should be 'XXXX'"
@@ -15,8 +19,8 @@ def test_authenticate_token(db, valid_jwt, valid_settings):
 
 @pytest.mark.asyncio
 async def test_aexpand_token_context_creates_related_models(
-    db, valid_jwt, valid_settings
-):
+    db: None, valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     token = decode_token(valid_jwt, valid_settings)
 
     expanded = await aexpand_token_context(token)
@@ -32,12 +36,14 @@ async def test_aexpand_token_context_creates_related_models(
 
 @pytest.mark.asyncio
 async def test_aexpand_token_context_resolves_organization_once(
-    db, valid_jwt, valid_settings
-):
+    db: None, valid_jwt: str, valid_settings: AuthentikateSettings
+) -> None:
     token = decode_token(valid_jwt, valid_settings)
     original_get_or_create = Organization.objects.aget_or_create
 
-    async def tracked_get_or_create(*args, **kwargs):
+    async def tracked_get_or_create(
+        *args: Any, **kwargs: Any
+    ) -> tuple[Organization, bool]:
         return await original_get_or_create(*args, **kwargs)
 
     mocked_get_or_create = AsyncMock(side_effect=tracked_get_or_create)

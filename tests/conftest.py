@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import uuid
+from collections.abc import Iterator
 
 import pytest
 from cryptography.hazmat.backends import default_backend
@@ -31,21 +32,21 @@ class KeyPairStr:
 
 
 @pytest.fixture(scope="session")
-def private_key():
+def private_key() -> rsa.RSAPrivateKey:
     return rsa.generate_private_key(
         public_exponent=65537, key_size=2048, backend=default_backend()
     )
 
 
 @pytest.fixture(scope="session")
-def key_pair(private_key) -> KeyPair:
+def key_pair(private_key: rsa.RSAPrivateKey) -> KeyPair:
     public_key = private_key.public_key()
 
     return KeyPair(private_key=private_key, public_key=public_key)
 
 
 @pytest.fixture(scope="session")
-def key_pair_str(private_key) -> KeyPairStr:
+def key_pair_str(private_key: rsa.RSAPrivateKey) -> KeyPairStr:
     # Generate the public key
     public_key = private_key.public_key()
 
@@ -65,13 +66,17 @@ def key_pair_str(private_key) -> KeyPairStr:
 
 
 @pytest.fixture(scope="session")
-def valid_claims():
+def valid_claims() -> dict[str, object]:
     return {
         "sub": "1",
         "iss": "XXXX",
         "jti": uuid.uuid4().hex,
-        "iat": int(datetime.datetime.now().timestamp()),  # issued at
-        "exp": int((datetime.datetime.now() + datetime.timedelta(days=1)).timestamp()),
+        "iat": int(datetime.datetime.now(datetime.UTC).timestamp()),  # issued at
+        "exp": int(
+            (
+                datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1)
+            ).timestamp()
+        ),
         "preferred_username": "farter",
         "client_id": "XXXX",
         "scope": "openid profile email read",
@@ -85,7 +90,7 @@ def valid_claims():
 
 
 @pytest.fixture(scope="session")
-def valid_jwt(valid_claims, key_pair_str: KeyPairStr):
+def valid_jwt(valid_claims: dict[str, object], key_pair_str: KeyPairStr) -> str:
 
     key = RSAKey.import_key(key_pair_str.private_key)
 
@@ -98,7 +103,7 @@ def valid_jwt(valid_claims, key_pair_str: KeyPairStr):
 
 
 @pytest.fixture(scope="session")
-def valid_settings(key_pair_str: KeyPairStr):
+def valid_settings(key_pair_str: KeyPairStr) -> AuthentikateSettings:
 
     key = RSAKey.import_key(key_pair_str.public_key)
 
@@ -118,7 +123,7 @@ def valid_settings(key_pair_str: KeyPairStr):
 
 
 @pytest.fixture(scope="session")
-def valid_rsa_key(key_pair_str: KeyPairStr):
+def valid_rsa_key(key_pair_str: KeyPairStr) -> AuthentikateSettings:
 
     return AuthentikateSettings(
         audience="test-service",
@@ -132,19 +137,19 @@ def valid_rsa_key(key_pair_str: KeyPairStr):
 
 
 @pytest.fixture(scope="session")
-def valid_decode_key(key_pair_str: KeyPairStr):
+def valid_decode_key(key_pair_str: KeyPairStr) -> RSAKey:
     return RSAKey.import_key(key_pair_str.public_key)
 
 
 @pytest.fixture(scope="session")
-def valid_auth_headers(valid_jwt):
+def valid_auth_headers(valid_jwt: str) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {valid_jwt}",
     }
 
 
 @pytest.fixture(autouse=True)
-def reset_authentikate_settings_cache():
+def reset_authentikate_settings_cache() -> Iterator[None]:
     """Give every test a fresh parse of ``settings.AUTHENTIKATE``.
 
     ``get_settings()`` memoises into a module global, while several tests mutate

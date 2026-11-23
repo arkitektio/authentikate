@@ -3,9 +3,10 @@ import asyncio
 from authentikate.base_models import AuthentikateSettings, StaticToken
 from authentikate.models import User
 from authentikate.utils import authenticate_header
+from tests.conftest import KeyPairStr
 
 
-def test_static_token(db, key_pair_str):
+def test_static_token(db: None, key_pair_str: KeyPairStr) -> None:
     static_sub = "static-user"
     static_iss = "static-issuer"
 

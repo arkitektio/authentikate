@@ -12,7 +12,6 @@ This must stay byte-for-byte identical to the issuer side (Rekuest's
 
 import hashlib
 import json
-from typing import Any
 
 from authentikate.errors import UnsupportedCanonicalizationError
 
@@ -20,7 +19,7 @@ CANONICALIZATION_VERSION = "sha256-canonical-v1"
 """The current canonicalization version, mirrored into the token's ``aha`` claim."""
 
 
-def canonicalize_v1(args: Any) -> bytes:
+def canonicalize_v1(args: object) -> bytes:
     """Canonicalize args under v1.
 
     v1: ``json.dumps`` with sorted keys and no insignificant whitespace,
@@ -31,7 +30,7 @@ def canonicalize_v1(args: Any) -> bytes:
     ).encode("utf-8")
 
 
-def args_hash(args: Any, version: str = CANONICALIZATION_VERSION) -> str:
+def args_hash(args: object, version: str = CANONICALIZATION_VERSION) -> str:
     """Compute the hex SHA-256 of the canonicalized args for ``version``.
 
     Raises

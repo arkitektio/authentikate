@@ -13,6 +13,7 @@ from joserfc.jwk import RSAKey
 from authentikate.base_models import AuthentikateSettings
 from authentikate.decode import adecode_token, decode_token
 from authentikate.errors import InvalidJwtTokenError
+from tests.conftest import KeyPairStr
 
 ISS = "https://idp.example"
 HUB = "0192f3c4-7a2b-7c1d-9e8f-1a2b3c4d5e6f"
@@ -47,14 +48,16 @@ def _token(private_key: str, hub: str | None) -> str:
     )
 
 
-def test_a_token_for_this_hubs_service_is_accepted(key_pair_str) -> None:
+def test_a_token_for_this_hubs_service_is_accepted(key_pair_str: KeyPairStr) -> None:
     token = decode_token(
         _token(key_pair_str.private_key, HUB), _settings(key_pair_str.public_key, HUB)
     )
     assert token.hub == HUB
 
 
-def test_a_token_for_the_same_service_of_another_hub_is_refused(key_pair_str) -> None:
+def test_a_token_for_the_same_service_of_another_hub_is_refused(
+    key_pair_str: KeyPairStr,
+) -> None:
     with pytest.raises(InvalidJwtTokenError):
         decode_token(
             _token(key_pair_str.private_key, OTHER_HUB),
@@ -63,7 +66,7 @@ def test_a_token_for_the_same_service_of_another_hub_is_refused(key_pair_str) ->
 
 
 def test_a_token_naming_no_hub_is_refused_where_the_service_has_one(
-    key_pair_str,
+    key_pair_str: KeyPairStr,
 ) -> None:
     with pytest.raises(InvalidJwtTokenError):
         decode_token(
@@ -73,7 +76,7 @@ def test_a_token_naming_no_hub_is_refused_where_the_service_has_one(
 
 
 @pytest.mark.asyncio
-async def test_the_async_path_checks_the_hub_too(key_pair_str) -> None:
+async def test_the_async_path_checks_the_hub_too(key_pair_str: KeyPairStr) -> None:
     with pytest.raises(InvalidJwtTokenError):
         await adecode_token(
             _token(key_pair_str.private_key, OTHER_HUB),
@@ -81,7 +84,7 @@ async def test_the_async_path_checks_the_hub_too(key_pair_str) -> None:
         )
 
 
-def test_a_service_of_no_hub_does_not_check_it(key_pair_str) -> None:
+def test_a_service_of_no_hub_does_not_check_it(key_pair_str: KeyPairStr) -> None:
     """The coordination server itself belongs to no hub."""
     settings = _settings(key_pair_str.public_key, None)
     assert (

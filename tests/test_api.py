@@ -62,7 +62,7 @@ def test_all_matches_the_export_table() -> None:
 
 def test_unknown_attribute_raises_attribute_error() -> None:
     with pytest.raises(AttributeError, match="has no attribute"):
-        authentikate.does_not_exist
+        _ = authentikate.does_not_exist
 
 
 def test_dir_lists_the_public_names() -> None:

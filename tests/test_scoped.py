@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -18,7 +19,7 @@ COLLABS = {"12": {"5": ["editor"], "9": []}, "13": {"1": ["admin"]}}
 
 
 @pytest.fixture(autouse=True)
-def _no_enforcer():
+def _no_enforcer() -> Iterator[None]:
     """Every test starts in a process that serves no guests."""
     scoped.stop_enforcing()
     yield
@@ -64,7 +65,7 @@ def test_collaborations_are_read_for_one_instance_with_their_roles() -> None:
 @pytest.mark.parametrize(
     "claim", [["5"], {"12": ["5"]}, {"12": {"5": "editor"}}, {"12": {"5": [1]}}]
 )
-def test_a_collabs_claim_of_another_shape_is_refused(claim: Any) -> None:
+def test_a_collabs_claim_of_another_shape_is_refused(claim: object) -> None:
     with pytest.raises(ValueError):
         _token(collabs=claim)
 
@@ -121,7 +122,7 @@ def test_require_full_member() -> None:
 
 
 @pytest.fixture
-def scoped_service(db):
+def scoped_service(db: None) -> Iterator[None]:
     """The test project serving guests on instance 12, with the static tokens below."""
     original = settings.AUTHENTIKATE
     settings.AUTHENTIKATE = copy.deepcopy(original)
@@ -167,38 +168,40 @@ def _reason(answer: dict[str, Any]) -> str | None:
 
 
 @pytest.mark.asyncio
-async def test_a_guest_reads_their_collabs_here(scoped_service) -> None:
+async def test_a_guest_reads_their_collabs_here(scoped_service: None) -> None:
     answer = await _run("scoped", "query { collabs }")
     assert answer["data"]["collabs"] == ["5:editor", "9:"]
 
 
 @pytest.mark.asyncio
-async def test_a_scoped_member_may_query(scoped_service) -> None:
+async def test_a_scoped_member_may_query(scoped_service: None) -> None:
     answer = await _run("scoped", "query { me { sub } }")
     assert answer["data"]["me"]["sub"] == "guest"
 
 
 @pytest.mark.asyncio
-async def test_a_scoped_member_may_not_mutate(scoped_service) -> None:
+async def test_a_scoped_member_may_not_mutate(scoped_service: None) -> None:
     answer = await _run("scoped", "mutation { requireRead }")
     assert _reason(answer) == "SCOPED_READ_ONLY"
     assert answer.get("data") is None
 
 
 @pytest.mark.asyncio
-async def test_the_same_mutation_passes_for_a_full_member(scoped_service) -> None:
+async def test_the_same_mutation_passes_for_a_full_member(scoped_service: None) -> None:
     answer = await _run("full", "mutation { requireRead }")
     assert answer["data"]["requireRead"] == "User"
 
 
 @pytest.mark.asyncio
-async def test_an_opted_in_mutation_passes(scoped_service) -> None:
+async def test_an_opted_in_mutation_passes(scoped_service: None) -> None:
     answer = await _run("scoped", "mutation { presign __typename }")
     assert answer["data"]["presign"] == "signed"
 
 
 @pytest.mark.asyncio
-async def test_opting_in_is_per_root_field_through_fragments(scoped_service) -> None:
+async def test_opting_in_is_per_root_field_through_fragments(
+    scoped_service: None,
+) -> None:
     mixed = await _run("scoped", "mutation { presign requireRead }")
     assert _reason(mixed) == "SCOPED_READ_ONLY"
     spread = await _run(
@@ -209,7 +212,7 @@ async def test_opting_in_is_per_root_field_through_fragments(scoped_service) -> 
 
 
 @pytest.mark.asyncio
-async def test_a_named_operation_is_judged_by_itself(scoped_service) -> None:
+async def test_a_named_operation_is_judged_by_itself(scoped_service: None) -> None:
     client = GraphQLHttpTestClient(
         application=application, headers={"Authorization": "Bearer scoped"}
     )
@@ -221,7 +224,7 @@ async def test_a_named_operation_is_judged_by_itself(scoped_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_role_field_requires_full_membership(scoped_service) -> None:
+async def test_a_role_field_requires_full_membership(scoped_service: None) -> None:
     settings.AUTHENTIKATE["SCOPED_TOKENS"] = (
         "self"  # no write gate: the field's own check answers
     )
@@ -230,7 +233,7 @@ async def test_a_role_field_requires_full_membership(scoped_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_under_self_the_service_decides(scoped_service) -> None:
+async def test_under_self_the_service_decides(scoped_service: None) -> None:
     settings.AUTHENTIKATE["SCOPED_TOKENS"] = "self"
     answer = await _run("scoped", "mutation { requireRead }")
     assert answer["data"]["requireRead"] == "User"
@@ -272,7 +275,7 @@ async def _subscribe(token: str, query: str) -> list[dict[str, Any]]:
 
 
 @pytest.mark.asyncio
-async def test_a_scoped_member_may_not_subscribe(scoped_service) -> None:
+async def test_a_scoped_member_may_not_subscribe(scoped_service: None) -> None:
     frames = await _subscribe("scoped", "subscription { yieldUser { sub } }")
     assert "SCOPED_READ_ONLY" in json_of(frames)
     assert '"guest"' not in json_of(frames)
@@ -280,7 +283,7 @@ async def test_a_scoped_member_may_not_subscribe(scoped_service) -> None:
 
 @pytest.mark.asyncio
 async def test_no_subscription_is_open_to_a_scoped_member(
-    scoped_service, monkeypatch
+    scoped_service: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Even one whose every root field claims to opt in.
     monkeypatch.setattr(
@@ -303,7 +306,7 @@ def test_a_subscription_field_cannot_opt_in() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_full_member_may_subscribe(scoped_service) -> None:
+async def test_a_full_member_may_subscribe(scoped_service: None) -> None:
     frames = await _subscribe("full", "subscription { yieldUser { sub } }")
     assert '"member"' in json_of(frames)
 
@@ -315,14 +318,14 @@ def json_of(frames: list[dict[str, Any]]) -> str:
 
 
 @pytest.mark.asyncio
-async def test_full_members_only_view(scoped_service) -> None:
-    from django.http import HttpResponse
+async def test_full_members_only_view(scoped_service: None) -> None:
+    from django.http import HttpRequest, HttpResponse
     from django.test import RequestFactory
 
     from authentikate.vars import get_token
 
     @scoped.full_members_only
-    def upload(request: Any) -> HttpResponse:
+    def upload(request: HttpRequest) -> HttpResponse:
         token = get_token()
         return HttpResponse(token.sub if token else "")
 
@@ -337,7 +340,9 @@ async def test_full_members_only_view(scoped_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_role_a_collaboration_holds_opens_the_field(scoped_service) -> None:
+async def test_a_role_a_collaboration_holds_opens_the_field(
+    scoped_service: None,
+) -> None:
     answer = await _run("scoped", "mutation { annotate }")
     assert (
         answer["data"]["annotate"] == "annotated"
@@ -346,14 +351,14 @@ async def test_a_role_a_collaboration_holds_opens_the_field(scoped_service) -> N
 
 @pytest.mark.asyncio
 async def test_a_role_held_only_in_another_instances_collaboration_does_not(
-    scoped_service,
+    scoped_service: None,
 ) -> None:
     answer = await _run("viewer", "mutation { annotate }")
     assert _reason(answer) == "INSUFFICIENT_ROLE"
 
 
 @pytest.mark.asyncio
-async def test_a_member_still_needs_the_role(scoped_service) -> None:
+async def test_a_member_still_needs_the_role(scoped_service: None) -> None:
     assert _reason(await _run("full", "mutation { annotate }")) == "INSUFFICIENT_ROLE"
     assert (await _run("editor", "mutation { annotate }"))["data"][
         "annotate"
@@ -380,7 +385,7 @@ def test_the_schema_says_who_may() -> None:
 
 @pytest.mark.asyncio
 async def test_a_resolvers_refusal_reaches_the_client_with_its_code(
-    scoped_service,
+    scoped_service: None,
 ) -> None:
     answer = await _run("scoped", "mutation { refuse }")
     (error,) = answer["errors"]
