@@ -36,7 +36,7 @@ from typing import Any, Literal
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 
-from authentikate.base_models import ANY_AUDIENCE, AuthentikateSettings, JWTToken
+from authentikate.base_models import AuthentikateSettings, JWTToken
 from authentikate.errors import FullMembershipRequired, ScopedTokenUnsupported
 
 ScopedMode = Literal["enforce", "reject", "self"]
@@ -63,12 +63,6 @@ def is_enforced() -> bool:
     return bool(_enforced)
 
 
-def current_instance(settings: AuthentikateSettings) -> str | None:
-    """This service instance, whose entry of a guest's ``collabs`` it reads: its ``audience``,
-    unless that is ``*`` (any audience names no instance)."""
-    return settings.audience if settings.audience != ANY_AUDIENCE else None
-
-
 def scoped_mode(settings: AuthentikateSettings) -> ScopedMode:
     """``SCOPED_TOKENS`` with ``auto`` resolved: enforce where narrowed, reject elsewhere."""
     if settings.scoped_tokens == "auto":
@@ -83,10 +77,6 @@ def check_scoped_token(token: JWTToken, settings: AuthentikateSettings) -> None:
     mode = scoped_mode(settings)
     if mode == "reject":
         raise ScopedTokenUnsupported("This service does not serve scoped members")
-    if mode == "enforce" and current_instance(settings) is None:
-        raise ScopedTokenUnsupported(
-            "This service serves guests but its audience names no instance (it is *)"
-        )
 
 
 def require_full_member(token: JWTToken | None = None) -> JWTToken:
@@ -142,7 +132,6 @@ def full_members_only(view: Callable[..., Any]) -> Callable[..., Any]:
 __all__ = [
     "ScopedMode",
     "check_scoped_token",
-    "current_instance",
     "enforce_scoped",
     "full_members_only",
     "is_enforced",

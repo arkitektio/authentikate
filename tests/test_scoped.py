@@ -1,4 +1,4 @@
-"""Guests: a token with a ``collabs`` claim, granted a few collaborations of a service instance only."""
+"""Guests: a token with a ``collabs`` claim, granted a few collaborations of the hub only."""
 
 import asyncio
 import copy
@@ -15,7 +15,7 @@ from authentikate.errors import FullMembershipRequired, ScopedTokenUnsupported
 from authentikate.utils import authenticate_token
 from test_project.asgi import application
 
-COLLABS = {"12": {"5": ["editor"], "9": []}, "13": {"1": ["admin"]}}
+COLLABS = {"5": ["editor"], "9": []}
 
 
 @pytest.fixture(autouse=True)
@@ -46,24 +46,27 @@ def _settings(**options: Any) -> AuthentikateSettings:
 
 def test_a_token_without_collabs_is_a_full_member() -> None:
     assert not StaticToken(sub="member").is_scoped
-    assert StaticToken(sub="member").collabs_here("12") == {}
+    assert StaticToken(sub="member").collab_roles() == {}
 
 
 def test_empty_collabs_grant_nothing() -> None:
     token = _token(collabs={})
     assert token.is_scoped
-    assert token.collabs_here("12") == {}
+    assert token.collab_roles() == {}
 
 
-def test_collaborations_are_read_for_one_instance_with_their_roles() -> None:
+def test_collaborations_are_read_with_their_roles() -> None:
     token = _token(collabs=COLLABS)
-    assert token.collabs_here("12") == {"5": ("editor",), "9": ()}
-    assert token.collabs_here("14") == {}
-    assert token.collabs_here(None) == {}
+    assert token.collab_roles() == {"5": ("editor",), "9": ()}
+
+
+def test_the_old_per_instance_shape_is_refused() -> None:
+    with pytest.raises(ValueError, match="collaboration keys"):
+        _token(collabs={"12": {"5": ["editor"]}})
 
 
 @pytest.mark.parametrize(
-    "claim", [["5"], {"12": ["5"]}, {"12": {"5": "editor"}}, {"12": {"5": [1]}}]
+    "claim", [["5"], {"5": "editor"}, {"5": [1]}, {"12": {"5": ["editor"]}}]
 )
 def test_a_collabs_claim_of_another_shape_is_refused(claim: object) -> None:
     with pytest.raises(ValueError):
@@ -79,18 +82,10 @@ def test_a_guest_is_rejected_where_no_collaboration_holds_reads() -> None:
     assert asyncio.run(authenticate_token("full", _settings())).sub == "member"
 
 
-def test_a_guest_is_accepted_where_held_and_the_audience_names_the_instance() -> None:
+def test_a_guest_is_accepted_where_held() -> None:
     scoped.enforce_scoped()
     assert asyncio.run(authenticate_token("scoped", _settings(audience="12"))).is_scoped
-    assert scoped.current_instance(_settings(audience="12")) == "12"
-    assert scoped.current_instance(_settings()) is None  # `*` names no instance
-
-
-def test_held_without_an_instance_is_rejected() -> None:
-    scoped.enforce_scoped()
-    with pytest.raises(ScopedTokenUnsupported):
-        asyncio.run(authenticate_token("scoped", _settings()))
-    assert asyncio.run(authenticate_token("full", _settings())).sub == "member"
+    assert asyncio.run(authenticate_token("scoped", _settings())).is_scoped
 
 
 def test_reject_rejects_even_where_held() -> None:
@@ -139,7 +134,7 @@ def scoped_service(db: None) -> Iterator[None]:
             "sub": "guest",
             "iss": "lok",
             "roles": [],
-            "collabs": {"12": {"9": []}, "13": {"1": ["editor"]}},
+            "collabs": {"9": []},
             "scope": "read write",
         },
         "full": {"sub": "member", "iss": "lok", "scope": "read write"},
@@ -350,7 +345,7 @@ async def test_a_role_a_collaboration_holds_opens_the_field(
 
 
 @pytest.mark.asyncio
-async def test_a_role_held_only_in_another_instances_collaboration_does_not(
+async def test_a_view_only_collaboration_does_not(
     scoped_service: None,
 ) -> None:
     answer = await _run("viewer", "mutation { annotate }")

@@ -229,11 +229,8 @@ class _AuthChecks:
 
     def _a_collaboration_holds(self, token: JWTToken) -> bool:
         """Whether one of the guest's collaborations here holds every role this field requires."""
-        from authentikate.scoped import current_instance
-        from authentikate.settings import get_settings
-
         every = set(self.roles or ()) | set(self.org_roles or ())
-        for roles in token.collabs_here(current_instance(get_settings())).values():
+        for roles in token.collab_roles().values():
             held = set(roles)
             if not every <= held:
                 continue

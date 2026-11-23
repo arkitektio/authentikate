@@ -151,10 +151,10 @@ class Query:
 ### Guests (collaborations)
 
 A guest of an organization was granted a few *collaborations* of its services, and nothing
-else. Their token says which, by service instance, with the roles they hold in each:
+else. Their token says which, by collaboration key, with the roles they hold in each:
 
 ```json
-{"org": "12", "roles": [], "collabs": {"12": {"5": ["editor"], "9": []}}}
+{"org": "12", "roles": [], "collabs": {"5": ["editor"], "9": []}}
 ```
 
 A guest holds a collaboration's roles only inside that collaboration: `editor` in collaboration 5 lets
@@ -164,18 +164,19 @@ decides whether such a token is served at all, and checks a field's roles agains
 the guest's collaborations. The issuer caps a guest's roles to those of whoever granted
 the collaboration, so a guest never holds more than that person.
 
-`token.is_scoped` tells guests from full members, and `token.collabs_here(instance)`
-lists the collaborations granted on one service instance with their roles.
+A collaboration is lok's and named by one key across the hub: every service of the
+organization reads the same `collabs` entry, and shows what it put in that collaboration.
+
+`token.is_scoped` tells guests from full members, and `token.collab_roles()` lists the
+collaborations granted with their roles.
 
 ```python
 AUTHENTIKATE = {
     ...,
-    "AUDIENCE": "12",         # this service instance: tokens must name it, and its entry of `collabs` is read
+    "AUDIENCE": "mikro",      # this service: tokens must name it
     "SCOPED_TOKENS": "auto",  # auto | reject | self
 }
 ```
-
-A service whose audience is `*` names no instance, so it serves no guests.
 
 - `auto` (the default) rejects a guest's token (`SCOPED_TOKEN_UNSUPPORTED`) unless
   something in the process holds reads to the guest's collaborations and has said so with

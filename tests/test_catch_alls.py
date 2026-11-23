@@ -34,7 +34,7 @@ def service(transactional_db: None) -> Iterator[None]:
             "sub": "guest",
             "iss": "lok",
             "roles": ["boss"],
-            "collabs": {"12": {"5": ["boss"]}},
+            "collabs": {"5": ["boss"]},
             "scope": "openid",
         },
     }

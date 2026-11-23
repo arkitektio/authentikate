@@ -164,35 +164,33 @@ class JWTToken(BaseModel):
     An audience names a service only within its hub (``mikro``); a service that
     knows its hub (``AUTHENTIKATE.HUB``) accepts only tokens minted for it.
     """
-    collabs: dict[str, dict[str, list[str]]] | None = None
-    """The collaborations a guest was granted, by service instance, with their roles there:
-    ``{"12": {"5": ["editor"], "9": []}}``.
+    collabs: dict[str, list[str]] | None = None
+    """The collaborations a guest was granted, by their key, with the roles held in each:
+    ``{"0b4e…": ["editor"], "9f12…": []}``.
+
+    A collaboration is lok's, one key for the whole hub: every service of the
+    organization reads the same entry, and holds there what it put in that collaboration.
 
     Absent (None) for a full member, who acts for the whole organization. Present
     -- even empty -- for a guest, who may see only what is in these collaborations, and
-    holds each collaboration's roles only inside it (``[]``: view only). No entry for an
-    instance grants nothing there; it never means "everything".
+    holds each collaboration's roles only inside it (``[]``: view only). An empty claim
+    grants nothing; it never means "everything".
     """
 
     @field_validator("collabs", mode="before")
     @classmethod
-    def collabs_are_roles_by_collaboration_by_instance(cls, v: object) -> object:
+    def collabs_are_roles_by_collaboration(cls, v: object) -> object:
         """Refuse a ``collabs`` claim of any other shape: it would grant who knows what."""
         if v is None:
             return v
         if not isinstance(v, dict) or not all(
-            isinstance(instance, str)
-            and isinstance(collaborations, dict)
-            and all(
-                isinstance(collaboration, str)
-                and isinstance(roles, list)
-                and all(isinstance(r, str) for r in roles)
-                for collaboration, roles in collaborations.items()
-            )
-            for instance, collaborations in v.items()
+            isinstance(collaboration, str)
+            and isinstance(roles, list)
+            and all(isinstance(r, str) for r in roles)
+            for collaboration, roles in v.items()
         ):
             raise ValueError(
-                "collaborations must map service instances to collaborations to lists of roles"
+                "collaborations must map collaboration keys to lists of roles"
             )
         return v
 
@@ -268,18 +266,14 @@ class JWTToken(BaseModel):
         """Whether the token is a guest's: granted some collaborations, not the organization."""
         return self.collabs is not None
 
-    def collabs_here(self, instance: str | None) -> dict[str, tuple[str, ...]]:
-        """The collaborations granted on the service ``instance``, each with the roles held in it.
+    def collab_roles(self) -> dict[str, tuple[str, ...]]:
+        """The collaborations granted, by key, each with the roles held in it.
 
         Empty for a full member too: ask :attr:`is_scoped` first.
         """
-        if instance is None:
-            return {}
         return {
             collaboration: tuple(roles)
-            for collaboration, roles in (self.collabs or {})
-            .get(str(instance), {})
-            .items()
+            for collaboration, roles in (self.collabs or {}).items()
         }
 
     @property

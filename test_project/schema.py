@@ -48,13 +48,11 @@ class Query:
 
     @kante.django_field
     def collabs(self, info: Info) -> list[str]:
-        """The collaborations the request's token grants here, as ``<collaboration>:<role>,<role>``."""
-        from authentikate.scoped import current_instance
-        from authentikate.settings import get_settings
+        """The collaborations the request's token grants, as ``<collaboration>:<role>,<role>``."""
         from authentikate.vars import get_token
 
         token = get_token()
-        here = token.collabs_here(current_instance(get_settings())) if token else {}
+        here = token.collab_roles() if token else {}
         return [
             f"{collaboration}:{','.join(roles)}"
             for collaboration, roles in sorted(here.items())
