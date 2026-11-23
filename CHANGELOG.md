@@ -1,6 +1,71 @@
 # CHANGELOG
 
 
+## v6.1.1 (2026-11-23)
+
+### Bug Fixes
+
+- Every argument and return annotated, no Any; DTZ, bugbear and logging findings fixed
+  ([`6f080b1`](https://github.com/arkitektio/authentikate/commit/6f080b1a6a15b6d5042e5f91966920dd374f16cf))
+
+The rest of the arkitekt standard by hand. The package was nearly clean under its old config (which
+  ignored ANN401 and left the tests out); now: - Parameters that took Any take `object` (widening,
+  so every caller still type-checks): the args of canonicalize_v1 / args_hash / verify_args /
+  ProvenanceToken.verify_args, the revocation payload, the collabs validator's input, the auth
+  extensions' resolver source; the lazy module __getattr__ returns `object` (the exported names are
+  declared under TYPE_CHECKING, so their types are unchanged); full_members_only's wrapper takes an
+  HttpRequest and returns an HttpResponseBase. - The two re-raises inside except blocks chain to the
+  caught error; the authentication-failure log passes the exception itself as exc_info. - The tests
+  (now linted) are annotated with their fixtures' real types; the SimpleNamespace stand-ins for Info
+  are cast to the Info they stand in for; token timestamps come from an aware now() (same epoch
+  seconds). kraph's type check against this authentikate is unchanged (0 beyond its baseline). No
+  behaviour change: the suite passes as before (292) and the test project's SDL is byte-identical.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Code Style
+
+- Adopt the arkitekt Python standard (ruff format, safe fixes)
+  ([`a4c20a7`](https://github.com/arkitektio/authentikate/commit/a4c20a777df2608ae52735860badcd4d62c4e997))
+
+ruff.shared.toml / pyright.shared.json synced from arkitektio/.github; the repo's own settings move
+  to ruff.toml / pyrightconfig.json (migrations excluded; the tests and the test project are now
+  linted and type-checked too; the documented reportIncompatibleVariableOverride exemption for
+  pydantic discriminators carries over); ruff and basedpyright pinned in the dev group, which takes
+  over the deprecated tool.uv.dev-dependencies; the old [tool.ruff] / [tool.basedpyright] sections
+  go, and the repo's own quality.yaml becomes one call to the shared python-quality workflow. The
+  code is reformatted (line length 88, as Black) and ruff's safe fixes applied (import order, unused
+  imports in the tests, datetime.UTC). No behaviour change: the suite passes as before (292) and the
+  test project's SDL is byte-identical.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_011cg5eFTPpZkvu6HSjH3Bwp
+
+### Continuous Integration
+
+- The shared quality workflow, required, with a type-check baseline
+  ([`0c689de`](https://github.com/arkitektio/authentikate/commit/0c689def5e37e835ce778a27a464b0fc5bfebeec))
+
+.basedpyright/baseline.json holds the 141 errors the repo had when it adopted the standard, tests
+  included (written with Python 3.12, as CI runs it): CI fails on any other. .git-blame-ignore-revs
+  lists the formatting-only commit.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Refactoring
+
+- Adopt Python 3.11 typing (X | None, builtin generics, collections.abc)
+  ([`abe7167`](https://github.com/arkitektio/authentikate/commit/abe716784aad7f21b48f425117935dd5d46d8b36))
+
+Rewrite Optional[X]/Union[A, B] to X | None / A | B, List/Dict/Tuple/Type/Set to builtins,
+  typing.Callable & co. to collections.abc, and other pyupgrade rewrites for the >=3.11 floor.
+  Enforce it with ruff's UP rules (UP037, UP038 and UP042 ignored; generated api/schema.py keeps
+  typing imports).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v6.1.0 (2026-10-28)
 
 ### Chores
