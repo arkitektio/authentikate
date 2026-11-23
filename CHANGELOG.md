@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v7.0.0 (2026-11-23)
+
+### Features
+
+- A guest's collabs name lok's collaboration keys, one across the hub
+  ([`7fbc136`](https://github.com/arkitektio/authentikate/commit/7fbc1361a9d7bdfd97063405da7425aa8685659b))
+
+The collabs claim is {key: [roles]} instead of {instance: {id: [roles]}}: a collaboration is lok's
+  and every service of the organization reads the same entry. token.collab_roles() replaces
+  token.collabs_here(instance); a service serving guests no longer needs its audience to name an
+  instance.
+
+BREAKING CHANGE: JWTToken.collabs is dict[str, list[str]] (collaboration key to roles);
+  collabs_here(instance) and authentikate.scoped.current_instance are gone. A token with the old
+  per-instance shape is refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- Jwttoken.collabs is dict[str, list[str]] (collaboration key to roles); collabs_here(instance) and
+  authentikate.scoped.current_instance are gone. A token with the old per-instance shape is refused.
+
+
 ## v6.1.1 (2026-11-23)
 
 ### Bug Fixes
